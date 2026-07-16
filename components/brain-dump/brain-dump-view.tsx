@@ -42,7 +42,7 @@ type OptimisticAction =
   | { type: "content"; id: string; content: string }
   | { type: "remove"; id: string };
 
-export function BrainDumpView({ items }: { items: BrainDumpItemRow[] }) {
+export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; timeZone?: string }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("inbox");
   const [draft, setDraft] = useState("");
@@ -205,6 +205,7 @@ export function BrainDumpView({ items }: { items: BrainDumpItemRow[] }) {
                 <BrainDumpItem
                   item={item}
                   busy={busyId === item.id}
+                  timeZone={timeZone}
                   onConvert={convert}
                   onArchive={(id) => act(id, { type: "status", id, status: "archived" }, () => archiveBrainDumpItemAction(id))}
                   onRestore={(id) => act(id, { type: "status", id, status: "inbox" }, () => restoreBrainDumpItemAction(id))}

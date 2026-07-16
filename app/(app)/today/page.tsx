@@ -28,6 +28,7 @@ export default async function TodayPage() {
       greetingPart={zonedPartOfDay(now, timeZone)}
       dateLabel={formatManilaLongDate(today) ?? ""}
       today={today}
+      timeZone={timeZone}
       tasks={tasks}
       goals={goals}
       priorities={priorities}

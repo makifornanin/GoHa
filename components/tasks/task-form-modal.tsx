@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { instantToManilaDateTimeInput } from "@/lib/date";
+import { instantToZonedDateTimeInput, MANILA_TZ } from "@/lib/date";
 import {
   TASK_DESCRIPTION_MAX,
   TASK_PRIORITY_ORDER,
@@ -20,7 +20,7 @@ import {
   taskStatusConfig,
 } from "@/lib/tasks";
 import {
-  taskFormSchema,
+  makeTaskFormSchema,
   toTaskFieldErrors,
   type TaskFieldErrors,
   type TaskFormInput,
@@ -52,6 +52,8 @@ type FormProps = {
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
+  /** The user's saved timezone: due-at wall-clock times are shown/read in it. */
+  timeZone?: string;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
   onClose: () => void;
   titleRef: React.RefObject<HTMLInputElement | null>;
@@ -63,6 +65,7 @@ function TaskFormFields({
   goals,
   lifeAreas,
   defaultScheduledFor,
+  timeZone = MANILA_TZ,
   onSubmit,
   onClose,
   titleRef,
@@ -76,7 +79,7 @@ function TaskFormFields({
   const [scheduledFor, setScheduledFor] = useState(
     () => task?.scheduledFor ?? defaultScheduledFor ?? "",
   );
-  const [dueAt, setDueAt] = useState(() => instantToManilaDateTimeInput(task?.dueAt));
+  const [dueAt, setDueAt] = useState(() => instantToZonedDateTimeInput(task?.dueAt, timeZone));
 
   const [fieldErrors, setFieldErrors] = useState<TaskFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -91,7 +94,7 @@ function TaskFormFields({
     setFormError(null);
 
     const input = values();
-    const parsed = taskFormSchema.safeParse(input);
+    const parsed = makeTaskFormSchema(timeZone).safeParse(input);
     if (!parsed.success) {
       setFieldErrors(toTaskFieldErrors(parsed.error));
       return;
@@ -271,6 +274,7 @@ export function TaskFormModal({
   goals,
   lifeAreas,
   defaultScheduledFor,
+  timeZone,
   onSubmit,
   onClose,
 }: {
@@ -280,6 +284,7 @@ export function TaskFormModal({
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
+  timeZone?: string;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
   onClose: () => void;
 }) {
@@ -302,6 +307,7 @@ export function TaskFormModal({
         goals={goals}
         lifeAreas={lifeAreas}
         defaultScheduledFor={defaultScheduledFor}
+        timeZone={timeZone}
         onSubmit={onSubmit}
         onClose={onClose}
         titleRef={titleRef}

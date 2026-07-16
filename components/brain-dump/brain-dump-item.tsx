@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { BrainDumpItem as BrainDumpItemRow } from "@/db";
 import type { ConvertTarget } from "@/db/repositories/brain-dump";
 import { BRAIN_DUMP_CONTENT_MAX, convertTargetConfig } from "@/lib/brain-dump";
-import { formatManilaDateTimeMedium } from "@/lib/date";
+import { formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const CONVERT_ACTIONS: { target: ConvertTarget; icon: LucideIcon }[] = [
@@ -60,6 +60,7 @@ function ActionButton({
 export function BrainDumpItem({
   item,
   busy,
+  timeZone = MANILA_TZ,
   onConvert,
   onArchive,
   onRestore,
@@ -68,6 +69,7 @@ export function BrainDumpItem({
 }: {
   item: BrainDumpItemRow;
   busy: boolean;
+  timeZone?: string;
   onConvert: (id: string, target: ConvertTarget) => void;
   onArchive: (id: string) => void;
   onRestore: (id: string) => void;
@@ -165,7 +167,7 @@ export function BrainDumpItem({
         </div>
       ) : null}
 
-      <p className="tabular mt-2 font-mono text-mono-sm text-outline">{formatManilaDateTimeMedium(item.createdAt)}</p>
+      <p className="tabular mt-2 font-mono text-mono-sm text-outline">{formatZonedDateTimeMedium(item.createdAt, timeZone)}</p>
     </article>
   );
 }

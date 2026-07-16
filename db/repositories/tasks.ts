@@ -1,8 +1,7 @@
 import "server-only";
 
-import { and, asc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
-import { manilaBucketRange, type DateBucket, type Weekday } from "@/lib/date";
 import { db } from "../client";
 import { tasks } from "../schema";
 import type { Priority, TaskStatus } from "../schema";
@@ -34,73 +33,6 @@ export async function listTasksForUser(userId: string): Promise<Task[]> {
     .from(tasks)
     .where(eq(tasks.userId, userId))
     .orderBy(asc(tasks.sortOrder), asc(tasks.scheduledFor), asc(tasks.createdAt));
-}
-
-export type TaskListFilter = {
-  status?: TaskStatus;
-  goalId?: string | null;
-  lifeAreaId?: string | null;
-  includeCompleted?: boolean;
-};
-
-export async function listTasks(userId: string, filter: TaskListFilter = {}): Promise<Task[]> {
-  const filters = [eq(tasks.userId, userId)];
-  if (filter.status) filters.push(eq(tasks.status, filter.status));
-  if (!filter.status && !filter.includeCompleted) filters.push(ne(tasks.status, "completed"));
-  if (filter.goalId !== undefined) {
-    filters.push(filter.goalId === null ? isNull(tasks.goalId) : eq(tasks.goalId, filter.goalId));
-  }
-  if (filter.lifeAreaId !== undefined) {
-    filters.push(
-      filter.lifeAreaId === null ? isNull(tasks.lifeAreaId) : eq(tasks.lifeAreaId, filter.lifeAreaId),
-    );
-  }
-  return db
-    .select()
-    .from(tasks)
-    .where(and(...filters))
-    .orderBy(asc(tasks.sortOrder), asc(tasks.scheduledFor), asc(tasks.createdAt));
-}
-
-/**
- * Tasks scheduled within a date-derived bucket (Today/Week/Month/Quarter/Year),
- * computed in Asia/Manila. Completed tasks are excluded by default. (Used by the
- * Today dashboard; the Tasks page filters client-side.)
- */
-export async function listTasksForBucket(
-  userId: string,
-  bucket: DateBucket,
-  options: { now?: Date; weekStartsOn?: Weekday; includeCompleted?: boolean } = {},
-): Promise<Task[]> {
-  const range = manilaBucketRange(bucket, options.now, options.weekStartsOn);
-  const filters = [
-    eq(tasks.userId, userId),
-    gte(tasks.scheduledFor, range.start),
-    lt(tasks.scheduledFor, range.endExclusive),
-  ];
-  if (!options.includeCompleted) filters.push(ne(tasks.status, "completed"));
-  return db
-    .select()
-    .from(tasks)
-    .where(and(...filters))
-    .orderBy(asc(tasks.scheduledFor), asc(tasks.sortOrder), asc(tasks.createdAt));
-}
-
-/** Inbox: unscheduled, active tasks (no scheduledFor and no dueAt). */
-export async function listInboxTasks(userId: string): Promise<Task[]> {
-  return db
-    .select()
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.userId, userId),
-        isNull(tasks.scheduledFor),
-        isNull(tasks.dueAt),
-        ne(tasks.status, "completed"),
-        ne(tasks.status, "cancelled"),
-      ),
-    )
-    .orderBy(asc(tasks.sortOrder), asc(tasks.createdAt));
 }
 
 export async function getTask(userId: string, id: string): Promise<Task | null> {
@@ -194,19 +126,4 @@ export async function deleteTask(userId: string, id: string): Promise<boolean> {
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .returning({ id: tasks.id });
   return rows.length > 0;
-}
-
-/** Count of completed vs total tasks for a goal, used by derived goal progress. */
-export async function countTasksByGoal(
-  userId: string,
-  goalId: string,
-): Promise<{ total: number; completed: number }> {
-  const [row] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      completed: sql<number>`count(*) filter (where ${tasks.status} = 'completed')::int`,
-    })
-    .from(tasks)
-    .where(and(eq(tasks.userId, userId), eq(tasks.goalId, goalId)));
-  return { total: row?.total ?? 0, completed: row?.completed ?? 0 };
 }

@@ -2,7 +2,7 @@ import { CalendarDays, CheckCircle2, CircleOff, Clock, Flag, Shapes } from "luci
 import type { LucideIcon } from "lucide-react";
 
 import type { FocusSession } from "@/db";
-import { formatManilaDateTimeMedium } from "@/lib/date";
+import { formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
 import { formatDurationHm, type FocusBreakdown } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 
@@ -60,10 +60,12 @@ export function FocusStats({
   stats,
   recent,
   taskTitleById,
+  timeZone = MANILA_TZ,
 }: {
   stats: FocusStatsData;
   recent: FocusSession[];
   taskTitleById: Map<string, string>;
+  timeZone?: string;
 }) {
   const hasBreakdown = stats.byTask.length + stats.byGoal.length + stats.byLifeArea.length > 0;
 
@@ -107,7 +109,7 @@ export function FocusStats({
                       {session.taskId ? taskTitleById.get(session.taskId) ?? "Task" : "Open focus"}
                     </p>
                     <p className="tabular font-mono text-mono-sm text-on-surface-variant">
-                      {formatManilaDateTimeMedium(session.startedAt)}
+                      {formatZonedDateTimeMedium(session.startedAt, timeZone)}
                       {abandoned ? " · abandoned" : ""}
                     </p>
                   </div>

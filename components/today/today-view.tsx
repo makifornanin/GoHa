@@ -26,7 +26,7 @@ import type { DailyPriority, HabitEntry, Task } from "@/db";
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { TaskStatus } from "@/db/schema/enums";
-import { formatIsoDateMedium, formatManilaDateTimeMedium } from "@/lib/date";
+import { formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
 import { deriveTodayHabits } from "@/lib/habit-view";
 import { listEntrance, rowExit } from "@/lib/motion";
 import { taskEffectiveDate } from "@/lib/task-buckets";
@@ -56,6 +56,7 @@ export function TodayView({
   greetingPart,
   dateLabel,
   today,
+  timeZone = MANILA_TZ,
   tasks,
   goals,
   priorities,
@@ -66,6 +67,7 @@ export function TodayView({
   greetingPart: string;
   dateLabel: string;
   today: string;
+  timeZone?: string;
   tasks: Task[];
   goals: GoalWithCounts[];
   priorities: DailyPriority[];
@@ -177,7 +179,7 @@ export function TodayView({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             {/* Main column */}
             <div className="flex flex-col gap-6 md:col-span-8">
-              <FocusCard task={data.focus} onToggle={toggle} />
+              <FocusCard task={data.focus} timeZone={timeZone} onToggle={toggle} />
 
               <TopPriorities
                 priorities={data.priorities}
@@ -233,7 +235,7 @@ export function TodayView({
                                   {task.dueAt ? (
                                     <span className="hidden items-center gap-1 font-mono text-footnote tabular-nums text-label-secondary sm:inline-flex">
                                       <CalendarClock className="size-3.5" aria-hidden />
-                                      {formatManilaDateTimeMedium(task.dueAt)}
+                                      {formatZonedDateTimeMedium(task.dueAt, timeZone)}
                                     </span>
                                   ) : null}
                                   <PriorityChip task={task} />
@@ -346,8 +348,16 @@ export function TodayView({
  * The day's single anchor. A SOLID card (glass is chrome-only); the blue
  * primary action is the one accent moment on the screen.
  */
-function FocusCard({ task, onToggle }: { task: Task | null; onToggle: (task: Task) => void }) {
-  const due = task ? formatManilaDateTimeMedium(task.dueAt) : null;
+function FocusCard({
+  task,
+  timeZone,
+  onToggle,
+}: {
+  task: Task | null;
+  timeZone: string;
+  onToggle: (task: Task) => void;
+}) {
+  const due = task ? formatZonedDateTimeMedium(task.dueAt, timeZone) : null;
 
   return (
     <Card className="p-4 sm:p-5">

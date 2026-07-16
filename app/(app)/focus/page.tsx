@@ -65,6 +65,7 @@ export default async function FocusPage({
       stats={stats}
       recent={recent}
       preselectTaskId={validPreselect}
+      timeZone={timeZone}
     />
   );
 }

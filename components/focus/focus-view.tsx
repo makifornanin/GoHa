@@ -38,6 +38,7 @@ export function FocusView({
   stats,
   recent,
   preselectTaskId,
+  timeZone,
 }: {
   activeSession: FocusSession | null;
   candidateTasks: TaskOption[];
@@ -45,6 +46,7 @@ export function FocusView({
   stats: FocusStatsData;
   recent: FocusSession[];
   preselectTaskId?: string | null;
+  timeZone?: string;
 }) {
   const session = useFocusTimer((s) => s.session);
   const setSession = useFocusTimer((s) => s.setSession);
@@ -73,7 +75,7 @@ export function FocusView({
         />
       )}
 
-      <FocusStats stats={stats} recent={recent} taskTitleById={taskTitleById} />
+      <FocusStats stats={stats} recent={recent} taskTitleById={taskTitleById} timeZone={timeZone} />
     </div>
   );
 }

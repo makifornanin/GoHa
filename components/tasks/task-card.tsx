@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { LifeAreaIcon } from "@/components/life-areas/icon";
 import type { Task } from "@/db";
-import { formatIsoDateMedium, formatManilaDateTimeMedium } from "@/lib/date";
+import { formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
 import { lifeAreaColorConfig, toColorKey } from "@/lib/life-areas";
 import { easeOutExpo, springSnappy } from "@/lib/motion";
 import { taskPriorityConfig, taskStatusConfig } from "@/lib/tasks";
@@ -33,6 +33,7 @@ export function TaskCard({
   task,
   goalTitle,
   lifeArea,
+  timeZone = MANILA_TZ,
   onToggleComplete,
   onEdit,
   onCancel,
@@ -42,6 +43,7 @@ export function TaskCard({
   task: Task;
   goalTitle?: string | null;
   lifeArea?: TaskLifeAreaRef | null;
+  timeZone?: string;
   onToggleComplete: (task: Task) => void;
   onEdit: (task: Task) => void;
   onCancel: (task: Task) => void;
@@ -54,7 +56,7 @@ export function TaskCard({
   const isCancelled = task.status === "cancelled";
   const areaColor = lifeArea ? lifeAreaColorConfig[toColorKey(lifeArea.color)] : null;
   const scheduledLabel = formatIsoDateMedium(task.scheduledFor);
-  const dueLabel = formatManilaDateTimeMedium(task.dueAt);
+  const dueLabel = formatZonedDateTimeMedium(task.dueAt, timeZone);
 
   const [burst, setBurst] = useState(false);
   const prevCompleted = useRef(isCompleted);

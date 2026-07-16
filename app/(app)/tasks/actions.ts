@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { goalsRepo, lifeAreasRepo, tasksRepo, type Task } from "@/db";
 import { requireUser } from "@/lib/session";
+import { getUserDatePrefs } from "@/lib/user-settings";
 import {
   completionNoteSchema,
-  taskFormSchema,
+  makeTaskFormSchema,
   taskIdSchema,
   toTaskFieldErrors,
   type TaskFieldErrors,
@@ -50,7 +51,9 @@ async function validateReferences(
 export async function createTaskAction(input: TaskFormInput): Promise<ActionResult<Task>> {
   const user = await requireUser();
 
-  const parsed = taskFormSchema.safeParse(input);
+  // Due-at wall-clock input is interpreted in the user's saved timezone.
+  const { timeZone } = await getUserDatePrefs(user.id);
+  const parsed = makeTaskFormSchema(timeZone).safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,
@@ -83,7 +86,8 @@ export async function updateTaskAction(
   const idResult = taskIdSchema.safeParse(id);
   if (!idResult.success) return { ok: false, error: "That task could not be found." };
 
-  const parsed = taskFormSchema.safeParse(input);
+  const { timeZone } = await getUserDatePrefs(user.id);
+  const parsed = makeTaskFormSchema(timeZone).safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,

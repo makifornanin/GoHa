@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { manilaLocalToInstant } from "@/lib/date";
+import { MANILA_TZ, zonedLocalToInstant } from "@/lib/date";
 import {
   TASK_COMPLETION_NOTE_MAX,
   TASK_DESCRIPTION_MAX,
@@ -27,46 +27,57 @@ const optionalScheduledFor = z
   .transform((value) => (value && value.length > 0 ? value : null))
   .pipe(z.union([z.iso.date("Enter a valid date."), z.null()]));
 
-/** Optional Manila-local datetime ("YYYY-MM-DDTHH:mm") -> a UTC instant, or null. */
-const optionalDueAt = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : null))
-  .transform((value, ctx): Date | null => {
-    if (value === null) return null;
-    const instant = manilaLocalToInstant(value);
-    if (!instant) {
-      ctx.addIssue({ code: "custom", message: "Enter a valid date and time." });
-      return z.NEVER;
-    }
-    return instant;
-  });
+/** Optional zone-local datetime ("YYYY-MM-DDTHH:mm") -> a UTC instant, or null. */
+function optionalDueAt(timeZone: string) {
+  return z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : null))
+    .transform((value, ctx): Date | null => {
+      if (value === null) return null;
+      const instant = zonedLocalToInstant(value, timeZone);
+      if (!instant) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid date and time." });
+        return z.NEVER;
+      }
+      return instant;
+    });
+}
 
 /**
  * Validation for task create/edit input: the server boundary contract
  * (CLAUDE.md section 5). Ownership of `goalId` and `lifeAreaId` is verified in
  * the Server Action, not here.
+ *
+ * A factory because the due-at wall-clock time is interpreted in the USER'S
+ * timezone (from Settings): the Server Action builds the schema with the
+ * caller's saved zone, so "5:00 PM" means 5 PM where the user lives.
  */
-export const taskFormSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1, "Give this task a title.")
-    .max(TASK_TITLE_MAX, `Keep the title to ${TASK_TITLE_MAX} characters or fewer.`),
-  description: z
-    .string()
-    .trim()
-    .max(TASK_DESCRIPTION_MAX, `Keep the description to ${TASK_DESCRIPTION_MAX} characters or fewer.`)
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : null)),
-  goalId: optionalUuid("Choose a valid goal."),
-  lifeAreaId: optionalUuid("Choose a valid life area."),
-  status: z.enum(TASK_STATUS_VALUES).default("todo"),
-  priority: z.enum(TASK_PRIORITY_VALUES).default("medium"),
-  scheduledFor: optionalScheduledFor,
-  dueAt: optionalDueAt,
-});
+export function makeTaskFormSchema(timeZone: string = MANILA_TZ) {
+  return z.object({
+    title: z
+      .string()
+      .trim()
+      .min(1, "Give this task a title.")
+      .max(TASK_TITLE_MAX, `Keep the title to ${TASK_TITLE_MAX} characters or fewer.`),
+    description: z
+      .string()
+      .trim()
+      .max(TASK_DESCRIPTION_MAX, `Keep the description to ${TASK_DESCRIPTION_MAX} characters or fewer.`)
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : null)),
+    goalId: optionalUuid("Choose a valid goal."),
+    lifeAreaId: optionalUuid("Choose a valid life area."),
+    status: z.enum(TASK_STATUS_VALUES).default("todo"),
+    priority: z.enum(TASK_PRIORITY_VALUES).default("medium"),
+    scheduledFor: optionalScheduledFor,
+    dueAt: optionalDueAt(timeZone),
+  });
+}
+
+/** Manila-default instance (client-side field validation, tests). */
+export const taskFormSchema = makeTaskFormSchema();
 
 export type TaskFormInput = z.input<typeof taskFormSchema>;
 export type TaskFormValues = z.output<typeof taskFormSchema>;

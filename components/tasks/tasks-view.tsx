@@ -255,6 +255,7 @@ export function TasksView({
           mode="create"
           goals={goalOptions}
           lifeAreas={lifeAreaOptions}
+          timeZone={timeZone}
           onSubmit={handleCreate}
           onClose={() => setFormOpen(false)}
         />
@@ -365,6 +366,7 @@ export function TasksView({
                     task={task}
                     goalTitle={task.goalId ? goalTitleById.get(task.goalId) ?? null : null}
                     lifeArea={task.lifeAreaId ? lifeAreaById.get(task.lifeAreaId) ?? null : null}
+                    timeZone={timeZone}
                     onToggleComplete={handleToggleComplete}
                     onEdit={(t) => {
                       setEditing(t);
@@ -388,6 +390,7 @@ export function TasksView({
         goals={goalOptions}
         lifeAreas={lifeAreaOptions}
         defaultScheduledFor={!editing && view === "today" ? zonedToday(now, timeZone) : undefined}
+        timeZone={timeZone}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />
