@@ -288,19 +288,19 @@ export function TasksView({
                   aria-current={active ? "page" : undefined}
                   onClick={() => setView(v.key)}
                   className={cn(
-                    "flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-label-md transition-colors",
+                    "flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2.5 text-callout font-medium transition-colors",
                     active
-                      ? "bg-surface-container-high text-on-surface"
-                      : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
+                      ? "bg-blue/12 text-blue"
+                      : "text-label-secondary hover:bg-surface-hover hover:text-label",
                   )}
                 >
-                  <Icon className={cn("size-5 shrink-0", active && "text-primary")} aria-hidden />
+                  <Icon className="size-4 shrink-0" aria-hidden />
                   <span>{v.label}</span>
                   {count > 0 ? (
                     <span
                       className={cn(
-                        "tabular ml-auto rounded-full px-2 py-0.5 font-mono text-mono-sm",
-                        active ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant",
+                        "ml-auto rounded-full px-1.5 py-0.5 font-mono text-footnote tabular-nums",
+                        active ? "bg-blue text-white" : "bg-surface-secondary text-label-secondary",
                       )}
                     >
                       {count}
@@ -313,8 +313,8 @@ export function TasksView({
         </aside>
 
         <div className="lg:col-span-9">
-          <div className="mb-6 flex flex-col gap-3 border-b border-outline-variant pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-headline-md text-on-surface">{activeView.label}</h2>
+          <div className="mb-6 flex flex-col gap-3 border-b border-separator pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-title-3 text-label">{activeView.label}</h2>
             <div className="flex items-center gap-2">
               <Select
                 aria-label="Filter by life area"
@@ -345,9 +345,9 @@ export function TasksView({
           </div>
 
           {visibleTasks.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-12 text-center text-body-md text-on-surface-variant">
+            <p className="rounded-2xl bg-surface-secondary px-6 py-12 text-center text-callout text-label-secondary">
               Nothing here yet.{" "}
-              <button type="button" onClick={openCreate} className="text-primary hover:underline">
+              <button type="button" onClick={openCreate} className="cursor-pointer font-medium text-blue hover:underline">
                 Add a task
               </button>
               .
@@ -358,7 +358,7 @@ export function TasksView({
               variants={listContainer}
               initial="hidden"
               animate="visible"
-              className="flex flex-col gap-4"
+              className="flex flex-col gap-2"
             >
               {visibleTasks.map((task) => (
                 <motion.li key={task.id} variants={listItem} layout>

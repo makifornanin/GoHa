@@ -144,10 +144,10 @@ export function HabitsView({
   const headerActions = (
     <>
       {bestStreak > 0 ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant/70 bg-surface-container px-3 py-1 text-label-sm text-on-surface-variant">
-          <Flame className="size-4 text-secondary" aria-hidden />
+        <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-surface-secondary px-3 text-footnote text-label-secondary">
+          <Flame className="size-3.5 text-orange" aria-hidden />
           Best streak:{" "}
-          <span className="tabular font-mono text-mono-sm text-on-surface">{bestStreak}</span>{" "}
+          <span className="font-mono tabular-nums text-label">{bestStreak}</span>{" "}
           {bestStreak === 1 ? "day" : "days"}
         </span>
       ) : null}
@@ -187,12 +187,12 @@ export function HabitsView({
         />
       ) : (
         <div className="flex flex-col gap-8">
-          <section className="raised card-shadow rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-6">
-            <div className="mb-5 flex items-center gap-6">
+          <section className="rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1">
+            <div className="mb-4 flex items-center gap-4">
               <ProgressRing percent={completion} label={`${doneToday} of ${scheduledToday.length} habits done today`} />
               <div>
-                <h3 className="text-headline-md text-on-surface">Today</h3>
-                <p className="mt-1 text-body-md text-on-surface-variant">
+                <h3 className="text-headline text-label">Today</h3>
+                <p className="mt-1 font-mono text-footnote tabular-nums text-label-secondary">
                   {scheduledToday.length === 0
                     ? "No habits scheduled for today."
                     : `${doneToday} done · ${scheduledToday.length - doneToday} to go`}
@@ -201,24 +201,24 @@ export function HabitsView({
             </div>
 
             {scheduledToday.length > 0 ? (
-              <ul className="flex flex-col divide-y divide-outline-variant/40">
+              <ul className="flex flex-col">
                 {scheduledToday.map((view) => {
                   const area = view.habit.lifeAreaId ? lifeAreaById.get(view.habit.lifeAreaId) : null;
                   const color = lifeAreaColorConfig[toColorKey(view.habit.color)];
                   return (
-                    <li key={view.habit.id} className="flex flex-wrap items-center gap-3 py-3">
-                      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", color.tile)}>
-                        <LifeAreaIcon iconKey={view.habit.icon} className="size-5" />
+                    <li key={view.habit.id} className="relative flex min-h-10 flex-wrap items-center gap-3 rounded-xl px-3 py-1.5 transition-colors hover:bg-surface-hover [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator">
+                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", color.tile)}>
+                        <LifeAreaIcon iconKey={view.habit.icon} className="size-4" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className={cn("truncate text-body-md text-on-surface", view.todayState === "done" && "text-on-surface-variant line-through")}>
+                        <p className={cn("truncate text-body text-label", view.todayState === "done" && "text-label-tertiary line-through")}>
                           {view.habit.name}
                         </p>
-                        <p className="flex items-center gap-2 text-label-sm text-on-surface-variant">
+                        <p className="flex items-center gap-2 text-footnote text-label-secondary">
                           {area ? <span className="truncate">{area.name}</span> : null}
                           {view.streaks.current > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Flame className="size-3 text-secondary" aria-hidden />
+                            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                              <Flame className="size-3 text-orange" aria-hidden />
                               {view.streaks.current}
                             </span>
                           ) : null}
@@ -240,25 +240,25 @@ export function HabitsView({
           <HabitsWeekGrid views={views} onEdit={openEdit} />
 
           <section>
-            <h3 className="mb-3 text-label-sm uppercase text-on-surface-variant">All habits</h3>
+            <h3 className="mb-3 text-caption uppercase text-label-secondary">All habits</h3>
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {views.map((view) => {
                 const color = lifeAreaColorConfig[toColorKey(view.habit.color)];
                 return (
                   <li
                     key={view.habit.id}
-                    className="group raised card-shadow card-elevated flex items-center gap-3 rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-4"
+                    className="group flex items-center gap-3 rounded-xl border border-separator-opaque bg-surface p-3 shadow-e1 transition-shadow hover:shadow-e2"
                   >
-                    <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", color.tile)}>
-                      <LifeAreaIcon iconKey={view.habit.icon} className="size-5" />
+                    <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", color.tile)}>
+                      <LifeAreaIcon iconKey={view.habit.icon} className="size-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-body-md text-on-surface">{view.habit.name}</p>
-                      <p className="text-label-sm text-on-surface-variant">
+                      <p className="truncate text-body font-medium text-label">{view.habit.name}</p>
+                      <p className="text-footnote text-label-secondary">
                         Current{" "}
-                        <span className="tabular font-mono text-on-surface">{view.streaks.current}</span>{" "}
+                        <span className="font-mono tabular-nums text-label">{view.streaks.current}</span>{" "}
                         · Best{" "}
-                        <span className="tabular font-mono">{view.streaks.longest}</span>
+                        <span className="font-mono tabular-nums">{view.streaks.longest}</span>
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">

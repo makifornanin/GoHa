@@ -133,7 +133,7 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
       <PageHeader title="Brain Dump" description="Fast capture for messy thoughts. Clear your mind." />
 
-      <section className="raised card-shadow rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-1 transition-colors focus-within:border-primary/60">
+      <section className="rounded-2xl border border-separator-opaque bg-surface p-1 shadow-e1 transition-colors focus-within:border-blue/40">
         <Textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -143,10 +143,10 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
           maxLength={BRAIN_DUMP_CONTENT_MAX}
           placeholder="Capture anything..."
           aria-label="Capture a thought"
-          className="min-h-28 border-none bg-transparent text-body-lg focus-visible:ring-0"
+          className="min-h-28 bg-transparent text-body-lg focus-visible:bg-transparent focus-visible:outline-none"
         />
-        <div className="flex items-center justify-between border-t border-outline-variant/50 p-2">
-          <span className="tabular pl-2 font-mono text-mono-sm text-outline">
+        <div className="flex items-center justify-between border-t border-separator p-2">
+          <span className="pl-2 font-mono text-footnote tabular-nums text-label-tertiary">
             {draft.length}/{BRAIN_DUMP_CONTENT_MAX} · ⌘/Ctrl + Enter
           </span>
           <Button onClick={capture} disabled={draft.trim().length === 0} loading={capturePending}>
@@ -157,7 +157,7 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
       </section>
 
       <div>
-        <div className="mb-4 flex gap-6 border-b border-outline-variant">
+        <div className="mb-4 flex gap-5 border-b border-separator">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -166,15 +166,15 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                "flex items-center gap-2 whitespace-nowrap py-3 text-label-md transition-colors",
+                "flex cursor-pointer items-center gap-2 whitespace-nowrap py-2.5 text-callout font-medium transition-colors",
                 tab === t.key
-                  ? "border-b-2 border-primary font-bold text-primary"
-                  : "text-on-surface-variant hover:text-primary",
+                  ? "border-b-2 border-blue text-blue"
+                  : "text-label-secondary hover:text-label",
               )}
             >
               {t.label}
               {(counts.get(t.key) ?? 0) > 0 ? (
-                <span className="tabular rounded-full bg-surface-container-high px-2 py-0.5 font-mono text-mono-sm text-on-surface-variant">
+                <span className="rounded-full bg-surface-secondary px-1.5 py-0.5 font-mono text-footnote tabular-nums text-label-secondary">
                   {counts.get(t.key)}
                 </span>
               ) : null}

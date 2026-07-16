@@ -78,21 +78,21 @@ function SettingsCard({
   return (
     <section
       className={cn(
-        "raised card-shadow rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-6 lg:p-8",
+        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
         className,
       )}
     >
-      <div className="mb-6 flex items-start gap-3.5">
+      <div className="mb-6 flex items-start gap-3">
         <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-outline-variant/70 bg-surface-container text-primary"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
           aria-hidden
         >
           {icon}
         </span>
         <div>
-          <h2 className="text-headline-md text-on-surface">{title}</h2>
+          <h2 className="text-headline text-label">{title}</h2>
           {description ? (
-            <p className="mt-1 text-body-md text-on-surface-variant">{description}</p>
+            <p className="mt-0.5 text-callout text-label-secondary">{description}</p>
           ) : null}
         </div>
       </div>
@@ -145,7 +145,7 @@ function ProfileCard({
         }}
       >
         <div className="space-y-1.5">
-          <label htmlFor="settings-name" className="text-label-sm uppercase text-on-surface-variant">
+          <label htmlFor="settings-name" className="text-subhead text-label-secondary">
             Display name
           </label>
           <Input
@@ -157,11 +157,11 @@ function ProfileCard({
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="settings-email" className="text-label-sm uppercase text-on-surface-variant">
+          <label htmlFor="settings-email" className="text-subhead text-label-secondary">
             Email address
           </label>
           <Input id="settings-email" value={email} readOnly disabled aria-describedby="settings-email-hint" />
-          <p id="settings-email-hint" className="text-label-sm text-outline">
+          <p id="settings-email-hint" className="text-footnote text-label-tertiary">
             Your sign-in email cannot be changed here.
           </p>
         </div>
@@ -212,10 +212,10 @@ function AppearanceCard({ dbTheme }: { dbTheme: ThemeValue }) {
                 key={opt.value}
                 className={cn(
                   "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-colors",
-                  "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40",
+                  "has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-blue/40",
                   isActive
-                    ? "border-primary bg-primary-container/15 text-primary"
-                    : "border-outline-variant text-on-surface-variant hover:border-primary/60 hover:text-on-surface",
+                    ? "border-blue bg-blue/12 text-blue"
+                    : "border-separator-opaque text-label-secondary hover:border-gray-2 hover:text-label",
                 )}
               >
                 <input
@@ -227,7 +227,7 @@ function AppearanceCard({ dbTheme }: { dbTheme: ThemeValue }) {
                   className="sr-only"
                 />
                 <Icon className="size-6" aria-hidden />
-                <span className="text-label-md">{opt.label}</span>
+                <span className="text-callout font-medium">{opt.label}</span>
               </label>
             );
           })}
@@ -277,7 +277,7 @@ function PreferencesCard({
     >
       <div className="flex flex-col gap-5">
         <div className="space-y-1.5">
-          <label htmlFor="settings-timezone" className="text-label-sm uppercase text-on-surface-variant">
+          <label htmlFor="settings-timezone" className="text-subhead text-label-secondary">
             Timezone
           </label>
           <Select
@@ -297,7 +297,7 @@ function PreferencesCard({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="settings-week-start" className="text-label-sm uppercase text-on-surface-variant">
+          <label htmlFor="settings-week-start" className="text-subhead text-label-secondary">
             Week starts on
           </label>
           <Select

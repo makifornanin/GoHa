@@ -61,10 +61,10 @@ type GohaNodeData = {
 type GohaNode = Node<GohaNodeData, "goha">;
 
 const NODE_CHIP: Record<TaskMapNodeTypeValue, string> = {
-  task: "bg-primary-container text-on-primary-container",
-  note: "bg-tertiary-container text-on-tertiary-container",
-  milestone: "bg-secondary-container text-on-secondary-container",
-  group: "bg-surface-variant text-on-surface-variant",
+  task: "bg-blue/15 text-blue",
+  note: "bg-purple/15 text-purple",
+  milestone: "bg-indigo/15 text-indigo",
+  group: "bg-gray-5 text-label-secondary",
 };
 
 /** Custom node: a card matching the design's step/note tiles, with connect handles. */
@@ -72,21 +72,21 @@ function GohaNodeView({ data, selected }: NodeProps<GohaNode>) {
   return (
     <div
       className={cn(
-        "raised node-shadow w-48 rounded-lg border bg-surface-container-lowest p-3 transition-shadow",
-        selected ? "border-primary ring-2 ring-primary/40" : "border-outline-variant/70",
+        "w-48 rounded-xl border bg-surface p-3 shadow-e2 transition-shadow",
+        selected ? "border-blue ring-[3px] ring-blue/40" : "border-separator-opaque",
       )}
     >
-      <Handle type="target" position={Position.Top} className="!size-2 !border !border-surface !bg-primary" />
+      <Handle type="target" position={Position.Top} className="!size-2 !border !border-surface !bg-blue" />
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className={cn("rounded-full px-2 py-0.5 text-label-sm", NODE_CHIP[data.nodeType])}>
+        <span className={cn("rounded-full px-2 py-0.5 text-footnote", NODE_CHIP[data.nodeType])}>
           {NODE_TYPE_LABELS[data.nodeType]}
         </span>
-        {data.taskId ? <Link2 className="size-3.5 text-primary" aria-label="Linked to a task" /> : null}
+        {data.taskId ? <Link2 className="size-3.5 text-blue" aria-label="Linked to a task" /> : null}
       </div>
-      <p className="line-clamp-3 break-words text-body-md text-on-surface">
+      <p className="line-clamp-3 break-words text-body text-label">
         {data.label || DEFAULT_NODE_LABEL}
       </p>
-      <Handle type="source" position={Position.Bottom} className="!size-2 !border !border-surface !bg-primary" />
+      <Handle type="source" position={Position.Bottom} className="!size-2 !border !border-surface !bg-blue" />
     </div>
   );
 }
@@ -103,22 +103,22 @@ const nodeTypes = { goha: GohaNodeView };
  * in light and dark with no scattered hex (CLAUDE.md section 9).
  */
 const REACT_FLOW_VARS = {
-  "--xy-edge-stroke-default": "var(--outline)",
-  "--xy-edge-stroke-selected-default": "var(--primary)",
-  "--xy-connectionline-stroke-default": "var(--primary)",
-  "--xy-background-color-default": "var(--surface)",
+  "--xy-edge-stroke-default": "var(--gray-2)",
+  "--xy-edge-stroke-selected-default": "var(--blue)",
+  "--xy-connectionline-stroke-default": "var(--blue)",
+  "--xy-background-color-default": "var(--canvas)",
   "--xy-attribution-background-color-default": "transparent",
-  "--xy-controls-button-background-color-default": "var(--surface-container)",
-  "--xy-controls-button-background-color-hover-default": "var(--surface-container-high)",
-  "--xy-controls-button-color-default": "var(--on-surface-variant)",
-  "--xy-controls-button-color-hover-default": "var(--on-surface)",
-  "--xy-controls-button-border-color-default": "var(--outline-variant)",
-  "--xy-minimap-background-color-default": "var(--surface-container-low)",
+  "--xy-controls-button-background-color-default": "var(--surface)",
+  "--xy-controls-button-background-color-hover-default": "var(--surface-secondary)",
+  "--xy-controls-button-color-default": "var(--label-secondary)",
+  "--xy-controls-button-color-hover-default": "var(--label)",
+  "--xy-controls-button-border-color-default": "var(--separator-opaque)",
+  "--xy-minimap-background-color-default": "var(--surface)",
 } as CSSProperties;
 
 const EDGE_OPTIONS = {
-  markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: "var(--outline)" },
-  style: { stroke: "var(--outline)", strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: "var(--gray-2)" },
+  style: { stroke: "var(--gray-2)", strokeWidth: 2 },
 };
 
 function dbNodeToFlow(n: TaskMapNode): GohaNode {
@@ -331,7 +331,7 @@ function FlowCanvasInner({
   );
 
   const toolbarButton =
-    "flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary disabled:opacity-50";
+    "flex h-7 cursor-pointer items-center gap-1 rounded-full px-3 text-footnote font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-blue disabled:opacity-50";
 
   return (
     <div ref={wrapperRef} className="relative size-full">
@@ -359,7 +359,7 @@ function FlowCanvasInner({
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--outline-variant)" />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--gray-3)" />
         <Controls showInteractive={false} />
         <MiniMap
           pannable
@@ -370,7 +370,7 @@ function FlowCanvasInner({
           maskColor="color-mix(in oklab, var(--surface) 55%, transparent)"
         />
         <Panel position="top-center">
-          <div className="raised node-shadow flex items-center gap-1 rounded-full border border-outline-variant/70 bg-surface-container-lowest p-1">
+          <div className="glass-regular flex items-center gap-1 rounded-full p-1 shadow-e2">
             <button type="button" onClick={() => addNode("task")} disabled={isAdding} className={toolbarButton}>
               <Plus className="size-4" aria-hidden /> Task
             </button>
@@ -422,25 +422,25 @@ function NodeInspector({
   const [isSaving, startSave] = useTransition();
 
   return (
-    <aside className="raised card-shadow absolute right-3 top-3 z-10 flex w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-4">
+    <aside className="absolute right-3 top-3 z-10 flex w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e3">
       <div className="flex items-center justify-between">
-        <h3 className="text-label-md text-on-surface">Edit node</h3>
+        <h3 className="text-headline text-label">Edit node</h3>
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer rounded-md px-2 text-label-sm text-on-surface-variant hover:text-on-surface"
+          className="hit-44 cursor-pointer rounded-md px-2 text-footnote font-medium text-blue hover:underline"
         >
           Done
         </button>
       </div>
 
       <label className="space-y-1">
-        <span className="text-label-sm uppercase text-on-surface-variant">Label</span>
+        <span className="text-subhead text-label-secondary">Label</span>
         <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Node label" />
       </label>
 
       <label className="space-y-1">
-        <span className="text-label-sm uppercase text-on-surface-variant">Type</span>
+        <span className="text-subhead text-label-secondary">Type</span>
         <Select value={nodeType} onChange={(e) => setNodeType(e.target.value as TaskMapNodeTypeValue)}>
           {TASK_MAP_NODE_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -451,7 +451,7 @@ function NodeInspector({
       </label>
 
       <label className="space-y-1">
-        <span className="text-label-sm uppercase text-on-surface-variant">Linked task</span>
+        <span className="text-subhead text-label-secondary">Linked task</span>
         <Select value={taskId} onChange={(e) => setTaskId(e.target.value)}>
           <option value="">No linked task</option>
           {tasks.map((t) => (
@@ -465,7 +465,7 @@ function NodeInspector({
       {taskId ? (
         <Link
           href="/tasks"
-          className="inline-flex items-center gap-1.5 text-label-md text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 text-callout font-medium text-blue hover:underline"
         >
           <ExternalLink className="size-4" aria-hidden /> Open in To-dos
         </Link>
@@ -475,7 +475,7 @@ function NodeInspector({
         <Button
           variant="ghost"
           size="sm"
-          className="text-error hover:text-error"
+          className="text-red hover:text-red"
           onClick={() => onDelete(node.id)}
         >
           <Trash2 className="size-4" aria-hidden /> Delete

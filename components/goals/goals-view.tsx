@@ -156,8 +156,8 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
         />
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="overflow-x-auto border-b border-outline-variant">
-            <ul className="flex min-w-max gap-6" role="tablist" aria-label="Filter goals by timeframe">
+          <div className="overflow-x-auto border-b border-separator">
+            <ul className="flex min-w-max gap-5" role="tablist" aria-label="Filter goals by timeframe">
               {GOAL_TIMEFRAME_ORDER.map((tf) => (
                 <li key={tf}>
                   <TabButton active={tab === tf} onClick={() => setTab(tf)}>
@@ -174,7 +174,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
           </div>
 
           {visibleGoals.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-10 text-center text-body-md text-on-surface-variant">
+            <p className="rounded-2xl bg-surface-secondary px-6 py-10 text-center text-callout text-label-secondary">
               No goals in this timeframe yet.
             </p>
           ) : null}
@@ -201,13 +201,13 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
             <button
               type="button"
               onClick={openCreate}
-              className="group flex min-h-[260px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/70 bg-surface-container-low p-5 text-on-surface-variant transition-colors hover:border-primary/60 hover:bg-surface-container hover:text-primary"
+              className="group flex min-h-60 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-gray-3 p-5 text-label-secondary transition-colors hover:border-blue/50 hover:bg-surface-hover"
             >
-              <span className="mb-4 flex size-12 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant transition-colors group-hover:bg-primary group-hover:text-on-primary">
-                <Plus className="size-6" aria-hidden />
+              <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors group-hover:bg-blue group-hover:text-white">
+                <Plus className="size-5" aria-hidden />
               </span>
-              <span className="text-headline-md">Create New Goal</span>
-              <span className="mt-2 max-w-[200px] text-center text-body-md opacity-70">
+              <span className="text-headline text-label">Create New Goal</span>
+              <span className="mt-1 max-w-52 text-center text-callout">
                 Define a new objective and break it into steps.
               </span>
             </button>
@@ -264,10 +264,10 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "whitespace-nowrap py-3 text-label-md transition-colors",
+        "cursor-pointer whitespace-nowrap py-2.5 text-callout font-medium transition-colors",
         active
-          ? "border-b-2 border-primary font-bold text-primary"
-          : "text-on-surface-variant hover:text-primary",
+          ? "border-b-2 border-blue text-blue"
+          : "text-label-secondary hover:text-label",
       )}
     >
       {children}

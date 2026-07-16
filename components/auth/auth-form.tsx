@@ -1,19 +1,20 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { z } from "zod";
 
-import { Brand } from "@/components/shell/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { spring } from "@/lib/motion";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-label-sm uppercase text-on-surface-variant">{label}</span>
+      <span className="text-subhead text-label-secondary">{label}</span>
       {children}
     </label>
   );
@@ -32,8 +33,9 @@ const registerSchema = z.object({
 
 /**
  * Email/password auth form for both sign-in and the one-time owner bootstrap.
- * Validates input with Zod before calling Better Auth, surfaces server errors,
- * and redirects to `redirectTo` (or /today) on success.
+ * A cinematic screen per spec section 10: one message, generous negative
+ * space, a single blue primary action, a slow `smooth` entrance. Restrained:
+ * no card chrome, no ambient effects; content sits directly on the canvas.
  */
 export function AuthForm({
   mode,
@@ -91,19 +93,20 @@ export function AuthForm({
   }
 
   return (
-    <div className="raised card-shadow relative overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-8">
-      {/* Hairline accent along the top edge of the card. */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent"
-      />
-      <div className="mb-8 flex flex-col items-center gap-4 text-center">
-        <Brand />
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...spring.smooth, duration: 0.5 }}
+    >
+      <div className="mb-10 flex flex-col items-center gap-5 text-center">
+        <div className="flex size-12 items-center justify-center rounded-xl bg-blue text-white">
+          <span className="text-title-3">G</span>
+        </div>
         <div>
-          <h1 className="text-headline-lg text-on-surface">
-            {isLogin ? "Welcome back" : "Create the owner account"}
+          <h1 className="text-large-title text-label">
+            {isLogin ? "Welcome back" : "Set up GoHa"}
           </h1>
-          <p className="mt-1.5 text-body-md text-on-surface-variant">
+          <p className="mt-2 text-body text-label-secondary">
             {isLogin
               ? "Sign in to your execution system."
               : "This one-time setup creates the single owner of this GoHa."}
@@ -141,32 +144,34 @@ export function AuthForm({
         {error ? (
           <p
             role="alert"
-            className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-body-sm text-error"
+            className="rounded-lg bg-red/12 px-3 py-2 text-callout text-red"
           >
             {error}
           </p>
         ) : null}
 
-        <Button type="submit" size="lg" className="w-full shadow-glow" loading={pending}>
+        <Button type="submit" size="lg" className="mt-2 w-full" loading={pending}>
           {isLogin ? "Sign in" : "Create owner account"}
         </Button>
       </form>
 
-      {isLogin ? (
-        <p className="mt-6 text-center text-body-sm text-on-surface-variant">
-          First time setting up GoHa?{" "}
-          <Link className="text-primary hover:underline" href="/register">
-            Create the owner account
-          </Link>
-        </p>
-      ) : (
-        <p className="mt-6 text-center text-body-sm text-on-surface-variant">
-          Already set up?{" "}
-          <Link className="text-primary hover:underline" href="/login">
-            Sign in
-          </Link>
-        </p>
-      )}
-    </div>
+      <p className="mt-8 text-center text-callout text-label-secondary">
+        {isLogin ? (
+          <>
+            First time setting up GoHa?{" "}
+            <Link className="font-medium text-blue hover:underline" href="/register">
+              Create the owner account
+            </Link>
+          </>
+        ) : (
+          <>
+            Already set up?{" "}
+            <Link className="font-medium text-blue hover:underline" href="/login">
+              Sign in
+            </Link>
+          </>
+        )}
+      </p>
+    </motion.div>
   );
 }

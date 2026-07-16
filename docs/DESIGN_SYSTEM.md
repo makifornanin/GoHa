@@ -2,7 +2,7 @@
 
 **This document is retired. The visual source of truth is now `docs/GOHA_DESIGN_SPEC.md` (Apple HIG / Liquid Glass), which replaces the Nightshift direction below in full as of 2026-07-16.**
 
-Current implementation status: the Apple spec is implemented in the token layer (`app/globals.css`), fonts (Inter v4 + Geist Mono), motion (`lib/motion.ts`, the three Apple springs), the shared primitives (`components/ui/*`), the app shell chrome (glass sidebar/header/mobile chrome), and the Today dashboard as the reference screen. The remaining screens keep their Nightshift-era composition (inheriting the new tokens) until their rollout slice.
+Current implementation status: the Apple spec is fully rolled out as of 2026-07-16: token layer (`app/globals.css`), fonts (Inter v4 + Geist Mono), motion (`lib/motion.ts`, the three Apple springs), the shared primitives (`components/ui/*`), the glass shell chrome, and EVERY screen (Today, Login, Focus, Tasks, Goals, Habits, Life Areas, Brain Dump, Settings, Task Maps incl. the React Flow canvas). Remaining debt: form-modal internals and non-Today loading skeletons still render through the legacy alias layer in `globals.css`; the aliases stay until those are tightened.
 
 The Nightshift text below is kept only as a historical record of the previous direction.
 

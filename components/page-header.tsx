@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+/** Standard page heading: title-2 with a callout subtitle (spec section 3). */
 export function PageHeader({
   title,
   description,
@@ -11,19 +12,13 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="space-y-2">
-        <h1 className="text-headline-lg-mobile text-on-surface md:text-headline-lg">
-          {title}
-        </h1>
+      <div>
+        <h1 className="text-title-2 text-label">{title}</h1>
         {description ? (
-          <p className="max-w-2xl text-body-lg text-on-surface-variant">
-            {description}
-          </p>
+          <p className="mt-1 max-w-2xl text-callout text-label-secondary">{description}</p>
         ) : null}
       </div>
-      {action ? (
-        <div className="flex shrink-0 items-center gap-3">{action}</div>
-      ) : null}
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </div>
   );
 }

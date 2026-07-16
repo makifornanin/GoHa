@@ -39,11 +39,11 @@ export const WEEK_ORDER_MON_FIRST = [1, 2, 3, 4, 5, 6, 0];
 export type DayCellState = StreakOutcome | "pending" | "off";
 
 export const dayCellConfig: Record<DayCellState, { className: string; label: string }> = {
-  done: { className: "bg-primary-container", label: "Done" },
-  partial: { className: "bg-secondary-fixed", label: "Partial" },
-  miss: { className: "bg-error-container", label: "Missed" },
-  skip: { className: "bg-surface-variant", label: "Skipped" },
-  pending: { className: "border border-dashed border-outline-variant bg-surface", label: "Pending" },
+  done: { className: "bg-green", label: "Done" },
+  partial: { className: "bg-green/40", label: "Partial" },
+  miss: { className: "bg-red/25", label: "Missed" },
+  skip: { className: "bg-gray-4", label: "Skipped" },
+  pending: { className: "border border-dashed border-gray-3 bg-transparent", label: "Pending" },
   off: { className: "bg-transparent", label: "Not scheduled" },
 };
 

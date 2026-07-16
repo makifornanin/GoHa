@@ -123,16 +123,16 @@ export function TaskMapsWorkspace({
     <>
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         {/* Explorer */}
-        <aside className="raised card-shadow flex max-h-[40vh] flex-col rounded-xl border border-outline-variant/70 bg-surface-container-lowest lg:max-h-none">
-          <div className="flex items-center justify-between border-b border-outline-variant/70 px-4 py-3">
-            <span className="text-label-sm uppercase text-on-surface-variant">
+        <aside className="flex max-h-[40vh] flex-col rounded-2xl border border-separator-opaque bg-surface shadow-e1 lg:max-h-none">
+          <div className="flex items-center justify-between border-b border-separator px-4 py-3">
+            <span className="text-caption uppercase text-label-secondary">
               Maps
             </span>
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
               aria-label="New map"
-              className="flex size-7 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
+              className="hit-44 flex size-7 cursor-pointer items-center justify-center rounded-full text-label-secondary transition-colors hover:bg-surface-hover hover:text-blue"
             >
               <Plus className="size-4" aria-hidden />
             </button>
@@ -149,14 +149,14 @@ export function TaskMapsWorkspace({
               />
             ))}
             {active.length === 0 ? (
-              <p className="px-3 py-6 text-center text-body-md text-on-surface-variant">
+              <p className="px-3 py-6 text-center text-callout text-label-secondary">
                 No active maps.
               </p>
             ) : null}
 
             {archived.length > 0 ? (
               <div className="pt-2">
-                <p className="px-3 py-1 text-label-sm uppercase tracking-widest text-outline">
+                <p className="px-3 py-1 text-caption uppercase text-label-tertiary">
                   Archived
                 </p>
                 {archived.map((map) => (
@@ -175,15 +175,15 @@ export function TaskMapsWorkspace({
         </aside>
 
         {/* Editor */}
-        <section className="raised card-shadow flex h-[600px] flex-col overflow-hidden rounded-xl border border-outline-variant/70 bg-surface-container-lowest lg:h-[calc(100vh-13rem)]">
+        <section className="flex h-[600px] flex-col overflow-hidden rounded-2xl border border-separator-opaque bg-surface shadow-e1 lg:h-[calc(100vh-13rem)]">
           {graph ? (
             <>
-              <header className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/70 px-4 py-3">
+              <header className="flex flex-wrap items-center justify-between gap-2 border-b border-separator px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Network className="size-4 shrink-0 text-primary" aria-hidden />
-                  <h2 className="truncate text-headline-md text-on-surface">{graph.map.name}</h2>
+                  <Network className="size-4 shrink-0 text-blue" aria-hidden />
+                  <h2 className="truncate text-title-3 text-label">{graph.map.name}</h2>
                   {graph.map.isArchived ? (
-                    <span className="rounded-full bg-surface-variant px-2 py-0.5 text-label-sm text-on-surface-variant">
+                    <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-footnote text-label-secondary">
                       Archived
                     </span>
                   ) : null}
@@ -224,7 +224,7 @@ export function TaskMapsWorkspace({
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center p-8 text-center">
-              <p className="text-body-lg text-on-surface-variant">
+              <p className="text-body text-label-secondary">
                 That map could not be found. Pick a map from the list or create a new one.
               </p>
             </div>
@@ -278,18 +278,18 @@ function ExplorerRow({
     <div
       className={cn(
         "group flex items-center gap-1 rounded-md pr-1 transition-colors",
-        active ? "bg-primary/10" : "hover:bg-surface-container",
+        active ? "bg-blue/12" : "hover:bg-surface-hover",
       )}
     >
       <Link href={href} scroll={false} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
         <Network
-          className={cn("size-4 shrink-0", active ? "text-primary" : "text-on-surface-variant")}
+          className={cn("size-4 shrink-0", active ? "text-blue" : "text-label-secondary")}
           aria-hidden
         />
         <span
           className={cn(
-            "truncate text-label-md",
-            active ? "font-semibold text-primary" : "text-on-surface-variant",
+            "truncate text-callout font-medium",
+            active ? "font-semibold text-blue" : "text-label-secondary",
           )}
         >
           {map.name}
@@ -299,7 +299,7 @@ function ExplorerRow({
         type="button"
         onClick={onEdit}
         aria-label={`Rename ${map.name}`}
-        className="hidden size-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high hover:text-primary group-hover:flex"
+        className="hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-label-secondary hover:bg-surface-hover hover:text-blue group-hover:flex"
       >
         <Pencil className="size-3.5" aria-hidden />
       </button>
@@ -307,7 +307,7 @@ function ExplorerRow({
         type="button"
         onClick={onArchive}
         aria-label={`Archive ${map.name}`}
-        className="hidden size-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high hover:text-primary group-hover:flex"
+        className="hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-label-secondary hover:bg-surface-hover hover:text-blue group-hover:flex"
       >
         <Archive className="size-3.5" aria-hidden />
       </button>
@@ -332,18 +332,18 @@ function ArchivedRow({
     <div
       className={cn(
         "group flex items-center gap-1 rounded-md pr-1 transition-colors",
-        active ? "bg-surface-container" : "hover:bg-surface-container-low",
+        active ? "bg-surface-secondary" : "hover:bg-surface-hover",
       )}
     >
       <Link href={href} scroll={false} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
-        <Network className="size-4 shrink-0 text-outline" aria-hidden />
-        <span className="truncate text-label-md text-outline">{map.name}</span>
+        <Network className="size-4 shrink-0 text-label-tertiary" aria-hidden />
+        <span className="truncate text-callout font-medium text-outline">{map.name}</span>
       </Link>
       <button
         type="button"
         onClick={onRestore}
         aria-label={`Restore ${map.name}`}
-        className="hidden size-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high hover:text-primary group-hover:flex"
+        className="hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-label-secondary hover:bg-surface-hover hover:text-blue group-hover:flex"
       >
         <ArchiveRestore className="size-3.5" aria-hidden />
       </button>
@@ -351,7 +351,7 @@ function ArchivedRow({
         type="button"
         onClick={onDelete}
         aria-label={`Delete ${map.name}`}
-        className="hidden size-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high hover:text-error group-hover:flex"
+        className="hidden size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-label-secondary hover:bg-surface-hover hover:text-red group-hover:flex"
       >
         <Trash2 className="size-3.5" aria-hidden />
       </button>
@@ -388,7 +388,7 @@ function CreateMapModal({ open, onClose }: { open: boolean; onClose: () => void 
         }}
       >
         <label className="space-y-1">
-          <span className="text-label-sm uppercase text-on-surface-variant">Name</span>
+          <span className="text-caption uppercase text-label-secondary">Name</span>
           <Input
             autoFocus
             value={name}
@@ -438,11 +438,11 @@ function EditMapModal({ map, onClose }: { map: TaskMap; onClose: () => void }) {
         }}
       >
         <label className="space-y-1">
-          <span className="text-label-sm uppercase text-on-surface-variant">Name</span>
+          <span className="text-caption uppercase text-label-secondary">Name</span>
           <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="space-y-1">
-          <span className="text-label-sm uppercase text-on-surface-variant">Description</span>
+          <span className="text-caption uppercase text-label-secondary">Description</span>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -466,7 +466,7 @@ function EditMapModal({ map, onClose }: { map: TaskMap; onClose: () => void }) {
 function CanvasLoading() {
   return (
     <div className="grid-pattern flex size-full items-center justify-center">
-      <p className="raised rounded-full border border-outline-variant/70 bg-surface-container-lowest px-4 py-2 text-label-md text-on-surface-variant">
+      <p className="rounded-full border border-separator-opaque bg-surface px-4 py-2 text-callout font-medium text-label-secondary shadow-e1">
         Loading canvas…
       </p>
     </div>

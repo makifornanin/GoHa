@@ -50,28 +50,28 @@ type StatusMeta = {
 export const goalStatusConfig: Record<GoalStatus, StatusMeta> = {
   not_started: {
     label: "Not Started",
-    badge: "bg-surface-variant text-on-surface-variant",
-    bar: "bg-outline",
+    badge: "bg-gray-5 text-label-secondary",
+    bar: "bg-gray-3",
   },
   active: {
     label: "Active",
-    badge: "bg-primary-container text-on-primary-container",
-    bar: "bg-primary-container",
+    badge: "bg-blue/15 text-blue",
+    bar: "bg-blue",
   },
   paused: {
     label: "Paused",
-    badge: "bg-secondary-container text-on-secondary-container",
-    bar: "bg-secondary",
+    badge: "bg-orange/15 text-orange",
+    bar: "bg-orange",
   },
   completed: {
     label: "Completed",
-    badge: "bg-primary text-on-primary",
-    bar: "bg-primary",
+    badge: "bg-green/15 text-green",
+    bar: "bg-green",
   },
   dropped: {
     label: "Dropped",
-    badge: "bg-surface-container-high text-outline",
-    bar: "bg-outline-variant",
+    badge: "bg-gray-5 text-label-tertiary",
+    bar: "bg-gray-3",
     muted: true,
   },
 };

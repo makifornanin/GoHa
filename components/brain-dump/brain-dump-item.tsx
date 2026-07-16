@@ -47,7 +47,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border border-outline-variant/40 bg-surface-container px-3 py-1.5 text-label-sm text-on-surface transition-colors hover:bg-surface-variant disabled:opacity-50",
+        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md bg-surface-secondary px-2.5 text-footnote font-medium text-label transition-colors hover:bg-surface-pressed disabled:opacity-50",
         className,
       )}
     >
@@ -92,8 +92,8 @@ export function BrainDumpItem({
     <article
       data-testid="brain-dump-item"
       className={cn(
-        "group raised card-shadow rounded-xl border border-outline-variant/70 bg-surface-container-lowest p-5 transition-colors hover:border-outline-variant",
-        (isConverted || isArchived) && "opacity-80",
+        "group rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 transition-shadow hover:shadow-e2",
+        (isConverted || isArchived) && "opacity-70",
       )}
     >
       {editing ? (
@@ -115,7 +115,7 @@ export function BrainDumpItem({
           </div>
         </div>
       ) : (
-        <p className={cn("whitespace-pre-wrap text-body-md text-on-surface", isConverted && "text-on-surface-variant")}>
+        <p className={cn("whitespace-pre-wrap text-body text-label", isConverted && "text-label-secondary")}>
           {item.content}
         </p>
       )}
@@ -124,15 +124,15 @@ export function BrainDumpItem({
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {isConverted ? (
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-primary-container/30 px-2.5 py-1 text-label-sm text-on-primary-container">
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-green/15 px-1.5 py-0.5 text-footnote text-green">
                 Converted to {item.convertedType ? convertTargetConfig[item.convertedType].label : "entity"}
               </span>
               {item.convertedType ? (
                 <Link
                   href={convertTargetConfig[item.convertedType].module}
-                  className="inline-flex items-center gap-1 text-label-sm text-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-footnote font-medium text-blue hover:underline"
                 >
-                  View <ExternalLink className="size-3.5" aria-hidden />
+                  View <ExternalLink className="size-3" aria-hidden />
                 </Link>
               ) : null}
             </>
@@ -160,14 +160,14 @@ export function BrainDumpItem({
             onClick={() => onDelete(item)}
             disabled={busy}
             aria-label="Delete item"
-            className="inline-flex size-8 items-center justify-center rounded-md text-outline transition-colors hover:bg-error/10 hover:text-error disabled:opacity-50"
+            className="hit-44 hit-44-narrow inline-flex size-7 cursor-pointer items-center justify-center rounded-full text-label-tertiary transition-colors hover:text-red disabled:opacity-50"
           >
-            <Trash2 className="size-4" aria-hidden />
+            <Trash2 className="size-3.5" aria-hidden />
           </button>
         </div>
       ) : null}
 
-      <p className="tabular mt-2 font-mono text-mono-sm text-outline">{formatZonedDateTimeMedium(item.createdAt, timeZone)}</p>
+      <p className="mt-2 font-mono text-footnote tabular-nums text-label-tertiary">{formatZonedDateTimeMedium(item.createdAt, timeZone)}</p>
     </article>
   );
 }
