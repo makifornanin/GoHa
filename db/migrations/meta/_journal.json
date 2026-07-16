@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1783406237386,
+      "tag": "0000_init_full_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783408579743,
+      "tag": "0001_tasks_status_priority_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783438219710,
+      "tag": "0002_habit_entry_status_add",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783438375433,
+      "tag": "0003_habit_entry_drop_completed",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783442811724,
+      "tag": "0004_focus_pause_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783444252486,
+      "tag": "0005_brain_dump_converted_add",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783444393269,
+      "tag": "0006_brain_dump_drop_task_id",
+      "breakpoints": true
+    }
+  ]
+}

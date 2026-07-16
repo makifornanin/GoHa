@@ -1,0 +1,403 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GoHa - Review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "stack-gap": "16px",
+                "sidebar-width": "280px",
+                "container-padding": "32px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ],
+                "display": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+</head>
+<body class="bg-[#FAF8F3] text-on-surface font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col py-8 px-4 gap-stack-gap bg-surface-container-low border-r border-outline-variant fixed left-0 top-0 h-screen w-sidebar-width z-50">
+<div class="flex items-center gap-4 px-4 mb-8">
+<img alt="User profile avatar" class="w-12 h-12 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQM3JAJi-e_AniQdIy7VITIWH4f9O3dtomkX2AYB5ngNs9SxN7shJjnCk8IRwnd7Y3N8W5hUvhfITkxgIZxk4OyfZ3C0BvYUSA3iseaYGx5YhEJmBU7exgbzYaOk3R9cOxJ0aJx2JH-8LuljNhWyF_I1Qi_0P5QYOjgUCfimOEC5bUbMQv_juglM3IcYa0I08rptZijRiHScQD_KA0mwQqrZPFDGBwFDBXLmDgQbg2URzSEKM4wKEh_KxpMy3UGkA4R2JFjCrjuq0">
+<div>
+<h1 class="font-display text-display text-primary">GoHa</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Life Operating System</p>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container py-3 rounded-lg font-label-md text-label-md hover:opacity-90 transition-colors flex items-center justify-center gap-2 mb-4">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+            Quick Action
+        </button>
+<nav class="flex-1 overflow-y-auto space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">today</span>
+<span class="font-label-md text-label-md">Today</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">emoji_events</span>
+<span class="font-label-md text-label-md">Goals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">checklist</span>
+<span class="font-label-md text-label-md">To-dos</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-md text-label-md">Task Map</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">center_focus_strong</span>
+<span class="font-label-md text-label-md">Focus</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">repeat</span>
+<span class="font-label-md text-label-md">Habits</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-md text-label-md">Calendar</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-md text-label-md">Brain Dump</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">category</span>
+<span class="font-label-md text-label-md">Life Areas</span>
+</a>
+<!-- Active state for Review -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary-container bg-primary-container rounded-lg font-bold scale-98 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rate_review</span>
+<span class="font-label-md text-label-md">Review</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-label-md text-label-md">Progress</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-sidebar-width min-h-screen relative">
+<!-- TopAppBar -->
+<header class="hidden md:flex justify-between items-center px-container-padding z-40 fixed top-0 right-0 w-[calc(100%-280px)] h-16 bg-[#FAF8F3]/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex-1 flex items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-full py-2 pl-10 pr-4 text-label-md focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-colors" placeholder="Search..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary-container transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+<button class="font-label-md text-label-md px-4 py-2 border border-outline-variant rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors">
+                    Focus Mode
+                </button>
+<button class="font-label-md text-label-md px-4 py-2 bg-primary-container text-on-primary-container rounded-full hover:opacity-90 transition-colors">
+                    Add Task
+                </button>
+</div>
+</header>
+<!-- Canvas -->
+<div class="pt-24 pb-section-gap px-4 md:px-container-padding max-w-[1200px] mx-auto">
+<div class="mb-12">
+<h2 class="font-headline-lg text-headline-lg md:text-[40px] text-on-surface mb-2">Weekly Review</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Reflect on the past 7 days to set intentions for the next.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Left Column: Summary & Checklist -->
+<div class="lg:col-span-4 flex flex-col gap-8">
+<!-- Week in Review Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-[#E8E2D8] hover:-translate-y-[1px] hover:shadow-md transition-all duration-300">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Week in Review</h3>
+<span class="material-symbols-outlined text-[#A9A7C9]">monitoring</span>
+</div>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between font-label-md text-label-md mb-2">
+<span class="text-on-surface-variant">Tasks Completed</span>
+<span class="font-bold text-primary-container">32/45</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 71%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-md text-label-md mb-2">
+<span class="text-on-surface-variant">Habit Consistency</span>
+<span class="font-bold text-[#C9B79C]">85%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-[#C9B79C] rounded-full" style="width: 85%"></div>
+</div>
+</div>
+<div class="pt-4 border-t border-[#E8E2D8]">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Life Score Trend</p>
+<div class="flex items-end gap-2 h-16">
+<div class="flex-1 bg-surface-container-high rounded-t-sm h-[40%]"></div>
+<div class="flex-1 bg-surface-container-high rounded-t-sm h-[60%]"></div>
+<div class="flex-1 bg-surface-container-high rounded-t-sm h-[50%]"></div>
+<div class="flex-1 bg-surface-container-high rounded-t-sm h-[80%]"></div>
+<div class="flex-1 bg-[#A9A7C9] rounded-t-sm h-[90%] relative">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 font-label-sm text-label-sm text-[#A9A7C9] font-bold">9.2</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Review Flow Checklist -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-[#E8E2D8]">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4">Review Flow</h3>
+<div class="space-y-3">
+<label class="flex items-start gap-3 p-3 rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer">
+<input class="mt-1 w-4 h-4 text-primary-container rounded border-[#E8E2D8] focus:ring-primary-container focus:ring-offset-surface-container-lowest bg-surface-container-lowest" type="checkbox">
+<div>
+<p class="font-label-md text-label-md text-on-surface">Process Inbox</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal">Clear out brain dump and unassigned tasks.</p>
+</div>
+</label>
+<label class="flex items-start gap-3 p-3 rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer">
+<input class="mt-1 w-4 h-4 text-primary-container rounded border-[#E8E2D8] focus:ring-primary-container focus:ring-offset-surface-container-lowest bg-surface-container-lowest" type="checkbox">
+<div>
+<p class="font-label-md text-label-md text-on-surface">Review Goals</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal">Check progress on monthly/quarterly goals.</p>
+</div>
+</label>
+<label class="flex items-start gap-3 p-3 rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer">
+<input class="mt-1 w-4 h-4 text-primary-container rounded border-[#E8E2D8] focus:ring-primary-container focus:ring-offset-surface-container-lowest bg-surface-container-lowest" type="checkbox">
+<div>
+<p class="font-label-md text-label-md text-on-surface">Plan Next Week</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal">Time-block major priorities.</p>
+</div>
+</label>
+</div>
+</div>
+</div>
+<!-- Right Column: Reflection Prompts (Bento Style) -->
+<div class="lg:col-span-8 flex flex-col gap-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Prompt 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-[#E8E2D8] flex flex-col h-full">
+<div class="flex items-center gap-2 mb-4 text-[#C9B79C]">
+<span class="material-symbols-outlined">wb_sunny</span>
+<h4 class="font-headline-md text-headline-md text-on-surface">What went well?</h4>
+</div>
+<textarea class="w-full flex-1 min-h-[150px] bg-transparent border-none resize-none font-body-md text-body-md text-on-surface placeholder:text-outline focus:ring-0 p-0" placeholder="Celebrate your wins. What gave you energy this week?"></textarea>
+</div>
+<!-- Prompt 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-[#E8E2D8] flex flex-col h-full">
+<div class="flex items-center gap-2 mb-4 text-error">
+<span class="material-symbols-outlined">warning</span>
+<h4 class="font-headline-md text-headline-md text-on-surface">What did I avoid?</h4>
+</div>
+<textarea class="w-full flex-1 min-h-[150px] bg-transparent border-none resize-none font-body-md text-body-md text-on-surface placeholder:text-outline focus:ring-0 p-0" placeholder="Be honest. What tasks kept getting pushed back?"></textarea>
+</div>
+</div>
+<!-- Prompt 3 (Full width) -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-[#E8E2D8] flex flex-col flex-1 min-h-[250px]">
+<div class="flex items-center gap-2 mb-4 text-primary-container">
+<span class="material-symbols-outlined">my_location</span>
+<h4 class="font-headline-md text-headline-md text-on-surface">Focus for next week?</h4>
+</div>
+<textarea class="w-full flex-1 bg-transparent border-none resize-none font-body-md text-body-md text-on-surface placeholder:text-outline focus:ring-0 p-0" placeholder="If you could only accomplish 3 things next week, what would they be? Set your core intentions here."></textarea>
+<div class="flex justify-end mt-4 pt-4 border-t border-[#E8E2D8]">
+<button class="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-full font-label-md text-label-md hover:opacity-90 transition-all shadow-sm hover:shadow-md flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                Complete Review
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

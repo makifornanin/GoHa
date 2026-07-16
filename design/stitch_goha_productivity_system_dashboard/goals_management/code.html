@@ -1,0 +1,584 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GoHa - Goals</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "stack-gap": "16px",
+                "sidebar-width": "280px",
+                "container-padding": "32px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ],
+                "display": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Subtle Ambient Shadow for Cards */
+        .card-shadow {
+            box-shadow: 0 4px 20px rgba(27, 27, 33, 0.04);
+        }
+        .card-hover:hover {
+            box-shadow: 0 6px 24px rgba(27, 27, 33, 0.08);
+            transform: translateY(-1px);
+        }
+        
+        /* Custom scrollbar for sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e3e2e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #c2c8c6;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased overflow-hidden flex h-screen">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-8 px-4 gap-stack-gap fixed left-0 top-0 h-screen w-sidebar-width bg-surface-container-low border-r border-outline-variant z-50">
+<!-- Brand Header -->
+
+<!-- Quick Action CTA -->
+<button class="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary transition-colors duration-200 shadow-sm active:scale-95">
+<span class="material-symbols-outlined filled-icon">add</span>
+            Quick Action
+        </button>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto mt-2 pr-2">
+<ul class="flex flex-col gap-1">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="today">today</span>
+<span class="">Today</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-primary-container bg-primary-container font-bold font-label-md text-label-md scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined filled-icon" data-icon="emoji_events">emoji_events</span>
+<span class="">Goals</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="checklist">checklist</span>
+<span class="">To-dos</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="">Task Map</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="center_focus_strong">center_focus_strong</span>
+<span class="">Focus</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="repeat">repeat</span>
+<span class="">Habits</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span class="">Calendar</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="">Brain Dump</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="category">category</span>
+<span class="">Life Areas</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="rate_review">rate_review</span>
+<span class="">Review</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="">Progress</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+<!-- Footer Actions -->
+<div class="mt-auto pt-4 border-t border-outline-variant">
+<ul class="flex flex-col gap-1">
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="">Help</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:ml-[280px] h-screen bg-surface relative">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-padding z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant h-16 shrink-0 w-full">
+<div class="flex items-center gap-4">
+<!-- Mobile Menu Button -->
+<button class="md:hidden text-on-surface-variant hover:text-primary-container p-2 -ml-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h2 class="font-headline-md text-headline-md text-primary-container hidden md:block">Goals</h2>
+</div>
+<!-- Global Search -->
+<div class="flex-1 max-w-md mx-4 hidden md:flex relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary-container transition-colors">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-full py-1.5 pl-10 pr-4 text-body-md font-body-md focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all placeholder:text-outline text-on-surface" placeholder="Search goals, tasks..." type="text">
+</div>
+<div class="flex items-center gap-2">
+<button class="hidden md:flex bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 px-4 rounded-full items-center gap-2 hover:bg-primary transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Add Goal
+                </button>
+<button class="p-2 text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high rounded-full transition-colors active:opacity-70">
+<span class="material-symbols-outlined" data-icon="center_focus_strong">center_focus_strong</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary-container hover:bg-surface-container-high rounded-full transition-colors active:opacity-70">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-tertiary-container overflow-hidden ml-2 cursor-pointer border border-outline-variant">
+<img alt="User profile avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzHD84F5mBooinSE4eLK4crMQWUoR5UxWm9PJUR0iK3PAE5dycFoEQnxRRrSxt1ubstPlvcJZIYC72PCQkJ4OKSPzsZK6fHtvywFLnusBIEVo6wx9RD18AVClYg-oCH5-a8aFnbNCJiH4wn4VVxm-oDYSko_SddsytPTUTwkNdbvtk2NkXwyPYOqNGmNc8VFgDQD1I_GMv2q7J7ZVUM32A8RHWE3IAktZuvNqgYoVycqJap9z-KC7yqpgY5mH2PzYplRpcV8poQM8">
+</div>
+</div>
+</header>
+<!-- Page Content Scrollable Area -->
+<div class="flex-1 overflow-y-auto p-4 md:p-container-padding">
+<div class="max-w-[1200px] mx-auto space-y-section-gap">
+<!-- Page Header & Filters -->
+<div class="space-y-6">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">My Goals</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Track and manage your long-term objectives across all life areas.</p>
+</div>
+</div>
+<!-- Filter Tabs -->
+<div class="border-b border-outline-variant overflow-x-auto no-scrollbar">
+<ul class="flex gap-6 min-w-max">
+<li class="">
+<button class="font-label-md text-label-md py-3 text-on-surface-variant hover:text-primary-container transition-colors whitespace-nowrap">Today</button>
+</li>
+<li class="">
+<button class="font-label-md text-label-md py-3 text-on-surface-variant hover:text-primary-container transition-colors whitespace-nowrap">This Week</button>
+</li>
+<li class="">
+<button class="font-label-md text-label-md py-3 text-on-surface-variant hover:text-primary-container transition-colors whitespace-nowrap">This Month</button>
+</li>
+<li class="">
+<button class="font-label-md text-label-md py-3 text-on-surface-variant hover:text-primary-container transition-colors whitespace-nowrap">Quarterly</button>
+</li>
+<li class="">
+<button class="font-label-md text-label-md py-3 text-on-surface-variant hover:text-primary-container transition-colors whitespace-nowrap">Yearly</button>
+</li>
+<li class="">
+<button class="font-label-md text-label-md py-3 text-primary-container font-bold border-b-2 border-primary-container whitespace-nowrap">All Goals</button>
+</li>
+</ul>
+</div>
+</div>
+<!-- Goals Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Goal Card 1: In Progress (Health) -->
+<div class="bg-surface-container-lowest rounded-xl p-5 card-shadow card-hover transition-all duration-200 border border-surface-container-high flex flex-col relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-secondary-fixed/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-fixed/30 text-on-secondary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">favorite</span>
+                                Health &amp; Fitness
+                            </span>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Run a Half Marathon</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 line-clamp-2">Complete the city half marathon in under 2 hours. Requires consistent weekly training and diet adjustment.</p>
+<div class="mt-auto space-y-4">
+<!-- Progress Section -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider uppercase bg-primary-container text-on-primary-container">
+                                        In Progress
+                                    </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">45%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 45%;"></div>
+</div>
+</div>
+<!-- Meta Footer -->
+<div class="flex items-center justify-between pt-3 border-t border-surface-container-high">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm" title="Tasks">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span class="">12/24</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm" title="Habits connected">
+<span class="material-symbols-outlined text-[16px]">repeat</span>
+<span class="">2</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-error font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">event</span>
+<span class="">Oct 15</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Goal Card 2: On Track (Career) -->
+<div class="bg-surface-container-lowest rounded-xl p-5 card-shadow card-hover transition-all duration-200 border border-surface-container-high flex flex-col relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-tertiary-fixed/30 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">work</span>
+                                Career
+                            </span>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Launch SaaS MVP</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 line-clamp-2">Complete the core features of the new productivity app and launch to initial 100 beta testers.</p>
+<div class="mt-auto space-y-4">
+<!-- Progress Section -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider uppercase bg-secondary text-on-secondary">
+                                        On Track
+                                    </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">72%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 72%;"></div>
+</div>
+</div>
+<!-- Meta Footer -->
+<div class="flex items-center justify-between pt-3 border-t border-surface-container-high">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span class="">45/58</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">description</span>
+<span class="">3</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">event</span>
+<span class="">Nov 30</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Goal Card 3: At Risk (Finance) -->
+<div class="bg-surface-container-lowest rounded-xl p-5 card-shadow card-hover transition-all duration-200 border border-surface-container-high flex flex-col relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-surface-tint/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+                                Finance
+                            </span>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Save Emergency Fund</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 line-clamp-2">Accumulate 6 months of living expenses in a high-yield savings account.</p>
+<div class="mt-auto space-y-4">
+<!-- Progress Section -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider uppercase bg-error-container text-on-error-container border border-error/20">
+                                        At Risk
+                                    </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">30%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-error rounded-full" style="width: 30%;"></div>
+</div>
+</div>
+<!-- Meta Footer -->
+<div class="flex items-center justify-between pt-3 border-t border-surface-container-high">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span class="">4/12</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">repeat</span>
+<span class="">1</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">event</span>
+<span class="">Dec 31</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Goal Card 4: Not Started (Learning) -->
+<div class="bg-surface-container-lowest rounded-xl p-5 card-shadow card-hover transition-all duration-200 border border-surface-container-high flex flex-col relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-inverse-primary/30 text-on-primary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">school</span>
+                                Learning
+                            </span>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Learn Spanish (B1)</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 line-clamp-2">Achieve B1 conversational fluency in Spanish before the trip to Madrid next summer.</p>
+<div class="mt-auto space-y-4 opacity-70 group-hover:opacity-100 transition-opacity">
+<!-- Progress Section -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider uppercase bg-surface-variant text-on-surface-variant">
+                                        Not Started
+                                    </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">0%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-outline rounded-full" style="width: 0%;"></div>
+</div>
+</div>
+<!-- Meta Footer -->
+<div class="flex items-center justify-between pt-3 border-t border-surface-container-high">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span class="">0/20</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">event</span>
+<span class="">Jun 01, 2024</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Add New Goal Placeholder -->
+<button class="bg-surface-container-low rounded-xl p-5 border-2 border-dashed border-outline-variant hover:border-primary-container hover:bg-surface-container transition-all duration-200 flex flex-col items-center justify-center min-h-[260px] group text-on-surface-variant hover:text-primary-container">
+<div class="w-12 h-12 rounded-full bg-surface-container-high group-hover:bg-primary-container flex items-center justify-center mb-4 transition-colors">
+<span class="material-symbols-outlined text-[24px] group-hover:text-on-primary-container">add</span>
+</div>
+<span class="font-headline-md text-headline-md">Create New Goal</span>
+<span class="font-body-md text-body-md text-center mt-2 max-w-[200px] opacity-70">Define a new objective and break it down into actionable steps.</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+
+
+</body></html>

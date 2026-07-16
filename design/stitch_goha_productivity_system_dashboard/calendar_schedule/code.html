@@ -1,0 +1,521 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GoHa - Calendar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "stack-gap": "16px",
+                "sidebar-width": "280px",
+                "container-padding": "32px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .shadow-ambient {
+            box-shadow: 0 4px 20px rgba(27, 27, 33, 0.04);
+        }
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .hover-lift:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(27, 27, 33, 0.06);
+        }
+        
+        /* Hide scrollbar for clean look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-8 px-4 gap-stack-gap fixed left-0 top-0 h-screen w-sidebar-width bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline z-50">
+<!-- Brand -->
+<div class="px-4 mb-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center font-display-lg text-headline-md font-bold">G</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim font-bold">GoHa</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Life Operating System</p>
+</div>
+</div>
+<!-- Quick Action CTA -->
+<button class="w-full bg-primary text-on-primary hover:bg-on-primary-fixed-variant font-label-md text-label-md rounded-lg py-3 px-4 flex items-center justify-center gap-2 transition-colors duration-200 scale-98 active:scale-95 transition-all mb-4">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+            Quick Action
+        </button>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">today</span>
+                Today
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">emoji_events</span>
+                Goals
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">checklist</span>
+                To-dos
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">map</span>
+                Task Map
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">center_focus_strong</span>
+                Focus
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">repeat</span>
+                Habits
+            </a>
+<!-- Active State -->
+<a class="flex items-center gap-3 px-4 py-3 text-primary bg-secondary-container rounded-lg font-bold font-label-md text-label-md scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+                Calendar
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">psychology</span>
+                Brain Dump
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">category</span>
+                Life Areas
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">rate_review</span>
+                Review
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+                Progress
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</div>
+<!-- Footer -->
+<div class="pt-4 border-t border-outline-variant dark:border-outline flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">help</span>
+                Help
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </a>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-full md:w-[calc(100%-280px)] h-16 flex justify-between items-center px-container-padding z-40 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant dark:border-outline">
+<!-- Mobile Menu Trigger & Brand (Hidden on Desktop) -->
+<div class="flex items-center gap-4 md:hidden">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary font-bold">GoHa</h1>
+</div>
+<!-- Empty div for flex spacing on desktop since search is supposed to be on left, but we have no navigation links -->
+<div class="hidden md:block">
+<!-- Search could go here if implemented, but JSON says search_bar: "on_left" but no actual search input details provided -->
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4">
+<button class="hidden lg:flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-full font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[18px]">center_focus_strong</span>
+                Focus Mode
+            </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-full font-label-md text-label-md hover:bg-on-primary-fixed-variant transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Add Task
+            </button>
+<div class="w-px h-6 bg-outline-variant mx-2 hidden sm:block"></div>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70 hidden sm:block">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70">
+<img alt="User profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A close-up portrait of a professional looking individual used as a profile avatar. The person has a neutral, pleasant expression. The lighting is soft and natural, fitting a clean, modern UI design aesthetic. Background is out of focus." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0-o1aV1mCT5hG8iDKB4EDswzQUjpKUAbNnxYQVR3guk1atgkdGu7seV60r6Zt5kTxGKMXMqM8yGDBPY2t3AwIe19Y1GXC8wkas4qMA31j_lVwHPiDxT87iHQyR-EyqQz2H2ZzEZzLWo6YD4q_g5GfPyno3_91eV1GIopnWBZnH2drcpebn8EMNIt4MmEIXamC_Y74KG6CWmp1dWLuq4ZFPK2oNAqTiIRePsiYEIu2pvkAeNyEU8qaJe9wJviaaDDmoIRnBYf94t0">
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-24 pb-12 px-4 md:px-container-padding md:ml-sidebar-width min-h-screen flex flex-col xl:flex-row gap-section-gap max-w-[1600px] mx-auto">
+<!-- Left Column: Calendar Grid (Fluid) -->
+<div class="flex-1 flex flex-col gap-stack-gap">
+<!-- Calendar Header / Controls -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container-lowest p-4 rounded-xl shadow-ambient border border-outline-variant">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">October 2023</h2>
+<div class="flex items-center gap-1 bg-surface-container-low rounded-lg p-1">
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-variant transition-colors"><span class="material-symbols-outlined">chevron_left</span></button>
+<button class="px-3 py-1 font-label-md text-label-md text-on-surface hover:bg-surface-variant rounded transition-colors">Today</button>
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-variant transition-colors"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+<!-- View Toggles -->
+<div class="flex bg-surface-container-low p-1 rounded-lg">
+<button class="px-4 py-1.5 rounded-md bg-surface-container-lowest shadow-sm font-label-md text-label-md text-primary font-bold">Month</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors">Week</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors">Day</button>
+</div>
+</div>
+<!-- Calendar Grid -->
+<div class="bg-surface-container-lowest rounded-xl shadow-ambient border border-outline-variant overflow-hidden flex-1 min-h-[600px] flex flex-col">
+<!-- Days of Week Header -->
+<div class="grid grid-cols-7 border-b border-outline-variant bg-surface-container-low/50">
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Sun</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Mon</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Tue</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Wed</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Thu</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Fri</div>
+<div class="py-3 text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Sat</div>
+</div>
+<!-- Grid Cells (Simplified for demonstration) -->
+<div class="grid grid-cols-7 grid-rows-5 flex-1 bg-surface-variant gap-[1px]">
+<!-- Row 1 -->
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">1</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">2</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">3</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">4</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">5</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">6</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-outline">7</span>
+</div>
+<!-- Row 2 -->
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-on-surface">8</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px] flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface">9</span>
+<!-- Time Block -->
+<div class="bg-surface-container-high border-l-2 border-outline px-2 py-1 rounded-r font-label-sm text-label-sm text-on-surface-variant truncate">
+                            Deep Work
+                        </div>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px] flex flex-col gap-1 bg-primary/5">
+<span class="font-label-md text-label-md text-primary font-bold flex items-center justify-between">
+                            10
+                            <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</span>
+<!-- Mixed Items Today -->
+<div class="bg-primary-container text-on-primary-container px-2 py-1 rounded font-label-sm text-label-sm truncate shadow-sm cursor-pointer hover:opacity-90">
+                            10:00 - Job Interview
+                        </div>
+<div class="bg-tertiary-fixed border border-tertiary-fixed-dim px-2 py-1 rounded font-label-sm text-label-sm text-on-tertiary-fixed truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">repeat</span> Read 20 pages
+                        </div>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px] flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface">11</span>
+<div class="border border-outline-variant px-2 py-1 rounded font-label-sm text-label-sm text-on-surface-variant truncate flex items-center gap-1 line-through opacity-70">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Draft Proposal
+                        </div>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-on-surface">12</span>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px] flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface">13</span>
+<div class="bg-secondary-container text-on-secondary-container px-2 py-1 rounded font-label-sm text-label-sm truncate">
+                            Weekly Review
+                        </div>
+</div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]">
+<span class="font-label-md text-label-md text-on-surface">14</span>
+</div>
+<!-- Row 3, 4, 5 omitted for brevity, filled with empty cells -->
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">15</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">16</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">17</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">18</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">19</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">20</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">21</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">22</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">23</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">24</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">25</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">26</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">27</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">28</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">29</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">30</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-on-surface">31</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-outline">1</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-outline">2</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-outline">3</span></div>
+<div class="bg-surface-container-lowest p-2 min-h-[120px]"><span class="font-label-md text-label-md text-outline">4</span></div>
+</div>
+</div>
+</div>
+<!-- Right Column: Sidebar (Upcoming Events & Details) -->
+<aside class="w-full xl:w-[320px] flex flex-col gap-stack-gap">
+<!-- Contextual Insight Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient border border-outline-variant hover-lift">
+<div class="flex items-center gap-3 mb-4 text-tertiary">
+<span class="material-symbols-outlined">auto_awesome</span>
+<h3 class="font-headline-md text-headline-md">Daily Focus</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4">You have a major interview today. Focus on preparation and keeping a clear mind. Routine tasks have been deprioritized.</p>
+<div class="h-1.5 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[60%] rounded-full"></div>
+</div>
+</div>
+<!-- Upcoming List -->
+<div class="flex-1 bg-surface-container-lowest rounded-xl shadow-ambient border border-outline-variant flex flex-col overflow-hidden">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low/50">
+<h3 class="font-headline-md text-headline-md text-on-surface">Upcoming</h3>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-[20px]">filter_list</span></button>
+</div>
+<div class="p-4 flex flex-col gap-4 overflow-y-auto no-scrollbar">
+<!-- Today Section -->
+<div>
+<h4 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-3">Today, Oct 10</h4>
+<!-- Detailed Event Card: Job Interview -->
+<div class="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
+<div class="flex justify-between items-start mb-2">
+<div class="flex gap-2 items-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="font-label-md text-label-md text-primary font-bold">10:00 AM</span>
+</div>
+<span class="bg-primary-container text-on-primary-container text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">Event</span>
+</div>
+<h5 class="font-headline-md text-[16px] leading-tight text-on-surface mb-1">Job Interview - Acme Corp</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">videocam</span> Video Call
+                            </p>
+<!-- Nested Prep Tasks -->
+<div class="bg-surface-container-lowest rounded-md p-2 border border-outline-variant">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-2">Prep Tasks:</p>
+<label class="flex items-center gap-2 mb-1.5 cursor-pointer group">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary w-3.5 h-3.5" type="checkbox">
+<span class="font-body-md text-[13px] text-on-surface-variant group-hover:text-on-surface line-through opacity-70">Prepare resume</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="rounded border-outline-variant text-primary focus:ring-primary w-3.5 h-3.5" type="checkbox">
+<span class="font-body-md text-[13px] text-on-surface-variant group-hover:text-on-surface">Practice answers</span>
+</label>
+</div>
+</div>
+<!-- Habit Reminder -->
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer mb-1">
+<span class="material-symbols-outlined text-tertiary mt-0.5 text-[18px]">repeat</span>
+<div>
+<h5 class="font-label-md text-label-md text-on-surface">Read 20 pages</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Habit • Anytime</p>
+</div>
+</div>
+<!-- Deadline Task -->
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<input class="rounded border-outline-variant text-primary focus:ring-primary mt-1" type="checkbox">
+<div>
+<h5 class="font-label-md text-label-md text-on-surface">Submit Expense Report</h5>
+<p class="font-label-sm text-label-sm text-error flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Due 5:00 PM
+                                </p>
+</div>
+</div>
+</div>
+<!-- Tomorrow Section -->
+<div class="mt-2">
+<h4 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-3">Tomorrow, Oct 11</h4>
+<!-- Time Block -->
+<div class="border-l-2 border-outline pl-3 py-1 mb-3">
+<h5 class="font-label-md text-label-md text-on-surface">Deep Work Block</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">9:00 AM - 12:00 PM</p>
+</div>
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<input class="rounded border-outline-variant text-primary focus:ring-primary mt-1" type="checkbox">
+<div>
+<h5 class="font-label-md text-label-md text-on-surface">Draft Proposal</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Task</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</main>
+</body></html>

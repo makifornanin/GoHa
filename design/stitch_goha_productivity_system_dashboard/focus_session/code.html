@@ -1,0 +1,261 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GoHa - Focus Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "container-padding": "32px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col antialiased">
+<!-- Top Navigation (Suppressed per instructions for focus mode, but kept header for task context) -->
+<header class="w-full flex justify-between items-center px-container-padding py-6 z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant/30">
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-bold tracking-tight">Finalize Q4 Presentation</h1>
+<div class="flex items-center gap-2 text-on-surface-variant mt-1">
+<span class="material-symbols-outlined text-sm">emoji_events</span>
+<span class="font-label-sm text-label-sm">Launch SaaS MVP</span>
+<span class="text-outline-variant">•</span>
+<span class="material-symbols-outlined text-sm">map</span>
+<span class="font-label-sm text-label-sm">Step 3 of 5</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-2 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-padding py-12 relative overflow-hidden">
+<!-- Ambient Background Circle -->
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
+<!-- Timer Centerpiece -->
+<div class="flex flex-col items-center gap-8 mb-16 z-10">
+<div class="relative flex items-center justify-center">
+<!-- Decorative Ring -->
+<svg class="absolute w-[400px] h-[400px] -z-10 opacity-20" viewBox="0 0 100 100">
+<circle class="text-primary" cx="50" cy="50" fill="none" r="48" stroke="currentColor" stroke-width="0.5"></circle>
+<circle class="text-primary" cx="50" cy="50" fill="none" r="48" stroke="currentColor" stroke-dasharray="301.59" stroke-dashoffset="75.4" stroke-width="2"></circle>
+</svg>
+<h2 class="font-display-lg text-[120px] leading-none text-primary font-extrabold tracking-tighter tabular-nums drop-shadow-sm">
+                    24:15
+                </h2>
+</div>
+<!-- Controls -->
+<div class="flex items-center gap-6 mt-4">
+<button class="flex items-center justify-center w-12 h-12 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-95">
+<span class="material-symbols-outlined text-xl">restart_alt</span>
+</button>
+<button class="flex items-center justify-center w-20 h-20 rounded-full bg-primary text-on-primary hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer active:scale-95">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<button class="flex items-center justify-center w-12 h-12 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer active:scale-95">
+<span class="material-symbols-outlined text-xl">check</span>
+</button>
+</div>
+<button class="text-primary font-label-md text-label-md hover:underline decoration-primary/30 underline-offset-4 cursor-pointer mt-2 transition-all opacity-80 hover:opacity-100">
+                Need More Time?
+            </button>
+</div>
+<!-- Presets -->
+<div class="flex gap-4 mb-16 z-10">
+<button class="px-6 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-primary hover:text-on-primary transition-colors cursor-pointer border border-outline-variant/20">15 min</button>
+<button class="px-6 py-2 rounded-full bg-primary/10 text-primary font-label-md text-label-md hover:bg-primary hover:text-on-primary transition-colors cursor-pointer border border-primary/20 ring-2 ring-primary/20 ring-offset-2 ring-offset-surface">25 min</button>
+<button class="px-6 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-primary hover:text-on-primary transition-colors cursor-pointer border border-outline-variant/20">45 min</button>
+<button class="px-6 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-primary hover:text-on-primary transition-colors cursor-pointer border border-outline-variant/20">60 min</button>
+<button class="px-4 py-2 rounded-full bg-surface-container-lowest text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+</div>
+<!-- Quick Notes Bottom Bar -->
+<div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 mt-auto z-10">
+<!-- Feedback Notes -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">lightbulb</span>
+<h3 class="font-headline-md text-headline-md text-sm font-semibold">Feedback Notes</h3>
+</div>
+<textarea class="w-full bg-transparent border-none focus:ring-0 p-0 text-on-surface font-body-md text-body-md resize-none h-24 placeholder:text-on-surface-variant/50" placeholder="Capture thoughts on the task..."></textarea>
+</div>
+<!-- Distraction Notes -->
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">speaker_notes_off</span>
+<h3 class="font-headline-md text-headline-md text-sm font-semibold">Distraction Dump</h3>
+</div>
+<textarea class="w-full bg-transparent border-none focus:ring-0 p-0 text-on-surface font-body-md text-body-md resize-none h-24 placeholder:text-on-surface-variant/50" placeholder="Off-topic thoughts to handle later..."></textarea>
+</div>
+</div>
+</main>
+</body></html>

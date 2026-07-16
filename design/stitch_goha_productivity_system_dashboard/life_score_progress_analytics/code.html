@@ -1,0 +1,540 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GoHa - Progress</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "sidebar-width": "280px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .shadow-level-1 {
+            box-shadow: 0px 4px 20px rgba(27, 27, 33, 0.04);
+        }
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .hover-lift:hover {
+            transform: translateY(-1px);
+            box-shadow: 0px 6px 24px rgba(27, 27, 33, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-md selection:bg-primary-container selection:text-on-primary-container flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-8 px-4 gap-stack-md bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline fixed left-0 top-0 h-screen w-sidebar-width z-50">
+<div class="flex items-center gap-4 px-4 mb-8">
+<img alt="User profile avatar" class="w-12 h-12 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWNiA2HZoXhwpb8jSkmNxHXo1EWzHazLZ-7ioB749999R74YcfRsRQ_S61n_PtoepcOIq3x9oCRG1vBbYHjJ9kl6bmpE9mvTciWfYD8LpGTs-y15fgmzpm3UwCpYhpwy4kZbJ2CbX9zszK3TWkZctcnoTWR4qhDxs68Uf_0WmIqgeSa2T5EPJoX26bi0e4TI_qBxGhh8-Zhg6W6upkYNGtr9FuYU9fmeZ2rqVzgdj9hZBJfzu5QdmWW35py9j4dHSziPPBS2i5VF0">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary dark:text-primary-fixed-dim">GoHa</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Life Operating System</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary rounded-lg py-3 px-4 font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-on-primary-fixed-variant transition-colors shadow-sm mb-4">
+<span class="material-symbols-outlined text-[18px]">add</span>
+            Quick Action
+        </button>
+<div class="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">today</span>
+<span class="font-label-md text-label-md">Today</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">emoji_events</span>
+<span class="font-label-md text-label-md">Goals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">checklist</span>
+<span class="font-label-md text-label-md">To-dos</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">map</span>
+<span class="font-label-md text-label-md">Task Map</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">center_focus_strong</span>
+<span class="font-label-md text-label-md">Focus</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">repeat</span>
+<span class="font-label-md text-label-md">Habits</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+<span class="font-label-md text-label-md">Calendar</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+<span class="font-label-md text-label-md">Brain Dump</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">category</span>
+<span class="font-label-md text-label-md">Life Areas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">rate_review</span>
+<span class="font-label-md text-label-md">Review</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-primary dark:text-primary-fixed-dim bg-secondary-container dark:bg-on-secondary-fixed-variant rounded-lg font-bold scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">query_stats</span>
+<span class="font-label-md text-label-md">Progress</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<div class="mt-auto pt-4 border-t border-outline-variant flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200 scale-98 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[280px] min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-container-margin z-40 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant dark:border-outline fixed top-0 right-0 w-full md:w-[calc(100%-280px)] h-16">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-lg text-headline-lg text-primary dark:text-primary-fixed-dim md:hidden">GoHa</h2>
+</div>
+<div class="flex items-center gap-3">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded-lg hover:bg-on-primary-fixed-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Add Task
+                </button>
+<button class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-lg hover:bg-surface-container-high transition-colors border border-outline-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">center_focus_strong</span>
+                    Focus Mode
+                </button>
+<div class="flex items-center gap-1 ml-2 border-l border-outline-variant pl-3">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="pt-24 pb-12 px-4 md:px-container-margin flex-1 max-w-[1200px] mx-auto w-full">
+<div class="mb-section-gap flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg md:text-headline-lg mb-2">Progress Overview</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Your life score and recent momentum.</p>
+</div>
+<div class="flex bg-surface-container-low rounded-lg p-1 border border-outline-variant">
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md bg-surface shadow-sm text-primary">30 Days</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:text-on-surface">3 Months</button>
+<button class="px-4 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:text-on-surface">Year</button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-stack-md">
+<!-- Main Life Score Gauge (Spans 4 cols on desktop) -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant md:col-span-4 flex flex-col items-center justify-center relative overflow-hidden hover-lift min-h-[320px]">
+<!-- Soft background glow based on score -->
+<div class="absolute inset-0 bg-secondary-container/10 blur-3xl rounded-full translate-y-1/2"></div>
+<h3 class="font-headline-md text-headline-md w-full text-left mb-6 text-on-surface relative z-10">Life Score</h3>
+<div class="relative w-48 h-48 flex items-center justify-center z-10">
+<!-- Simulated SVG Gauge -->
+<svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+<!-- Background track -->
+<circle cx="50" cy="50" fill="none" r="40" stroke="#efeeec" stroke-linecap="round" stroke-width="8"></circle>
+<!-- Progress track (78%) -->
+<circle class="transition-all duration-1000 ease-out" cx="50" cy="50" fill="none" r="40" stroke="#4c635f" stroke-dasharray="251.2" stroke-dashoffset="55.2" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="font-display-lg text-[48px] font-semibold text-primary leading-none">78</span>
+<span class="font-label-sm text-label-sm text-primary bg-primary-container/30 px-3 py-1 rounded-full mt-2">Strong</span>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-2 text-on-surface-variant font-label-md text-label-md relative z-10">
+<span class="material-symbols-outlined text-[18px] text-primary">trending_up</span>
+<span>+4 points from last month</span>
+</div>
+</div>
+<!-- Insights Area (Spans 8 cols on desktop) -->
+<div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-stack-md">
+<!-- Insight 1 -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant flex flex-col justify-between hover-lift">
+<div class="flex items-start justify-between mb-4">
+<div class="p-3 bg-tertiary-container/20 rounded-lg text-tertiary">
+<span class="material-symbols-outlined">work</span>
+</div>
+<span class="font-label-sm text-label-sm bg-surface-container-low text-on-surface-variant px-2 py-1 rounded">Strongest Area</span>
+</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">Career &amp; Growth</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">You've consistently hit your weekly deep work targets.</p>
+</div>
+</div>
+<!-- Insight 2 -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant flex flex-col justify-between hover-lift">
+<div class="flex items-start justify-between mb-4">
+<div class="p-3 bg-error-container/50 rounded-lg text-error">
+<span class="material-symbols-outlined">favorite</span>
+</div>
+<span class="font-label-sm text-label-sm bg-surface-container-low text-on-surface-variant px-2 py-1 rounded">Needs Focus</span>
+</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-1">Health &amp; Fitness</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Workout habits have dropped by 30% this week. Let's recalibrate.</p>
+</div>
+</div>
+<!-- Data Card 1 -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant flex items-center gap-4 hover-lift">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">center_focus_strong</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">Focus Sessions</p>
+<p class="font-headline-lg text-headline-lg text-on-surface">12 <span class="font-body-md text-body-md text-on-surface-variant font-normal">completed</span></p>
+</div>
+</div>
+<!-- Data Card 2 -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant flex items-center gap-4 hover-lift">
+<div class="w-12 h-12 rounded-full bg-secondary-container/40 text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined">emoji_events</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant">Goals Advanced</p>
+<p class="font-headline-lg text-headline-lg text-on-surface">3 <span class="font-body-md text-body-md text-on-surface-variant font-normal">moved forward</span></p>
+</div>
+</div>
+</div>
+<!-- Charts Section -->
+<div class="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-stack-md mt-4">
+<!-- Trend Chart -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant hover-lift h-[350px] flex flex-col">
+<h3 class="font-headline-md text-headline-md mb-6 text-on-surface">Life Score Trend</h3>
+<div class="flex-1 relative w-full h-full">
+<canvas id="trendChart"></canvas>
+</div>
+</div>
+<!-- Completion Chart -->
+<div class="bg-surface-container-lowest shadow-level-1 rounded-xl p-6 border border-outline-variant hover-lift h-[350px] flex flex-col">
+<h3 class="font-headline-md text-headline-md mb-6 text-on-surface">Task &amp; Habit Completion</h3>
+<div class="flex-1 relative w-full h-full">
+<canvas id="completionChart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Chart.js Configuration
+        document.addEventListener('DOMContentLoaded', function() {
+            // Trend Chart
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            
+            // Create gradient for trend line
+            let gradientTrend = ctxTrend.createLinearGradient(0, 0, 0, 300);
+            gradientTrend.addColorStop(0, 'rgba(76, 99, 95, 0.2)'); // primary color low opacity
+            gradientTrend.addColorStop(1, 'rgba(76, 99, 95, 0)');
+
+            new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Life Score',
+                        data: [65, 68, 74, 78],
+                        borderColor: '#4c635f', // primary
+                        backgroundColor: gradientTrend,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#4c635f',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1b1c1b',
+                            padding: 12,
+                            titleFont: { family: 'Manrope', size: 14 },
+                            bodyFont: { family: 'Manrope', size: 14 },
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 50,
+                            max: 100,
+                            grid: {
+                                color: '#f2f0ef', // inverse-on-surface
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: { family: 'Manrope', size: 12 },
+                                color: '#727877', // outline
+                                stepSize: 10
+                            }
+                        },
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: {
+                                font: { family: 'Manrope', size: 12 },
+                                color: '#727877' // outline
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+
+            // Completion Chart
+            const ctxComp = document.getElementById('completionChart').getContext('2d');
+            new Chart(ctxComp, {
+                type: 'bar',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [
+                        {
+                            label: 'Tasks',
+                            data: [8, 12, 10, 14, 9, 5, 4],
+                            backgroundColor: '#b3ccc7', // inverse-primary
+                            borderRadius: 4,
+                            barPercentage: 0.6,
+                            categoryPercentage: 0.8
+                        },
+                        {
+                            label: 'Habits',
+                            data: [5, 6, 4, 6, 5, 3, 2],
+                            backgroundColor: '#f3e0c3', // secondary-container
+                            borderRadius: 4,
+                            barPercentage: 0.6,
+                            categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                font: { family: 'Manrope', size: 12 },
+                                color: '#424847'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1b1c1b',
+                            padding: 12,
+                            titleFont: { family: 'Manrope', size: 14 },
+                            bodyFont: { family: 'Manrope', size: 14 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: true,
+                            grid: {
+                                color: '#f2f0ef',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: { family: 'Manrope', size: 12 },
+                                color: '#727877'
+                            }
+                        },
+                        x: {
+                            stacked: true,
+                            grid: { display: false, drawBorder: false },
+                            ticks: {
+                                font: { family: 'Manrope', size: 12 },
+                                color: '#727877'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body></html>

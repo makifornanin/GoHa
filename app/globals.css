@@ -1,0 +1,749 @@
+@import "tailwindcss";
+
+/*
+  GoHa design tokens: Apple HIG / Liquid Glass.
+  Source of truth: docs/GOHA_DESIGN_SPEC.md. Every value below is a spec
+  decision, not a suggestion. This is the ONLY file where color hex/rgba may
+  appear (CLAUDE.md section 9 + spec rule "no hex outside the token layer").
+
+  Structure:
+  1. Spec tokens (light `:root`, dark `.dark`): label opacity system, backgrounds,
+     separators, system colors (separate light/dark values), system grays,
+     glass tiers, elevation.
+  2. Legacy aliases: every token name from the previous system, repointed to the
+     Apple palette, so screens not yet rebuilt keep compiling and stay coherent
+     until their rollout slice.
+  3. @theme mapping, the spec type scale (exact tracking), and the radius scale.
+  4. Base styles, glass material classes with mandatory fallbacks, helpers.
+*/
+
+@custom-variant dark (&:is(.dark *));
+
+/* =====================================================================
+   1a. LIGHT (spec section 4)
+   ===================================================================== */
+:root {
+  color-scheme: light;
+
+  /* Label opacity system: rgba, never hex grays. */
+  --label: #000000;
+  --label-secondary: rgba(60, 60, 67, 0.6);
+  --label-tertiary: rgba(60, 60, 67, 0.3);
+  --label-quaternary: rgba(60, 60, 67, 0.18);
+
+  /* Backgrounds */
+  --canvas: #f2f2f7;
+  --surface: #ffffff;
+  --surface-secondary: #f2f2f7;
+  --surface-hover: rgba(60, 60, 67, 0.04);
+  --surface-pressed: rgba(60, 60, 67, 0.08);
+
+  /* Separators: translucent between rows, opaque for card edges. */
+  --separator: rgba(60, 60, 67, 0.29);
+  --separator-opaque: #c6c6c8;
+
+  /* System colors, light values. */
+  --blue: #007aff;
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --system-teal: #30b0c7;
+  --indigo: #5856d6;
+  --purple: #af52de;
+  --pink: #ff2d55;
+
+  /* System grays */
+  --gray-1: #8e8e93;
+  --gray-2: #aeaeb2;
+  --gray-3: #c7c7cc;
+  --gray-4: #d1d1d6;
+  --gray-5: #e5e5ea;
+  --gray-6: #f2f2f7;
+
+  /* Liquid Glass tiers (spec section 5). backdrop-filter applied by classes. */
+  --glass-ultra-thin-bg: rgba(255, 255, 255, 0.6);
+  --glass-thin-bg: rgba(255, 255, 255, 0.72);
+  --glass-regular-bg: rgba(255, 255, 255, 0.84);
+  --glass-thick-bg: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+
+  /* Modal overlay: no blur on the overlay itself. */
+  --overlay: rgba(0, 0, 0, 0.32);
+
+  /* Elevation (cool, quiet). */
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --e2: 0 2px 6px rgba(0, 0, 0, 0.06), 0 6px 16px rgba(0, 0, 0, 0.05);
+  --e3: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* ---- 2. Legacy aliases (previous token names -> Apple palette) ---- */
+  --background: var(--canvas);
+  --surface-dim: var(--gray-6);
+  --surface-bright: var(--surface);
+  --surface-container-lowest: var(--surface);
+  --surface-container-low: var(--gray-6);
+  --surface-container: var(--gray-5);
+  --surface-container-high: var(--gray-4);
+  --surface-container-highest: var(--gray-3);
+  --surface-variant: var(--gray-4);
+  --surface-tint: var(--blue);
+
+  --on-surface: var(--label);
+  --on-surface-variant: var(--label-secondary);
+  --on-background: var(--label);
+
+  --outline: var(--label-tertiary);
+  --outline-variant: var(--separator-opaque);
+
+  --inverse-surface: #000000;
+  --inverse-on-surface: #ffffff;
+  --inverse-primary: #0a84ff;
+
+  --primary: var(--blue);
+  --primary-hover: color-mix(in srgb, var(--blue) 94%, white);
+  --primary-active: color-mix(in srgb, var(--blue) 90%, black);
+  --on-primary: #ffffff;
+  --primary-container: color-mix(in srgb, var(--blue) 12%, transparent);
+  --on-primary-container: var(--blue);
+  --primary-fixed: color-mix(in srgb, var(--blue) 20%, transparent);
+  --primary-fixed-dim: var(--blue);
+  --on-primary-fixed: var(--blue);
+  --on-primary-fixed-variant: var(--blue);
+
+  --secondary: var(--indigo);
+  --secondary-hover: color-mix(in srgb, var(--indigo) 94%, white);
+  --on-secondary: #ffffff;
+  --secondary-container: color-mix(in srgb, var(--indigo) 14%, transparent);
+  --on-secondary-container: var(--indigo);
+  --secondary-fixed: color-mix(in srgb, var(--indigo) 20%, transparent);
+  --secondary-fixed-dim: var(--indigo);
+  --on-secondary-fixed: var(--indigo);
+  --on-secondary-fixed-variant: var(--indigo);
+
+  --tertiary: var(--purple);
+  --on-tertiary: #ffffff;
+  --tertiary-container: color-mix(in srgb, var(--purple) 14%, transparent);
+  --on-tertiary-container: var(--purple);
+  --tertiary-fixed: color-mix(in srgb, var(--purple) 20%, transparent);
+  --tertiary-fixed-dim: var(--purple);
+  --on-tertiary-fixed: var(--purple);
+  --on-tertiary-fixed-variant: var(--purple);
+
+  --success: var(--green);
+  --on-success: #ffffff;
+  --success-container: color-mix(in srgb, var(--green) 14%, transparent);
+  --on-success-container: var(--green);
+
+  --warning: var(--orange);
+  --on-warning: #ffffff;
+  --warning-container: color-mix(in srgb, var(--orange) 14%, transparent);
+  --on-warning-container: var(--orange);
+
+  --error: var(--red);
+  --on-error: #ffffff;
+  --error-container: color-mix(in srgb, var(--red) 12%, transparent);
+  --on-error-container: var(--red);
+
+  --accent-beige: var(--yellow);
+  --accent-lavender: var(--indigo);
+
+  --shadow-sm: var(--e1);
+  --shadow-md: var(--e2);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--blue) 30%, transparent),
+    0 8px 24px color-mix(in srgb, var(--blue) 18%, transparent);
+  --highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+
+  /* shadcn/ui compatibility aliases */
+  --foreground: var(--label);
+  --card: var(--surface);
+  --card-foreground: var(--label);
+  --popover: var(--surface);
+  --popover-foreground: var(--label);
+  --muted: var(--gray-5);
+  --muted-foreground: var(--label-secondary);
+  --accent: var(--gray-5);
+  --accent-foreground: var(--label);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --border: var(--separator-opaque);
+  --input: var(--separator-opaque);
+  --ring: var(--blue);
+
+  --radius: 0.625rem;
+}
+
+/* =====================================================================
+   1b. DARK (spec section 4)
+   ===================================================================== */
+.dark {
+  color-scheme: dark;
+
+  --label: #ffffff;
+  --label-secondary: rgba(235, 235, 245, 0.6);
+  --label-tertiary: rgba(235, 235, 245, 0.3);
+  --label-quaternary: rgba(235, 235, 245, 0.18);
+
+  --canvas: #000000;
+  --surface: #1c1c1e;
+  --surface-secondary: #2c2c2e;
+  --surface-hover: rgba(235, 235, 245, 0.06);
+  --surface-pressed: rgba(235, 235, 245, 0.1);
+
+  --separator: rgba(84, 84, 88, 0.6);
+  --separator-opaque: #38383a;
+
+  /* System colors, dark values (Apple ships different values per mode). */
+  --blue: #0a84ff;
+  --green: #30d158;
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --system-teal: #40c8e0;
+  --indigo: #5e5ce6;
+  --purple: #bf5af2;
+  --pink: #ff375f;
+
+  --gray-1: #8e8e93;
+  --gray-2: #636366;
+  --gray-3: #48484a;
+  --gray-4: #3a3a3c;
+  --gray-5: #2c2c2e;
+  --gray-6: #1c1c1e;
+
+  --glass-ultra-thin-bg: rgba(28, 28, 30, 0.6);
+  --glass-thin-bg: rgba(28, 28, 30, 0.72);
+  --glass-regular-bg: rgba(28, 28, 30, 0.84);
+  --glass-thick-bg: rgba(28, 28, 30, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+
+  --overlay: rgba(0, 0, 0, 0.32);
+
+  /* Dark: halve shadow opacities; separators + specular carry elevation. */
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.02), 0 1px 1px rgba(0, 0, 0, 0.015);
+  --e2: 0 2px 6px rgba(0, 0, 0, 0.03), 0 6px 16px rgba(0, 0, 0, 0.025);
+  --e3: 0 8px 32px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+
+  /* ---- Legacy aliases, dark ---- */
+  --background: var(--canvas);
+  --surface-dim: #000000;
+  --surface-bright: var(--gray-4);
+  --surface-container-lowest: var(--surface);
+  --surface-container-low: var(--gray-6);
+  --surface-container: var(--gray-5);
+  --surface-container-high: var(--gray-4);
+  --surface-container-highest: var(--gray-3);
+  --surface-variant: var(--gray-4);
+  --surface-tint: var(--blue);
+
+  --on-surface: var(--label);
+  --on-surface-variant: var(--label-secondary);
+  --on-background: var(--label);
+
+  --outline: var(--label-tertiary);
+  --outline-variant: var(--separator-opaque);
+
+  --inverse-surface: #f2f2f7;
+  --inverse-on-surface: #1c1c1e;
+  --inverse-primary: #007aff;
+
+  --primary: var(--blue);
+  --primary-hover: color-mix(in srgb, var(--blue) 94%, white);
+  --primary-active: color-mix(in srgb, var(--blue) 90%, black);
+  --on-primary: #ffffff;
+  --primary-container: color-mix(in srgb, var(--blue) 18%, transparent);
+  --on-primary-container: var(--blue);
+  --primary-fixed: color-mix(in srgb, var(--blue) 24%, transparent);
+  --primary-fixed-dim: var(--blue);
+  --on-primary-fixed: var(--blue);
+  --on-primary-fixed-variant: var(--blue);
+
+  --secondary: var(--indigo);
+  --secondary-hover: color-mix(in srgb, var(--indigo) 94%, white);
+  --on-secondary: #ffffff;
+  --secondary-container: color-mix(in srgb, var(--indigo) 20%, transparent);
+  --on-secondary-container: var(--indigo);
+  --secondary-fixed: color-mix(in srgb, var(--indigo) 24%, transparent);
+  --secondary-fixed-dim: var(--indigo);
+  --on-secondary-fixed: var(--indigo);
+  --on-secondary-fixed-variant: var(--indigo);
+
+  --tertiary: var(--purple);
+  --on-tertiary: #ffffff;
+  --tertiary-container: color-mix(in srgb, var(--purple) 20%, transparent);
+  --on-tertiary-container: var(--purple);
+  --tertiary-fixed: color-mix(in srgb, var(--purple) 24%, transparent);
+  --tertiary-fixed-dim: var(--purple);
+  --on-tertiary-fixed: var(--purple);
+  --on-tertiary-fixed-variant: var(--purple);
+
+  --success: var(--green);
+  --on-success: #ffffff;
+  --success-container: color-mix(in srgb, var(--green) 20%, transparent);
+  --on-success-container: var(--green);
+
+  --warning: var(--orange);
+  --on-warning: #ffffff;
+  --warning-container: color-mix(in srgb, var(--orange) 20%, transparent);
+  --on-warning-container: var(--orange);
+
+  --error: var(--red);
+  --on-error: #ffffff;
+  --error-container: color-mix(in srgb, var(--red) 18%, transparent);
+  --on-error-container: var(--red);
+
+  --accent-beige: var(--yellow);
+  --accent-lavender: var(--indigo);
+
+  --shadow-sm: var(--e1);
+  --shadow-md: var(--e2);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--blue) 30%, transparent),
+    0 8px 24px color-mix(in srgb, var(--blue) 18%, transparent);
+  --highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+
+  --foreground: var(--label);
+  --card: var(--surface);
+  --card-foreground: var(--label);
+  --popover: var(--surface);
+  --popover-foreground: var(--label);
+  --muted: var(--gray-5);
+  --muted-foreground: var(--label-secondary);
+  --accent: var(--gray-5);
+  --accent-foreground: var(--label);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --border: var(--separator-opaque);
+  --input: var(--separator-opaque);
+  --ring: var(--blue);
+}
+
+/* =====================================================================
+   3. Tailwind theme mapping
+   ===================================================================== */
+@theme inline {
+  /* ---- Spec tokens ---- */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-pressed: var(--surface-pressed);
+
+  --color-label: var(--label);
+  --color-label-secondary: var(--label-secondary);
+  --color-label-tertiary: var(--label-tertiary);
+  --color-label-quaternary: var(--label-quaternary);
+
+  --color-separator: var(--separator);
+  --color-separator-opaque: var(--separator-opaque);
+
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-orange: var(--orange);
+  --color-yellow: var(--yellow);
+  --color-system-teal: var(--system-teal);
+  --color-indigo: var(--indigo);
+  --color-purple: var(--purple);
+  --color-pink: var(--pink);
+
+  --color-gray-1: var(--gray-1);
+  --color-gray-2: var(--gray-2);
+  --color-gray-3: var(--gray-3);
+  --color-gray-4: var(--gray-4);
+  --color-gray-5: var(--gray-5);
+  --color-gray-6: var(--gray-6);
+
+  --color-glass-border: var(--glass-border);
+  --color-overlay: var(--overlay);
+
+  --shadow-e1: var(--e1);
+  --shadow-e2: var(--e2);
+  --shadow-e3: var(--e3);
+
+  /* ---- Legacy color aliases ---- */
+  --color-background: var(--background);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-variant: var(--surface-variant);
+  --color-surface-tint: var(--surface-tint);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-on-background: var(--on-background);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-inverse-primary: var(--inverse-primary);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-primary-fixed: var(--primary-fixed);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-on-primary-fixed: var(--on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--on-primary-fixed-variant);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-secondary-fixed-dim: var(--secondary-fixed-dim);
+  --color-on-secondary-fixed: var(--on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--on-secondary-fixed-variant);
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
+  --color-on-tertiary-fixed: var(--on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+  --color-success: var(--success);
+  --color-on-success: var(--on-success);
+  --color-success-container: var(--success-container);
+  --color-on-success-container: var(--on-success-container);
+  --color-warning: var(--warning);
+  --color-on-warning: var(--on-warning);
+  --color-warning-container: var(--warning-container);
+  --color-on-warning-container: var(--on-warning-container);
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+  --color-accent-beige: var(--accent-beige);
+  --color-accent-lavender: var(--accent-lavender);
+
+  /* shadcn/ui compatibility */
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Legacy elevation utility names */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-glow: var(--shadow-glow);
+
+  /* ---- Radius scale (spec section 6) ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 26px;
+
+  /* ---- Fonts ---- */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+
+  /* ---- Type scale (spec section 3; tracking is exact) ---- */
+  --text-large-title: 34px;
+  --text-large-title--line-height: 40px;
+  --text-large-title--letter-spacing: -0.022em;
+  --text-large-title--font-weight: 700;
+
+  --text-title-1: 28px;
+  --text-title-1--line-height: 34px;
+  --text-title-1--letter-spacing: -0.02em;
+  --text-title-1--font-weight: 700;
+
+  --text-title-2: 22px;
+  --text-title-2--line-height: 28px;
+  --text-title-2--letter-spacing: -0.015em;
+  --text-title-2--font-weight: 600;
+
+  --text-title-3: 17px;
+  --text-title-3--line-height: 22px;
+  --text-title-3--letter-spacing: -0.01em;
+  --text-title-3--font-weight: 600;
+
+  --text-headline: 15px;
+  --text-headline--line-height: 20px;
+  --text-headline--letter-spacing: -0.005em;
+  --text-headline--font-weight: 600;
+
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-body--letter-spacing: -0.003em;
+  --text-body--font-weight: 400;
+
+  --text-callout: 13px;
+  --text-callout--line-height: 18px;
+  --text-callout--letter-spacing: 0em;
+  --text-callout--font-weight: 400;
+
+  --text-subhead: 12px;
+  --text-subhead--line-height: 16px;
+  --text-subhead--letter-spacing: 0em;
+  --text-subhead--font-weight: 500;
+
+  --text-footnote: 11px;
+  --text-footnote--line-height: 14px;
+  --text-footnote--letter-spacing: 0.005em;
+  --text-footnote--font-weight: 500;
+
+  --text-caption: 11px;
+  --text-caption--line-height: 13px;
+  --text-caption--letter-spacing: 0.05em;
+  --text-caption--font-weight: 600;
+
+  /* ---- Legacy type tokens (screens not yet rebuilt) ---- */
+  --text-display-lg: 34px;
+  --text-display-lg--line-height: 40px;
+  --text-display-lg--letter-spacing: -0.022em;
+  --text-display-lg--font-weight: 700;
+
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+
+  --text-headline-lg: 22px;
+  --text-headline-lg--line-height: 28px;
+  --text-headline-lg--letter-spacing: -0.015em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-lg-mobile: 22px;
+  --text-headline-lg-mobile--line-height: 28px;
+  --text-headline-lg-mobile--letter-spacing: -0.015em;
+  --text-headline-lg-mobile--font-weight: 600;
+
+  --text-headline-md: 17px;
+  --text-headline-md--line-height: 22px;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 600;
+
+  --text-body-lg: 15px;
+  --text-body-lg--line-height: 22px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--letter-spacing: -0.003em;
+  --text-body-md--font-weight: 400;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+
+  --text-label-md: 13px;
+  --text-label-md--line-height: 18px;
+  --text-label-md--font-weight: 500;
+
+  --text-label-sm: 11px;
+  --text-label-sm--line-height: 14px;
+  --text-label-sm--letter-spacing: 0.05em;
+  --text-label-sm--font-weight: 600;
+
+  --text-mono-xl: 28px;
+  --text-mono-xl--line-height: 34px;
+  --text-mono-xl--letter-spacing: -0.02em;
+  --text-mono-xl--font-weight: 600;
+
+  --text-mono-lg: 17px;
+  --text-mono-lg--line-height: 22px;
+  --text-mono-lg--font-weight: 500;
+
+  --text-mono-md: 13px;
+  --text-mono-md--line-height: 18px;
+  --text-mono-md--font-weight: 500;
+
+  --text-mono-sm: 11px;
+  --text-mono-sm--line-height: 14px;
+  --text-mono-sm--letter-spacing: 0.02em;
+  --text-mono-sm--font-weight: 500;
+}
+
+/* =====================================================================
+   4. Base
+   ===================================================================== */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--canvas);
+    color: var(--label);
+    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui,
+      sans-serif;
+    font-feature-settings: "cv11", "ss01", "calt";
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: color-mix(in srgb, var(--blue) 25%, transparent);
+  }
+  /* lucide defaults to stroke-width 2, which reads heavy next to 400/500 type.
+     Spec: stroke 1.5 everywhere (CSS beats the SVG presentation attribute). */
+  svg.lucide {
+    stroke-width: 1.5;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-3) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--gray-3);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/* =====================================================================
+   5. Liquid Glass materials (spec section 5)
+   Allowed ONLY on: sidebar, header/toolbar, modals+sheets, dropdowns+popovers,
+   floating quick-add, context menus. Never on rows, cards, or content.
+   ===================================================================== */
+@layer components {
+  .glass-ultra-thin,
+  .glass-thin,
+  .glass-regular,
+  .glass-thick {
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-specular);
+  }
+  .glass-ultra-thin {
+    background-color: var(--glass-ultra-thin-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+  .glass-thin {
+    background-color: var(--glass-thin-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  .glass-regular {
+    background-color: var(--glass-regular-bg);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
+  }
+  .glass-thick {
+    background-color: var(--glass-thick-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    backdrop-filter: blur(40px) saturate(180%);
+  }
+
+  /* Mandatory fallbacks: solid equivalents, no backdrop-filter. */
+  @media (prefers-reduced-transparency: reduce) {
+    .glass-ultra-thin,
+    .glass-thin,
+    .glass-regular,
+    .glass-thick {
+      background-color: var(--surface);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass-ultra-thin,
+    .glass-thin,
+    .glass-regular,
+    .glass-thick {
+      background-color: var(--surface);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* 44px minimum hit area for small visual controls (genuine HIG rule). */
+  .hit-44 {
+    position: relative;
+    --hit-x: 44px;
+  }
+  .hit-44::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--hit-x));
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  /* For controls sitting side by side (habit log cluster, input-adjacent
+     buttons): cap the horizontal expansion so neighboring hit areas cannot
+     overlap and steal taps. Vertical stays 44. */
+  .hit-44-narrow {
+    --hit-x: 36px;
+  }
+
+  /* Tabular figures for numeric content. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Legacy helpers kept for screens not yet rebuilt ---- */
+  .card-shadow {
+    box-shadow: var(--e1);
+  }
+  .raised {
+    box-shadow: var(--highlight);
+  }
+  .raised.card-shadow {
+    box-shadow: var(--highlight), var(--e1);
+  }
+  .card-elevated {
+    transition:
+      box-shadow 0.2s ease-out,
+      border-color 0.2s ease-out;
+  }
+  .card-elevated:hover {
+    box-shadow: var(--e2);
+  }
+  .grid-pattern {
+    background-size: 40px 40px;
+    background-image: linear-gradient(
+        to right,
+        var(--gray-5) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, var(--gray-5) 1px, transparent 1px);
+  }
+  .node-shadow {
+    box-shadow: var(--e2);
+  }
+}
+
+/* =====================================================================
+   6. Reduced motion (CSS fallback; motion library handled by MotionConfig)
+   ===================================================================== */
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

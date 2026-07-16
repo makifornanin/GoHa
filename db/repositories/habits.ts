@@ -1,0 +1,245 @@
+import "server-only";
+
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+
+import type { IsoDate } from "@/lib/date";
+import { db } from "../client";
+import { habitEntries, habitSchedules, habits } from "../schema";
+import type { HabitEntryStatus, HabitFrequency, HabitType } from "../schema";
+import type { Habit, HabitEntry, HabitSchedule } from "../types";
+
+/** Habits repository (habits + habit_schedules + habit_entries). User-scoped. */
+
+export type HabitInput = {
+  name: string;
+  description?: string | null;
+  lifeAreaId?: string | null;
+  goalId?: string | null;
+  type?: HabitType;
+  targetValue?: string | null;
+  unit?: string | null;
+  higherIsBetter?: boolean;
+  color?: string | null;
+  icon?: string | null;
+  sortOrder?: number;
+};
+
+export type HabitScheduleInput = {
+  frequency?: HabitFrequency;
+  daysOfWeek?: number[] | null;
+  daysOfMonth?: number[] | null;
+  timesPerPeriod?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  isActive?: boolean;
+};
+
+/** A habit joined with its active schedule (one per habit by convention). */
+export type HabitWithSchedule = Habit & { schedule: HabitSchedule | null };
+
+// --- Habits ---
+
+export async function listHabits(
+  userId: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<Habit[]> {
+  const where = options.includeArchived
+    ? eq(habits.userId, userId)
+    : and(eq(habits.userId, userId), eq(habits.isArchived, false));
+  return db.select().from(habits).where(where).orderBy(asc(habits.sortOrder), asc(habits.createdAt));
+}
+
+/** Habits with their active schedule attached, for the list, streaks, and Today. */
+export async function listHabitsWithSchedule(
+  userId: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<HabitWithSchedule[]> {
+  const [rows, schedules] = await Promise.all([
+    listHabits(userId, options),
+    db
+      .select()
+      .from(habitSchedules)
+      .where(and(eq(habitSchedules.userId, userId), eq(habitSchedules.isActive, true))),
+  ]);
+  const byHabit = new Map(schedules.map((s) => [s.habitId, s]));
+  return rows.map((habit) => ({ ...habit, schedule: byHabit.get(habit.id) ?? null }));
+}
+
+export async function getHabit(userId: string, id: string): Promise<Habit | null> {
+  const [row] = await db
+    .select()
+    .from(habits)
+    .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function createHabit(userId: string, input: HabitInput): Promise<Habit> {
+  const [row] = await db
+    .insert(habits)
+    .values({ ...input, userId })
+    .returning();
+  return row;
+}
+
+export async function updateHabit(
+  userId: string,
+  id: string,
+  input: Partial<HabitInput>,
+): Promise<Habit | null> {
+  const [row] = await db
+    .update(habits)
+    .set(input)
+    .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+    .returning();
+  return row ?? null;
+}
+
+export async function archiveHabit(userId: string, id: string): Promise<Habit | null> {
+  const [row] = await db
+    .update(habits)
+    .set({ isArchived: true, archivedAt: new Date() })
+    .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+    .returning();
+  return row ?? null;
+}
+
+// --- Schedules (one active schedule per habit) ---
+
+export async function getHabitSchedule(userId: string, habitId: string): Promise<HabitSchedule | null> {
+  const [row] = await db
+    .select()
+    .from(habitSchedules)
+    .where(
+      and(
+        eq(habitSchedules.userId, userId),
+        eq(habitSchedules.habitId, habitId),
+        eq(habitSchedules.isActive, true),
+      ),
+    )
+    .orderBy(desc(habitSchedules.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Update the habit's active schedule in place, or create it if none exists. */
+export async function upsertHabitSchedule(
+  userId: string,
+  habitId: string,
+  input: HabitScheduleInput,
+): Promise<HabitSchedule> {
+  const existing = await getHabitSchedule(userId, habitId);
+  if (existing) {
+    const [row] = await db
+      .update(habitSchedules)
+      .set({ ...input, updatedAt: new Date() })
+      .where(and(eq(habitSchedules.id, existing.id), eq(habitSchedules.userId, userId)))
+      .returning();
+    return row;
+  }
+  const [row] = await db
+    .insert(habitSchedules)
+    .values({ ...input, userId, habitId })
+    .returning();
+  return row;
+}
+
+// --- Entries (one per habit per local date) ---
+
+/**
+ * Log (or update) a habit entry for a local date. The unique (habitId,
+ * entryDate) constraint makes this an idempotent upsert: repeated clicks edit the
+ * existing row rather than creating duplicates. Numeric `value` is preserved.
+ */
+export async function logHabitEntry(
+  userId: string,
+  habitId: string,
+  entryDate: IsoDate,
+  input: { status?: HabitEntryStatus; value?: string | null; note?: string | null } = {},
+): Promise<HabitEntry> {
+  const [row] = await db
+    .insert(habitEntries)
+    .values({
+      userId,
+      habitId,
+      entryDate,
+      status: input.status ?? "done",
+      value: input.value ?? null,
+      note: input.note ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [habitEntries.habitId, habitEntries.entryDate],
+      set: {
+        status: input.status ?? "done",
+        value: input.value ?? null,
+        note: input.note ?? null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function deleteHabitEntry(
+  userId: string,
+  habitId: string,
+  entryDate: IsoDate,
+): Promise<boolean> {
+  const rows = await db
+    .delete(habitEntries)
+    .where(
+      and(
+        eq(habitEntries.userId, userId),
+        eq(habitEntries.habitId, habitId),
+        eq(habitEntries.entryDate, entryDate),
+      ),
+    )
+    .returning({ id: habitEntries.id });
+  return rows.length > 0;
+}
+
+/** All of a user's entries within an inclusive local-date range (grid + streaks). */
+export async function listEntriesInRange(
+  userId: string,
+  range: { from: IsoDate; to: IsoDate },
+): Promise<HabitEntry[]> {
+  return db
+    .select()
+    .from(habitEntries)
+    .where(
+      and(
+        eq(habitEntries.userId, userId),
+        gte(habitEntries.entryDate, range.from),
+        lte(habitEntries.entryDate, range.to),
+      ),
+    )
+    .orderBy(asc(habitEntries.entryDate));
+}
+
+/** Entries for a single habit within a range. */
+export async function listHabitEntries(
+  userId: string,
+  habitId: string,
+  range: { from: IsoDate; to: IsoDate },
+): Promise<HabitEntry[]> {
+  return db
+    .select()
+    .from(habitEntries)
+    .where(
+      and(
+        eq(habitEntries.userId, userId),
+        eq(habitEntries.habitId, habitId),
+        gte(habitEntries.entryDate, range.from),
+        lte(habitEntries.entryDate, range.to),
+      ),
+    )
+    .orderBy(asc(habitEntries.entryDate));
+}
+
+/** All entries for a user on one local date (Today habits snapshot). */
+export async function listHabitEntriesForDate(userId: string, date: IsoDate): Promise<HabitEntry[]> {
+  return db
+    .select()
+    .from(habitEntries)
+    .where(and(eq(habitEntries.userId, userId), eq(habitEntries.entryDate, date)));
+}

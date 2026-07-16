@@ -1,0 +1,559 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Settings - GoHa</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface": "#faf9f8",
+                "on-primary-container": "#273d3a",
+                "on-surface": "#1b1c1b",
+                "on-surface-variant": "#424847",
+                "inverse-primary": "#b3ccc7",
+                "surface-container-high": "#e9e8e7",
+                "on-error": "#ffffff",
+                "inverse-on-surface": "#f2f0ef",
+                "secondary-fixed": "#f3e0c3",
+                "background": "#faf9f8",
+                "inverse-surface": "#303130",
+                "outline": "#727877",
+                "secondary-fixed-dim": "#d6c4a8",
+                "surface-container": "#efeeec",
+                "surface-variant": "#e3e2e1",
+                "primary-fixed": "#cfe8e3",
+                "on-background": "#1b1c1b",
+                "on-secondary-fixed-variant": "#524530",
+                "on-tertiary-fixed": "#191933",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#363652",
+                "secondary-container": "#f3e0c3",
+                "outline-variant": "#c2c8c6",
+                "on-secondary-container": "#71624c",
+                "surface-bright": "#faf9f8",
+                "on-tertiary": "#ffffff",
+                "secondary": "#6a5c46",
+                "primary": "#4c635f",
+                "tertiary-container": "#a19fc1",
+                "surface-container-lowest": "#ffffff",
+                "tertiary": "#5c5b7a",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "tertiary-fixed-dim": "#c5c3e6",
+                "surface-container-low": "#f5f3f2",
+                "on-tertiary-fixed-variant": "#454461",
+                "surface-dim": "#dbdad9",
+                "on-primary-fixed-variant": "#354b48",
+                "primary-container": "#8fa7a3",
+                "tertiary-fixed": "#e2dfff",
+                "on-secondary": "#ffffff",
+                "surface-container-highest": "#e3e2e1",
+                "surface-tint": "#4c635f",
+                "error-container": "#ffdad6",
+                "primary-fixed-dim": "#b3ccc7",
+                "on-primary-fixed": "#081f1d",
+                "on-secondary-fixed": "#241a08"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack-lg": "32px",
+                "section-gap": "64px",
+                "stack-md": "16px",
+                "stack-sm": "8px",
+                "unit": "8px",
+                "container-margin": "32px",
+                "gutter": "24px",
+                "sidebar-width": "280px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "Manrope"
+                ],
+                "display-lg": [
+                        "Manrope"
+                ],
+                "headline-lg": [
+                        "Manrope"
+                ],
+                "body-lg": [
+                        "Manrope"
+                ],
+                "body-md": [
+                        "Manrope"
+                ],
+                "headline-md": [
+                        "Manrope"
+                ],
+                "label-md": [
+                        "Manrope"
+                ],
+                "headline-lg-mobile": [
+                        "Manrope"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "300"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for minimalist feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #c2c8c6;
+            border-radius: 20px;
+        }
+        
+        /* Ambient shadow for cards */
+        .ambient-shadow {
+            box-shadow: 0 4px 20px rgba(27, 28, 27, 0.04);
+        }
+        .ambient-shadow:hover {
+            box-shadow: 0 6px 24px rgba(27, 28, 27, 0.06);
+        }
+        
+        /* Custom range slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #4c635f;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e3e2e1;
+            border-radius: 4px;
+        }
+        
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #4c635f;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4c635f;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col py-8 px-4 gap-stack-md fixed left-0 top-0 h-screen w-sidebar-width bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline z-50">
+<!-- Brand Header -->
+<div class="flex items-center gap-3 px-4 mb-4">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center shrink-0">
+<span class="font-display-lg text-display-lg text-primary dark:text-primary-fixed-dim text-[24px]">G</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary dark:text-primary-fixed-dim text-[20px] leading-tight">GoHa</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant dark:text-surface-variant font-normal tracking-normal uppercase text-[10px]">Life Operating System</p>
+</div>
+</div>
+<!-- Quick Action CTA -->
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg py-3 px-4 font-label-md text-label-md hover:opacity-90 transition-opacity mb-4 scale-98 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[20px]">add</span>
+            Quick Action
+        </button>
+<!-- Navigation Tabs -->
+<div class="flex-1 overflow-y-auto">
+<ul class="flex flex-col gap-1">
+<!-- Inactive Tabs -->
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">today</span>Today</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">emoji_events</span>Goals</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">checklist</span>To-dos</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">map</span>Task Map</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">center_focus_strong</span>Focus</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">repeat</span>Habits</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">calendar_month</span>Calendar</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">psychology</span>Brain Dump</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">category</span>Life Areas</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">rate_review</span>Review</a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span>Progress</a></li>
+<!-- Active Tab: Settings -->
+<li><a class="flex items-center gap-3 px-4 py-3 text-primary dark:text-primary-fixed-dim bg-secondary-container dark:bg-on-secondary-fixed-variant rounded-lg font-bold font-label-md text-label-md transition-all scale-98 active:scale-95" href="#"><span class="material-symbols-outlined text-[20px] fill">settings</span>Settings</a></li>
+</ul>
+</div>
+<!-- Footer Tabs -->
+<div class="mt-auto pt-4 border-t border-outline-variant/30">
+<ul class="flex flex-col gap-1">
+<li><a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">help</span>Help</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container transition-colors duration-200 font-label-md text-label-md" href="#"><span class="material-symbols-outlined text-[20px]">logout</span>Logout</a></li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="md:ml-[280px] min-h-screen w-full flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-full md:w-[calc(100%-280px)] h-16 flex justify-between items-center px-container-margin z-40 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant dark:border-outline">
+<!-- Mobile Menu Trigger & Brand (Hidden on Desktop) -->
+<div class="flex items-center gap-3 md:hidden">
+<button class="text-on-surface-variant cursor-pointer active:opacity-70"><span class="material-symbols-outlined">menu</span></button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim text-[24px]">GoHa</h1>
+</div>
+<!-- Empty div for alignment on desktop since search is supposed to be on left, but JSON config says navigation links [] and trailing actions -->
+<div class="hidden md:block flex-1"></div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4">
+<!-- Action Buttons -->
+<div class="hidden lg:flex items-center gap-2 mr-4">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-4 py-1.5 rounded-full hover:bg-primary/90 transition-colors cursor-pointer active:opacity-70">Add Task</button>
+<button class="border border-outline-variant text-primary font-label-md text-label-md px-4 py-1.5 rounded-full hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-70">Focus Mode</button>
+</div>
+<!-- Icons -->
+<button class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors cursor-pointer active:opacity-70 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<!-- Profile Avatar -->
+<button class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant cursor-pointer active:opacity-70 shrink-0">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a professional individual in a well-lit, minimalist modern office space. The lighting is soft and flattering, highlighting a clean and calm atmosphere. The image embodies a premium, highly intentional lifestyle aesthetic, aligning with the warm minimalism of a modern Japanese design environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB_xkPLp6xzmiPOguxWihF3ooMCD-bdAWTOz4gZ0zk49bjt5kSw_AtoQKUn-iXeVFQ8k7hJR8E2vOYeDo_3XMf0sACZmQXkl2Om2IoELoNA8bMHTVRBO1480DkYoGMECJo3knOEpfN0C4F2znCi8fiApUPajZHacPknzUGvBxCT9ZIe5hk2_U-q2UKrZzUH1eWg8MkZAVT6kjfV3TqLDYvhokW6CGuThOMqBFICHtIFly-5qkHVftqk16iuvYL-5BTtXtUZ6POhZE">
+</button>
+</div>
+</header>
+<!-- Page Canvas -->
+<main class="flex-1 mt-16 p-4 md:p-container-margin max-w-[1200px] w-full mx-auto">
+<!-- Page Header -->
+<div class="mb-8">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Settings</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage your account preferences and system configuration.</p>
+</div>
+<!-- Bento Grid Layout for Settings -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+<!-- LEFT COLUMN: Profile & Customization (Wider) -->
+<div class="lg:col-span-7 flex flex-col gap-6 lg:gap-8">
+<!-- Profile Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 lg:p-8 ambient-shadow border border-outline-variant/20 transition-transform duration-200 hover:-translate-y-[1px]">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">person</span>
+                            Profile Details
+                        </h2>
+<div class="flex flex-col sm:flex-row gap-8 items-start">
+<!-- Avatar Edit -->
+<div class="flex flex-col items-center gap-3 shrink-0">
+<div class="w-24 h-24 rounded-full overflow-hidden border border-outline-variant bg-surface-container">
+<img alt="Profile Avatar Large" class="w-full h-full object-cover" data-alt="A portrait of a thoughtful young professional in a bright, clean, minimalist setting. The subject has a calm expression, softly illuminated by natural light. The background is a soft, warm off-white, reflecting a premium, intentional, and clutter-free aesthetic common in modern minimal workspaces." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0b3atysuA7WIMQpfWjzdX8k5p5WdhhaQ8agePjdghd__9mdNlq87ktQMW9xZIMs_iQGbNiLT--YpklJv8pQB8PHdO2hfPw6VQBsGe9L8KHjwNhzAk9f0gvbkJ4xvlX6LW6HS9JKQNAe1rkEk10aW-CV89MAnPbhLKA2W2k7waC3JJbG0pQs_wAyBfBHR7PLY_Jju5j5RLrxX1dPd5aqG5GDGUPExwdOWifAslgC2rJGj9QEGjMQtb6l-k0YKY6hAeGFidDdNuUBU">
+</div>
+<button class="font-label-md text-label-md text-primary hover:text-primary-fixed-dim transition-colors bg-transparent border-none cursor-pointer">Change Photo</button>
+</div>
+<!-- Input Fields -->
+<div class="flex-1 w-full flex flex-col gap-5">
+<div class="group relative">
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-1">Display Name</label>
+<input class="w-full bg-transparent border-b border-outline-variant focus:border-primary pb-2 outline-none transition-colors font-body-lg text-body-lg text-on-surface placeholder-on-surface-variant/50" type="text" value="Elena Rostova">
+</div>
+<div class="group relative">
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-1">Email Address</label>
+<input class="w-full bg-transparent border-b border-outline-variant focus:border-primary pb-2 outline-none transition-colors font-body-lg text-body-lg text-on-surface placeholder-on-surface-variant/50" type="email" value="elena.r@gohasystem.io">
+</div>
+</div>
+</div>
+</section>
+<!-- Customization Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 lg:p-8 ambient-shadow border border-outline-variant/20 transition-transform duration-200 hover:-translate-y-[1px]">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">tune</span>
+                            System Customization
+                        </h2>
+<!-- Life Areas -->
+<div class="mb-8">
+<div class="flex justify-between items-end mb-4">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Manage Life Areas</h3>
+<p class="font-body-sm text-[13px] text-on-surface-variant mt-1">Categories for organizing your focus.</p>
+</div>
+<button class="text-primary hover:bg-surface-container-low rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface rounded-full font-label-sm text-label-sm flex items-center gap-1 cursor-pointer hover:bg-surface-variant transition-colors">Career <span class="material-symbols-outlined text-[14px]">close</span></span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface rounded-full font-label-sm text-label-sm flex items-center gap-1 cursor-pointer hover:bg-surface-variant transition-colors">Health <span class="material-symbols-outlined text-[14px]">close</span></span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface rounded-full font-label-sm text-label-sm flex items-center gap-1 cursor-pointer hover:bg-surface-variant transition-colors">Relationships <span class="material-symbols-outlined text-[14px]">close</span></span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface rounded-full font-label-sm text-label-sm flex items-center gap-1 cursor-pointer hover:bg-surface-variant transition-colors">Personal Growth <span class="material-symbols-outlined text-[14px]">close</span></span>
+<span class="px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full font-label-sm text-label-sm flex items-center gap-1 border-dashed cursor-pointer hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-[14px]">add</span> Add Area</span>
+</div>
+</div>
+<!-- Divider -->
+<hr class="border-outline-variant/30 my-6">
+<!-- Statuses -->
+<div class="mb-8">
+<h3 class="font-label-md text-label-md text-on-surface mb-4">Task Status Nomenclature</h3>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+<div class="flex items-center gap-2 border border-outline-variant/50 rounded-lg p-2 bg-surface">
+<div class="w-3 h-3 rounded-full bg-outline"></div>
+<input class="bg-transparent border-none outline-none font-body-md text-body-md text-on-surface w-full p-0" type="text" value="To Do">
+</div>
+<div class="flex items-center gap-2 border border-outline-variant/50 rounded-lg p-2 bg-surface">
+<div class="w-3 h-3 rounded-full bg-tertiary"></div>
+<input class="bg-transparent border-none outline-none font-body-md text-body-md text-on-surface w-full p-0" type="text" value="In Progress">
+</div>
+<div class="flex items-center gap-2 border border-outline-variant/50 rounded-lg p-2 bg-surface">
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+<input class="bg-transparent border-none outline-none font-body-md text-body-md text-on-surface w-full p-0" type="text" value="Completed">
+</div>
+</div>
+</div>
+<!-- Divider -->
+<hr class="border-outline-variant/30 my-6">
+<!-- Timer Durations -->
+<div>
+<h3 class="font-label-md text-label-md text-on-surface mb-4">Default Focus Timers</h3>
+<div class="flex gap-6">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Focus Session</label>
+<div class="flex items-center gap-2 border border-outline-variant/50 rounded-lg p-1 w-24 bg-surface">
+<input class="bg-transparent border-none outline-none text-center font-body-md text-body-md text-on-surface w-full p-1" max="120" min="1" type="number" value="25">
+<span class="text-on-surface-variant font-label-sm pr-2">min</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Short Break</label>
+<div class="flex items-center gap-2 border border-outline-variant/50 rounded-lg p-1 w-24 bg-surface">
+<input class="bg-transparent border-none outline-none text-center font-body-md text-body-md text-on-surface w-full p-1" max="30" min="1" type="number" value="5">
+<span class="text-on-surface-variant font-label-sm pr-2">min</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- RIGHT COLUMN: Appearance, Notifications, Life Score (Narrower) -->
+<div class="lg:col-span-5 flex flex-col gap-6 lg:gap-8">
+<!-- Appearance Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 lg:p-8 ambient-shadow border border-outline-variant/20 transition-transform duration-200 hover:-translate-y-[1px]">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">palette</span>
+                            Appearance
+                        </h2>
+<div class="grid grid-cols-2 gap-4">
+<!-- Light Mode Select -->
+<div class="cursor-pointer group relative">
+<input checked="" class="peer sr-only" id="theme-light" name="theme" type="radio">
+<div class="border-2 border-transparent peer-checked:border-primary rounded-xl p-1 transition-colors">
+<div class="bg-surface-bright border border-outline-variant/30 rounded-lg h-24 w-full flex flex-col items-center justify-center gap-2 p-2 relative overflow-hidden group-hover:bg-surface-container-lowest">
+<!-- Mini mock UI -->
+<div class="w-full h-2 bg-surface-container rounded-full"></div>
+<div class="w-3/4 h-2 bg-surface-container rounded-full self-start"></div>
+<div class="w-1/2 h-6 bg-primary-container rounded-md mt-2"></div>
+</div>
+</div>
+<label class="block text-center mt-2 font-label-md text-label-md text-on-surface cursor-pointer" for="theme-light">Light</label>
+</div>
+<!-- Dark Mode Select -->
+<div class="cursor-pointer group relative">
+<input class="peer sr-only" id="theme-dark" name="theme" type="radio">
+<div class="border-2 border-transparent peer-checked:border-primary rounded-xl p-1 transition-colors">
+<div class="bg-inverse-surface border border-outline-variant/30 rounded-lg h-24 w-full flex flex-col items-center justify-center gap-2 p-2 relative overflow-hidden">
+<!-- Mini mock UI -->
+<div class="w-full h-2 bg-surface-variant/20 rounded-full"></div>
+<div class="w-3/4 h-2 bg-surface-variant/20 rounded-full self-start"></div>
+<div class="w-1/2 h-6 bg-primary rounded-md mt-2"></div>
+</div>
+</div>
+<label class="block text-center mt-2 font-label-md text-label-md text-on-surface cursor-pointer" for="theme-dark">Dark</label>
+</div>
+</div>
+<div class="mt-6 flex items-center justify-between">
+<label class="font-body-md text-body-md text-on-surface">Match System Settings</label>
+<!-- Toggle -->
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-surface-variant appearance-none cursor-pointer z-10 transition-all duration-200 left-0 top-0" id="system-theme-toggle" name="toggle" type="checkbox">
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200" for="system-theme-toggle"></label>
+</div>
+</div>
+</section>
+<!-- Life Score Weights Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 lg:p-8 ambient-shadow border border-outline-variant/20 transition-transform duration-200 hover:-translate-y-[1px]">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary">balance</span>
+                            Life Score Balance
+                        </h2>
+<p class="font-body-sm text-[13px] text-on-surface-variant mb-6">Adjust the relative importance of each area to calculate your overall Life Score.</p>
+<div class="flex flex-col gap-5">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-2">
+<span class="text-on-surface">Career &amp; Work</span>
+<span class="text-primary font-bold">1.2x</span>
+</div>
+<input max="2" min="0" step="0.1" type="range" value="1.2">
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-2">
+<span class="text-on-surface">Health &amp; Fitness</span>
+<span class="text-primary font-bold">1.5x</span>
+</div>
+<input max="2" min="0" step="0.1" type="range" value="1.5">
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-2">
+<span class="text-on-surface">Relationships</span>
+<span class="text-primary font-bold">1.0x</span>
+</div>
+<input max="2" min="0" step="0.1" type="range" value="1.0">
+</div>
+</div>
+</section>
+<!-- Notifications Card -->
+<section class="bg-surface-container-lowest rounded-xl p-6 lg:p-8 ambient-shadow border border-outline-variant/20 transition-transform duration-200 hover:-translate-y-[1px]">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">notifications_active</span>
+                            Notifications
+                        </h2>
+<div class="flex flex-col gap-4">
+<!-- Daily Digest -->
+<div class="flex items-start justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Daily Digest Email</h3>
+<p class="font-body-sm text-[13px] text-on-surface-variant mt-1">Receive a morning summary of your goals and to-dos.</p>
+</div>
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in mt-1">
+<input checked="" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-surface-variant appearance-none cursor-pointer z-10 transition-all duration-200 left-0 top-0" id="email-digest" type="checkbox">
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-primary cursor-pointer transition-colors duration-200" for="email-digest"></label>
+</div>
+</div>
+<hr class="border-outline-variant/30 my-2">
+<!-- Push Notifications -->
+<div class="flex items-start justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Desktop Push Notifications</h3>
+<p class="font-body-sm text-[13px] text-on-surface-variant mt-1">Reminders for habits, focus timers, and scheduled events.</p>
+</div>
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in mt-1">
+<input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-surface-variant appearance-none cursor-pointer z-10 transition-all duration-200 left-0 top-0" id="push-notif" type="checkbox">
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer transition-colors duration-200" for="push-notif"></label>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Save Action Area (Sticky Bottom on Mobile, Flow on Desktop) -->
+<div class="mt-8 flex justify-end gap-4 pb-8">
+<button class="px-6 py-2 rounded-lg font-label-md text-label-md border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">Cancel</button>
+<button class="px-6 py-2 rounded-lg font-label-md text-label-md bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm">Save Changes</button>
+</div>
+</main>
+</div>
+<!-- Inline script for toggle visual update logic -->
+<script>
+        // Simple logic to ensure the toggle CSS styling works correctly when clicked
+        const toggles = document.querySelectorAll('.toggle-checkbox');
+        toggles.forEach(toggle => {
+            // initial state check
+            if(toggle.checked) {
+                toggle.style.right = '0';
+                toggle.style.borderColor = '#4c635f';
+                toggle.nextElementSibling.style.backgroundColor = '#4c635f';
+            }
+            
+            toggle.addEventListener('change', function() {
+                if(this.checked) {
+                    this.style.right = '0';
+                    this.style.borderColor = '#4c635f';
+                    this.nextElementSibling.style.backgroundColor = '#4c635f';
+                } else {
+                    this.style.right = 'auto'; // Reset, rely on CSS defaults
+                    this.style.borderColor = ''; // Reset
+                    this.nextElementSibling.style.backgroundColor = ''; // Reset
+                }
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,4 @@
+CREATE TYPE "public"."brain_dump_converted_type" AS ENUM('task', 'goal', 'habit');--> statement-breakpoint
+ALTER TABLE "brain_dump_items" ADD COLUMN "converted_type" "brain_dump_converted_type";--> statement-breakpoint
+ALTER TABLE "brain_dump_items" ADD COLUMN "converted_entity_id" uuid;--> statement-breakpoint
+ALTER TABLE "brain_dump_items" ADD CONSTRAINT "brain_dump_items_converted_consistent" CHECK (("brain_dump_items"."converted_type" is null and "brain_dump_items"."converted_entity_id" is null) or ("brain_dump_items"."converted_type" is not null and "brain_dump_items"."converted_entity_id" is not null));

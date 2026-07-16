@@ -1,0 +1,9 @@
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  # msw is only a transitive build-script dep of vitest's mocker; we never use
+  # it, so its postinstall is explicitly skipped. This also clears pnpm's
+  # ERR_PNPM_IGNORED_BUILDS gate that otherwise blocks every `pnpm <script>`.
+  msw: false
