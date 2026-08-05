@@ -95,17 +95,21 @@ export function TasksView({
   lifeAreas,
   timeZone = MANILA_TZ,
   weekStartsOn = 1,
+  openCreateOnMount = false,
 }: {
   tasks: Task[];
   goals: Goal[];
   lifeAreas: LifeArea[];
   timeZone?: string;
   weekStartsOn?: Weekday;
+  /** Opens the create form immediately (from `/tasks?new=1`, e.g. the header
+   *  "Add Task" button and the mobile "+" action). */
+  openCreateOnMount?: boolean;
 }) {
   const [view, setView] = useState<TaskViewKey>("today");
   const [sort, setSort] = useState<SortKey>("date");
   const [lifeAreaFilter, setLifeAreaFilter] = useState<string>("all");
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(openCreateOnMount);
   const [editing, setEditing] = useState<Task | null>(null);
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
@@ -149,6 +153,24 @@ export function TasksView({
 
   const activeView = VIEWS.find((v) => v.key === view)!;
 
+  /**
+   * When the current view is empty, the nearest view that DOES hold tasks.
+   * Inbox first (undated tasks are the ones users most often think vanished),
+   * then All. Prevents the "my task disappeared" dead end. Two map lookups,
+   * so it is computed inline rather than memoized.
+   */
+  const elsewhere = (() => {
+    if (visibleTasks.length > 0) return null;
+    for (const key of ["inbox", "all"] as const) {
+      if (key === view) continue;
+      const count = counts.get(key) ?? 0;
+      if (count > 0) {
+        return { key, count, label: VIEWS.find((v) => v.key === key)!.label };
+      }
+    }
+    return null;
+  })();
+
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
@@ -157,7 +179,21 @@ export function TasksView({
   async function handleCreate(values: TaskFormInput) {
     const result = await createTaskAction(values);
     if (result.ok) {
-      toast.success(`Added "${result.data.title}"`);
+      const task = result.data;
+      // A task must never save into a view the user isn't looking at and then
+      // seem to vanish. If the new task doesn't belong to the current view,
+      // switch to one where it IS visible and say where it went.
+      if (!taskMatchesView(task, view, now, weekStartsOn, timeZone)) {
+        const target: TaskViewKey =
+          taskEffectiveDate(task, timeZone) === null ? "inbox" : "all";
+        setView(target);
+        setLifeAreaFilter("all");
+        toast.success(
+          `Added "${task.title}" to ${VIEWS.find((v) => v.key === target)!.label}`,
+        );
+      } else {
+        toast.success(`Added "${task.title}"`);
+      }
       setFormOpen(false);
     }
     return result;
@@ -345,13 +381,34 @@ export function TasksView({
           </div>
 
           {visibleTasks.length === 0 ? (
-            <p className="rounded-2xl bg-surface-secondary px-6 py-12 text-center text-callout text-label-secondary">
-              Nothing here yet.{" "}
-              <button type="button" onClick={openCreate} className="cursor-pointer font-medium text-blue hover:underline">
-                Add a task
-              </button>
-              .
-            </p>
+            <div className="rounded-2xl bg-surface-secondary px-6 py-12 text-center">
+              <p className="text-callout text-label-secondary">
+                Nothing here yet.{" "}
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="cursor-pointer font-medium text-blue hover:underline"
+                >
+                  Add a task
+                </button>
+                .
+              </p>
+              {/* Never leave the user thinking their tasks vanished: if other
+                  views hold tasks, point straight at them. */}
+              {elsewhere ? (
+                <p className="mt-2 text-callout text-label-secondary">
+                  You have{" "}
+                  <button
+                    type="button"
+                    onClick={() => setView(elsewhere.key)}
+                    className="cursor-pointer font-medium text-blue hover:underline"
+                  >
+                    {elsewhere.count} task{elsewhere.count === 1 ? "" : "s"} in {elsewhere.label}
+                  </button>
+                  .
+                </p>
+              ) : null}
+            </div>
           ) : (
             <motion.ul
               key={`${view}-${sort}-${lifeAreaFilter}`}

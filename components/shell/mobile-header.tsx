@@ -1,9 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
@@ -59,14 +58,6 @@ export function MobileHeader({ className, user }: { className?: string; user: Na
       </div>
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Notifications"
-          onClick={() => toast("You're all caught up.")}
-        >
-          <Bell />
-        </Button>
       </div>
 
       <AnimatePresence>

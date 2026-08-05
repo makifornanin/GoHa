@@ -1,8 +1,7 @@
 "use client";
 
-import { Bell, Focus, Plus } from "lucide-react";
+import { Focus, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,21 +22,15 @@ export function AppHeader({ className }: { className?: string }) {
         <Focus />
         <span className="hidden lg:inline">Focus Mode</span>
       </Button>
-      <Button onClick={() => router.push("/tasks")}>
+      {/* `?new=1` opens the create form on arrival: this button promises a form,
+          so it must deliver one rather than just navigating. */}
+      <Button onClick={() => router.push("/tasks?new=1")}>
         <Plus />
         <span className="hidden sm:inline">Add Task</span>
       </Button>
 
       <div className="mx-2 h-5 w-px bg-separator" />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Notifications"
-        onClick={() => toast("You're all caught up.")}
-      >
-        <Bell />
-      </Button>
       <ThemeToggle />
     </header>
   );

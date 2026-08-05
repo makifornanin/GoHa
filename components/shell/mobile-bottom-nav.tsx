@@ -42,7 +42,7 @@ export function MobileBottomNav({ className }: { className?: string }) {
       <button
         type="button"
         aria-label="Add a task"
-        onClick={() => router.push("/tasks")}
+        onClick={() => router.push("/tasks?new=1")}
         className="-mt-6 flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-blue text-white shadow-e2 transition-transform active:scale-[0.96]"
       >
         <Plus className="size-6" aria-hidden />

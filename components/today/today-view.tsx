@@ -153,7 +153,7 @@ export function TodayView({
 
   const taskMenu: DropdownItem[] = [
     { label: "View all to-dos", icon: ListChecks, onSelect: () => router.push("/tasks") },
-    { label: "Plan the week", icon: CalendarClock, onSelect: () => router.push("/tasks") },
+    { label: "New task with details", icon: CalendarClock, onSelect: () => router.push("/tasks?new=1") },
     { type: "separator" },
     { label: "Start a focus session", icon: Play, onSelect: () => router.push("/focus") },
   ];
@@ -210,8 +210,8 @@ export function TodayView({
                 </CardHeader>
                 <CardContent className="px-1 pb-2">
                   {data.todayTasks.length === 0 ? (
-                    <p className="mx-3 mb-2 rounded-xl bg-surface-secondary px-4 py-6 text-center text-callout text-label-secondary">
-                      Nothing scheduled for today. Add one below or pull one in.
+                    <p className="mx-3 mb-3 rounded-xl bg-surface-secondary px-4 py-6 text-center text-callout text-label-secondary">
+                      Nothing scheduled for today yet.
                     </p>
                   ) : (
                     <div className="flex flex-col">
@@ -247,6 +247,11 @@ export function TodayView({
                       </AnimatePresence>
                     </div>
                   )}
+
+                  {/* Add tasks where they appear, not in a distant footer. */}
+                  <div className="px-2 pt-2">
+                    <QuickAddTask today={today} />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -322,8 +327,7 @@ export function TodayView({
           </div>
 
           {/* Foot */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <QuickAddTask today={today} />
+          <div className="grid grid-cols-1">
             <Link
               href="/review"
               className="group flex h-12 items-center justify-between rounded-2xl border border-separator-opaque bg-surface px-4 shadow-e1 transition-shadow hover:shadow-e2"

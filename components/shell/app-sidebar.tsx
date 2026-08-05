@@ -1,8 +1,7 @@
 "use client";
 
-import { CircleHelp, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
@@ -25,9 +24,10 @@ export function AppSidebar({ className, user }: { className?: string; user: NavU
     >
       <Brand className="px-2" />
 
-      <Button className="w-full" onClick={() => router.push("/tasks")}>
+      {/* Opens the task form directly (`?new=1`) instead of only navigating. */}
+      <Button className="w-full" onClick={() => router.push("/tasks?new=1")}>
         <Plus />
-        Quick Action
+        New Task
       </Button>
 
       <nav className="-mr-2 flex-1 overflow-y-auto pr-2" aria-label="Primary">
@@ -42,14 +42,6 @@ export function AppSidebar({ className, user }: { className?: string; user: NavU
 
       <div className="mt-auto flex flex-col gap-0.5 border-t border-separator pt-4">
         <UserBadge user={user} className="mb-2" />
-        <button
-          type="button"
-          onClick={() => toast("The help center is coming soon.")}
-          className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2.5 text-callout font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-label"
-        >
-          <CircleHelp className="size-5 shrink-0" aria-hidden />
-          Help
-        </button>
         <LogoutButton />
       </div>
     </aside>
