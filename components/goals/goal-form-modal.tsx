@@ -173,16 +173,13 @@ function GoalFormFields({
           <Select
             id="goal-life-area"
             value={lifeAreaId}
-            onChange={(e) => setLifeAreaId(e.target.value)}
+            onChange={setLifeAreaId}
             disabled={submitting}
-          >
-            <option value="">No life area</option>
-            {lifeAreas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "No life area" },
+              ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
+            ]}
+          />
           <FieldError id="goal-life-area-error" message={fieldErrors.lifeAreaId} />
         </div>
         <div>
@@ -190,16 +187,13 @@ function GoalFormFields({
           <Select
             id="goal-parent"
             value={parentGoalId}
-            onChange={(e) => setParentGoalId(e.target.value)}
+            onChange={setParentGoalId}
             disabled={submitting}
-          >
-            <option value="">None (top-level goal)</option>
-            {parentOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.title}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "None (top-level goal)" },
+              ...parentOptions.map((option) => ({ value: option.id, label: option.title })),
+            ]}
+          />
           <FieldError id="goal-parent-error" message={fieldErrors.parentGoalId} />
         </div>
       </div>
@@ -210,30 +204,23 @@ function GoalFormFields({
           <Select
             id="goal-timeframe"
             value={timeframe}
-            onChange={(e) => setTimeframe(e.target.value as GoalTimeframe)}
+            onChange={(v) => setTimeframe(v as GoalTimeframe)}
             disabled={submitting}
-          >
-            {GOAL_TIMEFRAME_ORDER.map((tf) => (
-              <option key={tf} value={tf}>
-                {goalTimeframeConfig[tf].label}
-              </option>
-            ))}
-          </Select>
+            options={GOAL_TIMEFRAME_ORDER.map((tf) => ({
+              value: tf,
+              label: goalTimeframeConfig[tf].label,
+            }))}
+          />
         </div>
         <div>
           <Label htmlFor="goal-status">Status</Label>
           <Select
             id="goal-status"
             value={status}
-            onChange={(e) => setStatus(e.target.value as GoalStatus)}
+            onChange={(v) => setStatus(v as GoalStatus)}
             disabled={submitting}
-          >
-            {GOAL_STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {goalStatusConfig[s].label}
-              </option>
-            ))}
-          </Select>
+            options={GOAL_STATUS_ORDER.map((s) => ({ value: s, label: goalStatusConfig[s].label }))}
+          />
         </div>
       </div>
 

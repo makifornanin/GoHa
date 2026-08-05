@@ -6,7 +6,6 @@ import {
   CalendarClock,
   ListChecks,
   MoreHorizontal,
-  Moon,
   Play,
   Sparkles,
   TriangleAlert,
@@ -326,22 +325,6 @@ export function TodayView({
             </div>
           </div>
 
-          {/* Foot */}
-          <div className="grid grid-cols-1">
-            <Link
-              href="/review"
-              className="group flex h-12 items-center justify-between rounded-2xl border border-separator-opaque bg-surface px-4 shadow-e1 transition-shadow hover:shadow-e2"
-            >
-              <span className="flex items-center gap-2">
-                <Moon className="size-4 text-indigo" aria-hidden />
-                <span className="text-callout font-medium text-label">Evening Reflection</span>
-              </span>
-              <ArrowRight
-                className="size-4 text-label-tertiary transition-transform group-hover:translate-x-0.5"
-                aria-hidden
-              />
-            </Link>
-          </div>
         </>
       )}
     </div>

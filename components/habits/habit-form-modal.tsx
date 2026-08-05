@@ -227,11 +227,12 @@ function HabitFormFields({ mode, habit, lifeAreas, goals, onSubmit, onClose, nam
               <Select
                 id="habit-direction"
                 value={higherIsBetter ? "at_least" : "at_most"}
-                onChange={(e) => setHigherIsBetter(e.target.value === "at_least")}
-              >
-                <option value="at_least">At least target</option>
-                <option value="at_most">At most target</option>
-              </Select>
+                onChange={(v) => setHigherIsBetter(v === "at_least")}
+                options={[
+                  { value: "at_least", label: "At least target" },
+                  { value: "at_most", label: "At most target" },
+                ]}
+              />
             </div>
           </div>
         ) : null}
@@ -301,22 +302,30 @@ function HabitFormFields({ mode, habit, lifeAreas, goals, onSubmit, onClose, nam
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="habit-life-area">Life area <span className="text-outline">(optional)</span></Label>
-          <Select id="habit-life-area" value={lifeAreaId} onChange={(e) => setLifeAreaId(e.target.value)} disabled={submitting}>
-            <option value="">No life area</option>
-            {lifeAreas.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </Select>
+          <Select
+            id="habit-life-area"
+            value={lifeAreaId}
+            onChange={setLifeAreaId}
+            disabled={submitting}
+            options={[
+              { value: "", label: "No life area" },
+              ...lifeAreas.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          />
           <FieldError id="habit-life-area-error" message={fieldErrors.lifeAreaId} />
         </div>
         <div>
           <Label htmlFor="habit-goal">Goal <span className="text-outline">(optional)</span></Label>
-          <Select id="habit-goal" value={goalId} onChange={(e) => setGoalId(e.target.value)} disabled={submitting}>
-            <option value="">No goal</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>{g.title}</option>
-            ))}
-          </Select>
+          <Select
+            id="habit-goal"
+            value={goalId}
+            onChange={setGoalId}
+            disabled={submitting}
+            options={[
+              { value: "", label: "No goal" },
+              ...goals.map((g) => ({ value: g.id, label: g.title })),
+            ]}
+          />
           <FieldError id="habit-goal-error" message={fieldErrors.goalId} />
         </div>
       </div>

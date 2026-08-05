@@ -35,8 +35,8 @@ export function Checkbox({
       aria-checked={checked}
       disabled={disabled}
       onClick={onToggle}
-      animate={checked ? { scale: [1, 1.2, 1] } : { scale: 1 }}
-      transition={spring.bouncy}
+      whileTap={{ scale: 0.9 }}
+      transition={spring.snappy}
       className={cn(
         "hit-44 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] transition-colors duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "border-transparent" : "border-gray-3 hover:border-gray-1",
@@ -45,6 +45,9 @@ export function Checkbox({
       style={checked ? { backgroundColor: fill } : undefined}
       {...props}
     >
+      {/* The satisfying pop comes from the bouncy spring overshooting on the way
+          to scale 1. Springs support only TWO keyframes, so a [1, 1.2, 1]
+          sequence throws "Only two keyframes currently supported" at runtime. */}
       <AnimatePresence initial={false}>
         {checked ? (
           <motion.span
@@ -52,7 +55,7 @@ export function Checkbox({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            transition={spring.snappy}
+            transition={spring.bouncy}
             className="flex items-center justify-center text-white"
           >
             {/* stroke-2 (utilities layer) beats the base `svg.lucide` 1.5 rule,

@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { mobileNav, primaryNav } from "@/lib/nav";
+import { mobileNav, plannedNav, primaryNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 describe("primary navigation", () => {
-  it("exposes every designed destination exactly once", () => {
-    expect(primaryNav).toHaveLength(12);
+  it("exposes every destination exactly once", () => {
     const hrefs = primaryNav.map((item) => item.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs.length).toBeGreaterThan(0);
+  });
+
+  it("never advertises an unbuilt surface", () => {
+    // A menu entry is a promise that the screen works. Placeholder routes live
+    // in `plannedNav` until they are real, so the two lists must not overlap.
+    const shipped = new Set(primaryNav.map((item) => item.href));
+    for (const item of plannedNav) {
+      expect(shipped.has(item.href)).toBe(false);
+    }
   });
 
   it("uses absolute route paths", () => {

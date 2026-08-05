@@ -19,10 +19,13 @@ export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string
 const GENERIC_ERROR = "Something went wrong. Please try again.";
 const idSchema = z.uuid();
 const startSchema = z.object({
+  // `.nullish()`, not `.optional()`: the UI sends `taskId: null` for an open
+  // focus session (no specific task). `.optional()` only permits `undefined`,
+  // so every task-less session was rejected before it could start.
   taskId: z
     .string()
     .trim()
-    .optional()
+    .nullish()
     .transform((v) => (v && v.length > 0 ? v : null))
     .pipe(z.union([z.uuid(), z.null()])),
   plannedDurationSeconds: z.coerce
@@ -46,7 +49,18 @@ export async function startFocusSessionAction(input: {
   const user = await requireUser();
 
   const parsed = startSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Choose a valid duration." };
+  if (!parsed.success) {
+    // Name the offending field: a blanket "duration" message sent users hunting
+    // the wrong control.
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false,
+      error:
+        issue?.path[0] === "taskId"
+          ? "That task could not be found."
+          : "Choose a valid duration.",
+    };
+  }
 
   if (parsed.data.taskId) {
     const task = await tasksRepo.getTask(user.id, parsed.data.taskId);

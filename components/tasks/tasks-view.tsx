@@ -355,28 +355,20 @@ export function TasksView({
               <Select
                 aria-label="Filter by life area"
                 value={lifeAreaFilter}
-                onChange={(e) => setLifeAreaFilter(e.target.value)}
-                className="h-9 w-auto"
-              >
-                <option value="all">All life areas</option>
-                {lifeAreas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </Select>
+                onChange={setLifeAreaFilter}
+                className="w-44"
+                options={[
+                  { value: "all", label: "All life areas" },
+                  ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
+                ]}
+              />
               <Select
                 aria-label="Sort tasks"
                 value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="h-9 w-auto"
-              >
-                {SORTS.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    Sort: {s.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={(v) => setSort(v as SortKey)}
+                className="w-36"
+                options={SORTS.map((s) => ({ value: s.key, label: `Sort: ${s.label}` }))}
+              />
             </div>
           </div>
 

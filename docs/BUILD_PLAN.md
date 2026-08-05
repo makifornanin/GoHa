@@ -353,3 +353,73 @@ Executed the owner-approved plan end to end, in three commits:
    - **Task Maps**: explorer/editor panels as solid cards with blue active row; React Flow `--xy-*` vars repointed to the Apple tokens (gray-2 edges, blue selection/connection line, canvas background, surface controls/minimap); nodes rebuilt (surface card, blue handles/ring, blue/purple/indigo type chips); the floating add-node toolbar is now `glass-regular` (allowed chrome); inspector as a solid e3 panel.
    - Also removed the redundant `LifeAreaIcon` import flagged by lint.
 - Verification: `tsc --noEmit` clean, ESLint clean, Vitest 98/98, `next build` green (18 routes); dev server log clean, `/login` 200, all nine protected routes 307. Authenticated click-through still owner's to do (single-owner login). Remaining design debt, deliberately left: form-modal INTERNALS (goal/habit/life-area/task forms, completion-note) render through the legacy alias layer (fields/buttons are already the new primitives); the legacy tokens/type aliases in `globals.css` stay until those internals are tightened; loading skeletons for non-Today routes render via aliases. Open decisions unchanged: blue vs neutral chrome icons, separator inset number vs intent, 8-color Life Area picker (data change).
+
+### 2026-08-05: Full-system bug hunt (browser-driven) + fixes
+Owner reported the app was "very buggy at laggy" with non-working buttons and
+tasks that seemed not to save. Investigated with direct database inspection and
+a new browser-driven audit; fixed everything found.
+
+**Database was never the problem.** `neondb_owner`, full privileges, 7
+migrations applied, zero orphaned rows. The reported "task didn't save" task was
+in the database the whole time. Added `pnpm db:diagnose` (scripts/diagnose.mts):
+a read-only health check reporting connection identity, privileges, migrations,
+row counts, referential integrity, and undated-task visibility.
+
+**Test harness.** GoHa is single-owner, so Better Auth's `user.create.before`
+hook blocks sign-ups and the Playwright suite could not bootstrap an account.
+`pnpm test:account:create` / `:destroy` (scripts/test-account.mts) inserts an
+isolated harness account with a properly hashed password, so tests log in
+through the real UI against their own user-scoped data and never touch the
+owner's. New `e2e/audit.spec.ts` drives all 12 routes plus the primary
+interaction on each, collecting console errors, uncaught exceptions, failed
+requests, HTTP 5xx, and navigation timings, reporting them all in one run.
+
+**Bugs found by the audit and fixed:**
+1. *Ticking a task made it vanish.* `deriveTodayData` filtered Today's list to
+   active tasks only, so completing one removed it instantly with no way to see
+   or undo it (the progress ring updated, which made it look like data loss).
+   Completed tasks now stay in the list, struck through, sorted to the bottom;
+   the focus fallback skips them.
+2. *Uncaught error on every completion.* The checkbox animated
+   `scale: [1, 1.2, 1]` with a spring, but springs support only TWO keyframes,
+   so Motion threw "Only two keyframes currently supported" and the pop never
+   played. The overshoot now comes from the bouncy spring on the check icon.
+3. *Focus Mode could never start a session.* `startSchema` declared
+   `taskId: z.string().optional()`, but the UI sends `taskId: null` for an open
+   session; `.optional()` permits only `undefined`, so EVERY task-less session
+   was rejected and reported as "Choose a valid duration." Changed to
+   `.nullish()` and made the message name the real field. (Audited the other
+   schemas: task-maps already used `.nullish()`; the form schemas only ever
+   receive strings.)
+4. *Hydration failed on every page.* `ThemeToggle` rendered Moon during SSR and
+   Sun on the client, so React discarded the server HTML and re-rendered the
+   whole shell on every navigation, plus a follow-on "Cannot read properties of
+   null" crash. Added `lib/use-mounted.ts` and a stable placeholder until
+   hydration; Settings now shares that hook.
+5. *Goals' create button lost its test id in the empty state*, and two buttons
+   shared the accessible name "Add Task" (header vs quick-add).
+
+**Performance.** Measured, not guessed: production server response is ~170ms
+warm (~125ms for a page with no queries), dev ~180-220ms once compiled. The
+server was never slow; the perceived lag was the hydration failure above
+(forcing a full client re-render every navigation) plus Turbopack's first-visit
+compile in dev. Told the owner to review with `pnpm build && pnpm start`.
+
+**Also completed (the P2/P3 plan):**
+- Replaced the native `<select>` in all 7 files with a custom Apple-style
+  `Select`: styled trigger, portaled popover (so it is not clipped by the
+  modals' `overflow-y-auto`), fixed positioning with flip-above, full keyboard
+  support (Arrows, Home/End, Enter, Escape, type-ahead), listbox ARIA, and a
+  selected checkmark. The OS dropdown ignored the design system entirely.
+- Removed Calendar, Review, and Progress from navigation: a quarter of the menu
+  led to "Coming Soon". Their routes still exist for direct URLs and they are
+  listed in `plannedNav`; a new test asserts the two lists never overlap, so an
+  unbuilt surface can't be advertised again. `mobileNav` now resolves by href
+  instead of fragile indices. Removed the Today "Evening Reflection" card,
+  which linked to the unbuilt /review.
+
+Verification: tsc clean, ESLint clean, Vitest 99/99, `next build` green (18
+routes), and the browser audit 13/13 against a PRODUCTION build with zero
+console errors, zero uncaught exceptions, and zero failed requests. Harness
+account destroyed afterwards; owner data verified intact (1 user, 2 tasks,
+referential integrity OK).

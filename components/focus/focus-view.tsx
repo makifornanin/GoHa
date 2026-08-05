@@ -155,16 +155,13 @@ function FocusSetup({
         <Select
           id="focus-task"
           value={taskId}
-          onChange={(e) => setTaskId(e.target.value)}
+          onChange={setTaskId}
           disabled={pending}
-        >
-          <option value="">No specific task</option>
-          {candidateTasks.map((task) => (
-            <option key={task.id} value={task.id}>
-              {task.title}
-            </option>
-          ))}
-        </Select>
+          options={[
+            { value: "", label: "No specific task" },
+            ...candidateTasks.map((task) => ({ value: task.id, label: task.title })),
+          ]}
+        />
       </div>
 
       <Button size="lg" className="w-full max-w-60 rounded-full" onClick={start} loading={pending}>

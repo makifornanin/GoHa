@@ -3,13 +3,14 @@
 import { Monitor, Moon, Palette, SlidersHorizontal, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import {
   updatePreferencesAction,
@@ -24,15 +25,6 @@ type SettingsData = {
   weekStartsOn: number;
 };
 
-const noopSubscribe = () => () => {};
-/** SSR-safe "are we hydrated" flag without setState-in-effect. */
-function useMounted() {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false,
-  );
-}
 
 const THEME_OPTIONS: { value: ThemeValue; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -284,17 +276,12 @@ function PreferencesCard({
             id="settings-timezone"
             value={timezone}
             disabled={pending}
-            onChange={(e) => {
-              setTimezone(e.target.value);
-              persist({ timezone: e.target.value, weekStartsOn });
+            onChange={(v) => {
+              setTimezone(v);
+              persist({ timezone: v, weekStartsOn });
             }}
-          >
-            {tzOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+            options={tzOptions.map((o) => ({ value: o.value, label: o.label }))}
+          />
         </div>
         <div className="space-y-1.5">
           <label htmlFor="settings-week-start" className="text-subhead text-label-secondary">
@@ -304,17 +291,12 @@ function PreferencesCard({
             id="settings-week-start"
             value={weekStartsOn}
             disabled={pending}
-            onChange={(e) => {
-              setWeekStartsOn(e.target.value);
-              persist({ timezone, weekStartsOn: e.target.value });
+            onChange={(v) => {
+              setWeekStartsOn(v);
+              persist({ timezone, weekStartsOn: v });
             }}
-          >
-            {WEEK_START_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+            options={WEEK_START_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
         </div>
       </div>
     </SettingsCard>

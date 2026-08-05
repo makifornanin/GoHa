@@ -15,7 +15,9 @@
     "db:migrate": "node db/migrate.mts",
     "db:diagnose": "node --experimental-strip-types scripts/diagnose.mts",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:account:create": "node --experimental-strip-types scripts/test-account.mts create",
+    "test:account:destroy": "node --experimental-strip-types scripts/test-account.mts destroy"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

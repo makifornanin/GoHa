@@ -441,25 +441,23 @@ function NodeInspector({
 
       <label className="space-y-1">
         <span className="text-subhead text-label-secondary">Type</span>
-        <Select value={nodeType} onChange={(e) => setNodeType(e.target.value as TaskMapNodeTypeValue)}>
-          {TASK_MAP_NODE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {NODE_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </Select>
+        <Select
+          value={nodeType}
+          onChange={(v) => setNodeType(v as TaskMapNodeTypeValue)}
+          options={TASK_MAP_NODE_TYPES.map((t) => ({ value: t, label: NODE_TYPE_LABELS[t] }))}
+        />
       </label>
 
       <label className="space-y-1">
         <span className="text-subhead text-label-secondary">Linked task</span>
-        <Select value={taskId} onChange={(e) => setTaskId(e.target.value)}>
-          <option value="">No linked task</option>
-          {tasks.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </Select>
+        <Select
+          value={taskId}
+          onChange={setTaskId}
+          options={[
+            { value: "", label: "No linked task" },
+            ...tasks.map((t) => ({ value: t.id, label: t.title })),
+          ]}
+        />
       </label>
 
       {taskId ? (

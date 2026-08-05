@@ -148,7 +148,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
           title="No goals yet"
           description="Goals turn your life areas into concrete objectives. Create your first one and choose whether its progress comes from tasks or is set by hand."
           action={
-            <Button onClick={openCreate}>
+            <Button data-testid="new-goal" onClick={openCreate}>
               <Plus />
               Create your first goal
             </Button>

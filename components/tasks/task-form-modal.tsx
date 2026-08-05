@@ -163,30 +163,20 @@ function TaskFormFields({
           <Select
             id="task-status"
             value={status}
-            onChange={(e) => setStatus(e.target.value as TaskStatus)}
+            onChange={(v) => setStatus(v as TaskStatus)}
             disabled={submitting}
-          >
-            {TASK_STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {taskStatusConfig[s].label}
-              </option>
-            ))}
-          </Select>
+            options={TASK_STATUS_ORDER.map((s) => ({ value: s, label: taskStatusConfig[s].label }))}
+          />
         </div>
         <div>
           <Label htmlFor="task-priority">Priority</Label>
           <Select
             id="task-priority"
             value={priority}
-            onChange={(e) => setPriority(e.target.value as Priority)}
+            onChange={(v) => setPriority(v as Priority)}
             disabled={submitting}
-          >
-            {TASK_PRIORITY_ORDER.map((p) => (
-              <option key={p} value={p}>
-                {taskPriorityConfig[p].label}
-              </option>
-            ))}
-          </Select>
+            options={TASK_PRIORITY_ORDER.map((p) => ({ value: p, label: taskPriorityConfig[p].label }))}
+          />
         </div>
       </div>
 
@@ -196,16 +186,13 @@ function TaskFormFields({
           <Select
             id="task-goal"
             value={goalId}
-            onChange={(e) => setGoalId(e.target.value)}
+            onChange={setGoalId}
             disabled={submitting}
-          >
-            <option value="">No goal</option>
-            {goals.map((goal) => (
-              <option key={goal.id} value={goal.id}>
-                {goal.title}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "No goal" },
+              ...goals.map((goal) => ({ value: goal.id, label: goal.title })),
+            ]}
+          />
           <FieldError id="task-goal-error" message={fieldErrors.goalId} />
         </div>
         <div>
@@ -213,16 +200,13 @@ function TaskFormFields({
           <Select
             id="task-life-area"
             value={lifeAreaId}
-            onChange={(e) => setLifeAreaId(e.target.value)}
+            onChange={setLifeAreaId}
             disabled={submitting}
-          >
-            <option value="">No life area</option>
-            {lifeAreas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "No life area" },
+              ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
+            ]}
+          />
           <FieldError id="task-life-area-error" message={fieldErrors.lifeAreaId} />
         </div>
       </div>
