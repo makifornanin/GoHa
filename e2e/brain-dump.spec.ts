@@ -18,7 +18,7 @@ test("capture a brain dump item and convert it to a task", async ({ page }) => {
   // reload so the item is rendered from the DB with its real id before we convert.
   await page.getByLabel("Capture a thought").fill(content);
   const captureDone = page.waitForResponse(isBrainDumpAction("/brain-dump"));
-  await page.getByRole("button", { name: "Dump It" }).click();
+  await page.getByRole("button", { name: "Pin it" }).click();
   await captureDone;
   await page.reload();
 
@@ -32,13 +32,14 @@ test("capture a brain dump item and convert it to a task", async ({ page }) => {
   await convertDone;
 
   // The source item is now converted (confirmed by the server).
-  await page.getByRole("tab", { name: "Converted" }).click();
+  await page.getByRole("radio", { name: /Converted/ }).click();
   await expect(
     page.getByTestId("brain-dump-item").filter({ hasText: content }),
-  ).toContainText("Converted to Task");
+  ).toContainText("→ Task");
 
-  // The Task exists (unscheduled -> Inbox view of To-dos).
+  // The Task exists in To-dos (filters default to showing everything).
   await page.goto("/tasks");
-  await page.getByRole("button", { name: "Inbox" }).click();
-  await expect(page.getByRole("heading", { name: content })).toBeVisible();
+  await expect(page.getByRole("heading", { name: content })).toBeVisible({
+    timeout: 15_000,
+  });
 });

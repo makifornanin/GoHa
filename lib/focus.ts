@@ -9,8 +9,42 @@
 export const FOCUS_PRESETS_MINUTES = [15, 25, 45, 60] as const;
 export const FOCUS_MIN_MINUTES = 1;
 export const FOCUS_MAX_MINUTES = 240;
-/** Adding time to a running session ("Need More Time?"). */
+/** Default increment when adding time to a running session ("Need More Time?"). */
 export const FOCUS_EXTEND_SECONDS = 5 * 60;
+/** One-tap extend amounts, in minutes. A custom amount is also accepted. */
+export const FOCUS_EXTEND_PRESETS_MINUTES = [5, 10, 15] as const;
+export const FOCUS_EXTEND_MIN_MINUTES = 1;
+export const FOCUS_EXTEND_MAX_MINUTES = 120;
+
+/**
+ * Parse a human duration into minutes: "90", "1h30", "1h 30m", "2h", "45m".
+ * Returns null when it cannot be understood or falls outside the allowed range,
+ * so the caller can show a validation message rather than guess.
+ */
+export function parseDurationMinutes(
+  input: string,
+  min = FOCUS_MIN_MINUTES,
+  max = FOCUS_MAX_MINUTES,
+): number | null {
+  const text = input.trim().toLowerCase();
+  if (text === "") return null;
+
+  let minutes: number | null = null;
+
+  // "1h30", "1h 30m", "1h", "1 h 30"
+  const hm = text.match(/^(\d+)\s*h(?:ours?)?\s*(\d+)?\s*m?(?:in(?:ute)?s?)?$/);
+  if (hm) {
+    minutes = Number(hm[1]) * 60 + (hm[2] ? Number(hm[2]) : 0);
+  } else {
+    // "45m", "45 mins", or a bare number of minutes
+    const m = text.match(/^(\d+)\s*m?(?:in(?:ute)?s?)?$/);
+    if (m) minutes = Number(m[1]);
+  }
+
+  if (minutes === null || !Number.isFinite(minutes)) return null;
+  if (minutes < min || minutes > max) return null;
+  return minutes;
+}
 
 /**
  * Abandoned-session policy. A running session left open longer than
@@ -95,6 +129,9 @@ export function formatDurationHm(totalSeconds: number): string {
   const minutes = Math.floor((s % 3600) / 60);
   if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
   if (hours > 0) return `${hours}h`;
+  // Sub-minute sessions must not read as "0m", which looks like nothing was
+  // recorded at all. Show the real seconds instead.
+  if (minutes === 0) return `${s}s`;
   return `${minutes}m`;
 }
 

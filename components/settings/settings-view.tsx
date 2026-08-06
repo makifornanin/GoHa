@@ -46,7 +46,7 @@ export function SettingsView({
   settings: SettingsData;
 }) {
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
+    <div className="grid items-start gap-4 lg:grid-cols-2">
       <ProfileCard className="lg:col-span-2" name={profile.name} email={profile.email} />
       <AppearanceCard dbTheme={settings.theme} />
       <PreferencesCard timezone={settings.timezone} weekStartsOn={settings.weekStartsOn} />

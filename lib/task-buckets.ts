@@ -74,3 +74,79 @@ export function taskMatchesView(
     isInBucket(taskEffectiveDate(task, timeZone), view, now, weekStartsOn, timeZone)
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Independent WHEN / WHAT-STATE filters                               */
+/*                                                                     */
+/* The single `TaskViewKey` list conflated two questions ("when is it  */
+/* scheduled" and "what state is it in"), so Done and the timeframes   */
+/* were mutually exclusive and there was no way to ask for, say,       */
+/* "this week's in-progress work". These two axes compose freely.      */
+/* ------------------------------------------------------------------ */
+
+/** WHEN a task is scheduled. Independent of its progress. */
+export type TaskTimeframeKey = "all" | "inbox" | DateBucket;
+
+/** WHAT STATE a task is in. `late` is derived, not stored. */
+export type TaskProgressKey =
+  | "all"
+  | "todo"
+  | "in_progress"
+  | "late"
+  | "done"
+  | "cancelled";
+
+/**
+ * Active work whose effective date has already passed. Derived from the date,
+ * never stored, so it can never drift out of sync (CLAUDE.md section 7).
+ */
+export function isTaskLate(
+  task: TaskDateFields & { status: TaskStatusLike },
+  now: Date = new Date(),
+  timeZone: string = MANILA_TZ,
+): boolean {
+  if (!ACTIVE_STATUSES.has(task.status)) return false;
+  const effective = taskEffectiveDate(task, timeZone);
+  if (effective === null) return false;
+  return effective < toZonedDate(now, timeZone);
+}
+
+/** Timeframe membership only. Status is deliberately NOT considered here. */
+export function taskMatchesTimeframe(
+  task: TaskDateFields,
+  timeframe: TaskTimeframeKey,
+  now: Date = new Date(),
+  weekStartsOn: Weekday = 1,
+  timeZone: string = MANILA_TZ,
+): boolean {
+  if (timeframe === "all") return true;
+  const effective = taskEffectiveDate(task, timeZone);
+  if (timeframe === "inbox") return effective === null;
+  return isInBucket(effective, timeframe, now, weekStartsOn, timeZone);
+}
+
+/**
+ * Progress membership. `all` means the normal working set: everything except
+ * cancelled work, which stays available under its own explicit option.
+ */
+export function taskMatchesProgress(
+  task: TaskDateFields & { status: TaskStatusLike },
+  progress: TaskProgressKey,
+  now: Date = new Date(),
+  timeZone: string = MANILA_TZ,
+): boolean {
+  switch (progress) {
+    case "all":
+      return task.status !== "cancelled";
+    case "todo":
+      return task.status === "todo";
+    case "in_progress":
+      return task.status === "in_progress";
+    case "late":
+      return isTaskLate(task, now, timeZone);
+    case "done":
+      return task.status === "completed";
+    case "cancelled":
+      return task.status === "cancelled";
+  }
+}

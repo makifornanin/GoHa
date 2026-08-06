@@ -1,12 +1,10 @@
 "use client";
 
-import { motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { Brain, CornerDownLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
-
-import { listContainer, listItem } from "@/lib/motion";
 
 import {
   archiveBrainDumpItemAction,
@@ -14,24 +12,33 @@ import {
   convertBrainDumpItemAction,
   deleteBrainDumpItemAction,
   restoreBrainDumpItemAction,
+  setBrainDumpColorAction,
   updateBrainDumpItemAction,
 } from "@/app/(app)/brain-dump/actions";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
 import type { BrainDumpItem as BrainDumpItemRow } from "@/db";
 import type { BrainDumpStatus } from "@/db/schema/enums";
 import type { ConvertTarget } from "@/db/repositories/brain-dump";
-import { BRAIN_DUMP_CONTENT_MAX, convertTargetConfig } from "@/lib/brain-dump";
+import {
+  BRAIN_DUMP_CONTENT_MAX,
+  convertTargetConfig,
+  DEFAULT_NOTE_COLOR,
+  NOTE_COLOR_KEYS,
+  noteColorConfig,
+  type NoteColorKey,
+} from "@/lib/brain-dump";
 import { cn } from "@/lib/utils";
 
 import { BrainDumpItem } from "./brain-dump-item";
 
 type Tab = BrainDumpStatus;
 const TABS: { key: Tab; label: string }[] = [
-  { key: "inbox", label: "Inbox" },
+  { key: "inbox", label: "Wall" },
   { key: "archived", label: "Archived" },
   { key: "converted", label: "Converted" },
 ];
@@ -40,12 +47,20 @@ type OptimisticAction =
   | { type: "add"; item: BrainDumpItemRow }
   | { type: "status"; id: string; status: BrainDumpStatus; convertedType?: ConvertTarget }
   | { type: "content"; id: string; content: string }
+  | { type: "color"; id: string; color: NoteColorKey }
   | { type: "remove"; id: string };
 
-export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; timeZone?: string }) {
+export function BrainDumpView({
+  items,
+  timeZone,
+}: {
+  items: BrainDumpItemRow[];
+  timeZone?: string;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("inbox");
   const [draft, setDraft] = useState("");
+  const [draftColor, setDraftColor] = useState<NoteColorKey>(DEFAULT_NOTE_COLOR);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<BrainDumpItemRow | null>(null);
   const [capturePending, startCapture] = useTransition();
@@ -65,6 +80,8 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
         );
       case "content":
         return state.map((i) => (i.id === action.id ? { ...i, content: action.content } : i));
+      case "color":
+        return state.map((i) => (i.id === action.id ? { ...i, color: action.color } : i));
     }
   });
 
@@ -85,6 +102,7 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
       userId: "",
       content,
       status: "inbox",
+      color: draftColor,
       convertedType: null,
       convertedEntityId: null,
       sortOrder: 0,
@@ -95,11 +113,24 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
       apply({ type: "add", item: optimistic });
       setDraft("");
       const result = await captureBrainDumpItemAction(content);
-      if (!result.ok) toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      // Capture stays a single fast field; the chosen colour is applied to the
+      // note the server just created.
+      if (draftColor !== DEFAULT_NOTE_COLOR) {
+        await setBrainDumpColorAction(result.data.id, draftColor);
+      }
     });
   }
 
-  function act(id: string, optimistic: OptimisticAction, run: () => Promise<{ ok: boolean; error?: string }>, onOk?: () => void) {
+  function act(
+    id: string,
+    optimistic: OptimisticAction,
+    run: () => Promise<{ ok: boolean; error?: string }>,
+    onOk?: () => void,
+  ) {
     setBusyId(id);
     startAction(async () => {
       apply(optimistic);
@@ -130,9 +161,10 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader title="Brain Dump" description="Fast capture for messy thoughts. Clear your mind." />
 
+      {/* Capture: one field, a colour, one key to post it. */}
       <section className="rounded-2xl border border-separator-opaque bg-surface p-1 shadow-e1 transition-colors focus-within:border-blue/40">
         <Textarea
           value={draft}
@@ -143,85 +175,101 @@ export function BrainDumpView({ items, timeZone }: { items: BrainDumpItemRow[]; 
           maxLength={BRAIN_DUMP_CONTENT_MAX}
           placeholder="Capture anything..."
           aria-label="Capture a thought"
-          className="min-h-28 bg-transparent text-body-lg focus-visible:bg-transparent focus-visible:outline-none"
+          className="min-h-24 bg-transparent text-body-lg focus-visible:bg-transparent focus-visible:outline-none"
         />
-        <div className="flex items-center justify-between border-t border-separator p-2">
-          <span className="pl-2 font-mono text-footnote tabular-nums text-label-tertiary">
-            {draft.length}/{BRAIN_DUMP_CONTENT_MAX} · ⌘/Ctrl + Enter
-          </span>
-          <Button onClick={capture} disabled={draft.trim().length === 0} loading={capturePending}>
-            <CornerDownLeft />
-            Dump It
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-separator p-2">
+          <div className="flex items-center gap-1.5 pl-1" role="radiogroup" aria-label="Note colour">
+            {NOTE_COLOR_KEYS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={draftColor === key}
+                aria-label={noteColorConfig[key].label}
+                onClick={() => setDraftColor(key)}
+                className={cn(
+                  "size-5 cursor-pointer rounded-full transition-transform hover:scale-110",
+                  noteColorConfig[key].swatch,
+                  draftColor === key &&
+                    "outline-solid outline-2 outline-offset-2 outline-label-tertiary",
+                )}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-footnote tabular-nums text-label-tertiary">
+              {draft.length}/{BRAIN_DUMP_CONTENT_MAX} · ⌘/Ctrl + Enter
+            </span>
+            <Button onClick={capture} disabled={draft.trim().length === 0} loading={capturePending}>
+              <CornerDownLeft />
+              Pin it
+            </Button>
+          </div>
         </div>
       </section>
 
-      <div>
-        <div className="mb-4 flex gap-5 border-b border-separator">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 whitespace-nowrap py-2.5 text-callout font-medium transition-colors",
-                tab === t.key
-                  ? "border-b-2 border-blue text-blue"
-                  : "text-label-secondary hover:text-label",
-              )}
-            >
-              {t.label}
-              {(counts.get(t.key) ?? 0) > 0 ? (
-                <span className="rounded-full bg-surface-secondary px-1.5 py-0.5 font-mono text-footnote tabular-nums text-label-secondary">
-                  {counts.get(t.key)}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
+      <SegmentedControl
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+        ariaLabel="Filter notes"
+        className="self-start"
+        options={TABS.map((t) => {
+          const count = counts.get(t.key) ?? 0;
+          return { value: t.key, label: count > 0 ? `${t.label} · ${count}` : t.label };
+        })}
+      />
 
-        {visible.length === 0 ? (
-          <EmptyState
-            icon={Brain}
-            title={tab === "inbox" ? "Your mind is clear" : `Nothing ${tab}`}
-            description={
-              tab === "inbox"
-                ? "Capture anything above and it lands here. Convert thoughts into tasks, goals, or habits when you're ready."
-                : `Items you ${tab === "archived" ? "archive" : "convert"} will show up here.`
-            }
-          />
-        ) : (
-          <motion.div
-            key={tab}
-            variants={listContainer}
-            initial="hidden"
-            animate="visible"
-            className="flex flex-col gap-4"
-          >
+      {visible.length === 0 ? (
+        <EmptyState
+          icon={Brain}
+          title={tab === "inbox" ? "Your mind is clear" : `Nothing ${tab}`}
+          description={
+            tab === "inbox"
+              ? "Capture anything above and it lands here. Convert thoughts into tasks, goals, or habits when you're ready."
+              : `Items you ${tab === "archived" ? "archive" : "convert"} will show up here.`
+          }
+        />
+      ) : (
+        /* A wall of notes: columns so notes keep their natural height. */
+        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+          <AnimatePresence initial={false}>
             {visible.map((item) => (
-              <motion.div key={item.id} variants={listItem} layout>
+              <div key={item.id} className="break-inside-avoid">
                 <BrainDumpItem
                   item={item}
                   busy={busyId === item.id}
                   timeZone={timeZone}
                   onConvert={convert}
-                  onArchive={(id) => act(id, { type: "status", id, status: "archived" }, () => archiveBrainDumpItemAction(id))}
-                  onRestore={(id) => act(id, { type: "status", id, status: "inbox" }, () => restoreBrainDumpItemAction(id))}
+                  onArchive={(id) =>
+                    act(id, { type: "status", id, status: "archived" }, () =>
+                      archiveBrainDumpItemAction(id),
+                    )
+                  }
+                  onRestore={(id) =>
+                    act(id, { type: "status", id, status: "inbox" }, () =>
+                      restoreBrainDumpItemAction(id),
+                    )
+                  }
                   onDelete={setDeleting}
-                  onEdit={(id, content) => act(id, { type: "content", id, content }, () => updateBrainDumpItemAction(id, content))}
+                  onEdit={(id, content) =>
+                    act(id, { type: "content", id, content }, () =>
+                      updateBrainDumpItemAction(id, content),
+                    )
+                  }
+                  onRecolor={(id, color) =>
+                    act(id, { type: "color", id, color }, () => setBrainDumpColorAction(id, color))
+                  }
                 />
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
-        )}
-      </div>
+          </AnimatePresence>
+        </div>
+      )}
 
       <Modal
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
-        title="Delete this item?"
+        title="Delete this note?"
         description="This permanently removes the captured thought. It cannot be undone."
       >
         <div className="flex items-center justify-end gap-3 px-6 py-5">

@@ -21,6 +21,12 @@ export const brainDumpItems = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     content: text().notNull(),
     status: brainDumpStatus().notNull().default("inbox"),
+    /**
+     * Sticky-note colour key (see lib/brain-dump NOTE_COLOR_KEYS). Stored as a
+     * key, never a hex value, so the palette stays a presentation concern
+     * (CLAUDE.md section 9). Null means the default note colour.
+     */
+    color: text(),
     /** What the item became: 'task' | 'goal' | 'habit'. */
     convertedType: brainDumpConvertedType(),
     /** The created entity's id (polymorphic across tables, so not a FK). */

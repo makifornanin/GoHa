@@ -1,0 +1,1 @@
+ALTER TABLE "brain_dump_items" ADD COLUMN "color" text;

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { focusRepo, tasksRepo, type FocusSession } from "@/db";
 import {
   countedFocusSeconds,
+  FOCUS_EXTEND_MAX_MINUTES,
+  FOCUS_EXTEND_MIN_MINUTES,
   FOCUS_EXTEND_SECONDS,
   FOCUS_MAX_MINUTES,
   FOCUS_MIN_MINUTES,
@@ -36,6 +38,14 @@ const startSchema = z.object({
 });
 
 const noteSchema = z.string().trim().max(2000).optional().transform((v) => (v && v.length > 0 ? v : null));
+
+/** Minutes to add to a running session. Defaults to the standard increment. */
+const extendMinutesSchema = z.coerce
+  .number()
+  .int()
+  .min(FOCUS_EXTEND_MIN_MINUTES)
+  .max(FOCUS_EXTEND_MAX_MINUTES)
+  .default(FOCUS_EXTEND_SECONDS / 60);
 
 /**
  * Start a focus session. Any still-open session is finalized first (as
@@ -136,10 +146,22 @@ export async function resumeFocusSessionAction(id: string): Promise<ActionResult
   }
 }
 
-/** "Need More Time?": extend the plan by a fixed increment. */
-export async function extendFocusSessionAction(id: string): Promise<ActionResult<FocusSession>> {
+/** "Need More Time?": extend the plan. Defaults to 5 minutes, or any amount. */
+export async function extendFocusSessionAction(
+  id: string,
+  minutes?: number,
+): Promise<ActionResult<FocusSession>> {
   const user = await requireUser();
   if (!idSchema.safeParse(id).success) return { ok: false, error: "No active session." };
+
+  const extra = extendMinutesSchema.safeParse(minutes);
+  if (!extra.success) {
+    return {
+      ok: false,
+      error: `Add between ${FOCUS_EXTEND_MIN_MINUTES} and ${FOCUS_EXTEND_MAX_MINUTES} minutes.`,
+    };
+  }
+  const extendSeconds = extra.data * 60;
 
   try {
     const session = await focusRepo.getFocusSession(user.id, id);
@@ -151,7 +173,7 @@ export async function extendFocusSessionAction(id: string): Promise<ActionResult
       pausedSeconds: session.pausedSeconds,
       pausedAt: session.pausedAt,
     });
-    const extended = await focusRepo.extendPlannedDuration(user.id, id, base + FOCUS_EXTEND_SECONDS);
+    const extended = await focusRepo.extendPlannedDuration(user.id, id, base + extendSeconds);
     return { ok: true, data: extended ?? session };
   } catch (error) {
     console.error("extendFocusSessionAction failed", error);

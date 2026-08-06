@@ -25,9 +25,11 @@ export default async function AppLayout({
       <div className="flex min-h-screen flex-col md:pl-[260px]">
         <MobileHeader className="md:hidden" user={navUser} />
         <AppHeader className="hidden md:flex" />
-        {/* Page padding: 24 desktop, 16 mobile; top 24 (spec section 7). */}
+        {/* Page padding: 24 desktop, 16 mobile; top 24 (spec section 7). The
+            narrower measure stops content stretching into empty space on wide
+            screens, which is what made pages read as mostly-blank. */}
         <main className="flex-1 pb-24 md:pb-12">
-          <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 md:px-6">
+          <div className="mx-auto w-full max-w-[1080px] px-4 pt-6 md:px-6">
             {children}
           </div>
         </main>

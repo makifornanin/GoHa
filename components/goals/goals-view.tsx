@@ -135,7 +135,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
   );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title="My Goals"
         description="Track and manage your objectives across every life area and timeframe."
@@ -155,7 +155,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
           }
         />
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           <div className="overflow-x-auto border-b border-separator">
             <ul className="flex min-w-max gap-5" role="tablist" aria-label="Filter goals by timeframe">
               {GOAL_TIMEFRAME_ORDER.map((tf) => (
@@ -184,7 +184,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
             variants={listContainer}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
           >
             {visibleGoals.map((goal) => (
               <motion.div key={goal.id} variants={listItem} layout>
@@ -201,7 +201,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
             <button
               type="button"
               onClick={openCreate}
-              className="group flex min-h-60 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-gray-3 p-5 text-label-secondary transition-colors hover:border-blue/50 hover:bg-surface-hover"
+              className="group flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-gray-3 p-5 text-label-secondary transition-colors hover:border-blue/50 hover:bg-surface-hover"
             >
               <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors group-hover:bg-blue group-hover:text-white">
                 <Plus className="size-5" aria-hidden />

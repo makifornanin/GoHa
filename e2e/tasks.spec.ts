@@ -47,8 +47,8 @@ test("completing a task updates its goal's derived progress", async ({ page }) =
   //    landed in) and complete it, matching by its unique name. Wait for the
   //    completion Server Action to COMMIT before reading /goals: completion runs
   //    in a transition, so navigating away too early would race the write.
-  // View buttons carry their live count in the accessible name ("All 3").
-  await page.getByRole("button", { name: /^All(\s|$)/ }).click();
+  // The filters default to showing everything, so the undated task is
+  // visible without switching views.
   const taskCard = page.getByTestId("task-card").filter({ hasText: taskName });
   await expect(taskCard).toBeVisible();
   const completeDone = page.waitForResponse(

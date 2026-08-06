@@ -159,25 +159,42 @@ export function TodayView({
 
   return (
     /* Page sections are 32 apart; groups within a section are 24 apart. */
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {/* Greeting */}
-      <header>
-        <h1 className="text-title-2 text-label">
-          Good {greetingPart}, {userName}
-        </h1>
-        <p className="mt-1 text-subhead tabular-nums text-label-secondary">{dateLabel}</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-title-2 text-label">
+            Good {greetingPart}, {userName}
+          </h1>
+          <p className="mt-1 text-subhead tabular-nums text-label-secondary">{dateLabel}</p>
+        </div>
+        {/* A one-line read on the day, so the header carries information
+            instead of whitespace. */}
+        {!dayIsEmpty ? (
+          <p className="text-subhead text-label-secondary">
+            <span className="font-mono tabular-nums text-label">{data.completedToday}</span>
+            <span className="text-label-tertiary">/{data.totalToday}</span> done today
+            {data.overdueTasks.length > 0 ? (
+              <>
+                {" · "}
+                <span className="font-mono tabular-nums text-red">{data.overdueTasks.length}</span>{" "}
+                <span className="text-red">overdue</span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </header>
 
       {dayIsEmpty ? (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           <EmptyDay />
           <QuickAddTask today={today} />
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
             {/* Main column */}
-            <div className="flex flex-col gap-6 md:col-span-8">
+            <div className="flex flex-col gap-4 md:col-span-8">
               <FocusCard task={data.focus} timeZone={timeZone} onToggle={toggle} />
 
               <TopPriorities
@@ -301,7 +318,7 @@ export function TodayView({
             </div>
 
             {/* Secondary column */}
-            <div className="flex flex-col gap-6 md:col-span-4">
+            <div className="flex flex-col gap-4 md:col-span-4">
               <Card>
                 <CardContent className="flex items-center gap-4 pt-4">
                   <ProgressRing

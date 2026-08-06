@@ -10,6 +10,7 @@ import {
   brainDumpContentSchema,
   brainDumpIdSchema,
   convertTargetSchema,
+  noteColorSchema,
 } from "@/lib/validations/brain-dump";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -50,6 +51,31 @@ export async function updateBrainDumpItemAction(
     return { ok: true, data: item };
   } catch (error) {
     console.error("updateBrainDumpItemAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/** Recolour a sticky note. The colour KEY is validated against the palette. */
+export async function setBrainDumpColorAction(
+  id: string,
+  color: string,
+): Promise<ActionResult<BrainDumpItem>> {
+  const user = await requireUser();
+
+  const idResult = brainDumpIdSchema.safeParse(id);
+  if (!idResult.success) return { ok: false, error: idResult.error.issues[0]?.message ?? GENERIC_ERROR };
+  const parsed = noteColorSchema.safeParse(color);
+  if (!parsed.success) return { ok: false, error: "That colour is not available." };
+
+  try {
+    const item = await brainDumpRepo.updateBrainDumpItem(user.id, idResult.data, {
+      color: parsed.data,
+    });
+    if (!item) return { ok: false, error: "That item could not be updated." };
+    revalidatePath("/brain-dump");
+    return { ok: true, data: item };
+  } catch (error) {
+    console.error("setBrainDumpColorAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }

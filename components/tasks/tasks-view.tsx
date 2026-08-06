@@ -1,17 +1,6 @@
 "use client";
 
-import {
-  Calendar,
-  CalendarClock,
-  CalendarDays,
-  CalendarRange,
-  CircleCheckBig,
-  Inbox,
-  ListTodo,
-  Plus,
-  Sun,
-  type LucideIcon,
-} from "lucide-react";
+import { ListTodo, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -29,29 +18,47 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import type { Goal, LifeArea, Task } from "@/db";
 import type { TaskStatus } from "@/db/schema/enums";
 import { MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
 import { listContainer, listItem } from "@/lib/motion";
-import { taskEffectiveDate, taskMatchesView, type TaskViewKey } from "@/lib/task-buckets";
+import {
+  isTaskLate,
+  taskEffectiveDate,
+  taskMatchesProgress,
+  taskMatchesTimeframe,
+  type TaskProgressKey,
+  type TaskTimeframeKey,
+} from "@/lib/task-buckets";
 import { taskPriorityConfig } from "@/lib/tasks";
 import type { TaskFormInput } from "@/lib/validations/task";
-import { cn } from "@/lib/utils";
 
 import { CompletionNoteModal } from "./completion-note-modal";
+import { TaskCalendar } from "./task-calendar";
 import { TaskCard } from "./task-card";
 import { TaskFormModal } from "./task-form-modal";
 
-const VIEWS: { key: TaskViewKey; label: string; icon: LucideIcon }[] = [
-  { key: "inbox", label: "Inbox", icon: Inbox },
-  { key: "today", label: "Today", icon: Sun },
-  { key: "this_week", label: "This Week", icon: CalendarRange },
-  { key: "this_month", label: "This Month", icon: CalendarDays },
-  { key: "this_quarter", label: "Quarterly", icon: CalendarClock },
-  { key: "this_year", label: "Yearly", icon: Calendar },
-  { key: "done", label: "Done", icon: CircleCheckBig },
-  { key: "all", label: "All", icon: ListTodo },
+/** WHEN. One dropdown instead of a column of mutually exclusive buttons. */
+const TIMEFRAMES: { key: TaskTimeframeKey; label: string }[] = [
+  { key: "all", label: "Any time" },
+  { key: "today", label: "Today" },
+  { key: "this_week", label: "This week" },
+  { key: "this_month", label: "This month" },
+  { key: "this_quarter", label: "This quarter" },
+  { key: "this_year", label: "This year" },
+  { key: "inbox", label: "No date (Inbox)" },
+];
+
+/** WHAT STATE. Separate axis, so "this week's in-progress work" is expressible. */
+const PROGRESS: { key: TaskProgressKey; label: string }[] = [
+  { key: "all", label: "All open + done" },
+  { key: "todo", label: "Not started" },
+  { key: "in_progress", label: "In progress" },
+  { key: "late", label: "Late" },
+  { key: "done", label: "Done" },
+  { key: "cancelled", label: "Cancelled" },
 ];
 
 type SortKey = "date" | "priority" | "created" | "alpha";
@@ -102,77 +109,109 @@ export function TasksView({
   lifeAreas: LifeArea[];
   timeZone?: string;
   weekStartsOn?: Weekday;
-  /** Opens the create form immediately (from `/tasks?new=1`, e.g. the header
-   *  "Add Task" button and the mobile "+" action). */
   openCreateOnMount?: boolean;
 }) {
-  const [view, setView] = useState<TaskViewKey>("today");
+  const [layout, setLayout] = useState<"list" | "calendar">("list");
+  const [timeframe, setTimeframe] = useState<TaskTimeframeKey>("all");
+  const [progress, setProgress] = useState<TaskProgressKey>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [lifeAreaFilter, setLifeAreaFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(openCreateOnMount);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [createDate, setCreateDate] = useState<string | undefined>(undefined);
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(), []);
 
-  const [optimisticTasks, applyOptimistic] = useOptimistic(
-    tasks,
-    (state, action: OptimisticAction) => {
-      if (action.type === "remove") return state.filter((t) => t.id !== action.id);
-      return state.map((t) =>
-        t.id === action.id
-          ? { ...t, status: action.status, completedAt: action.status === "completed" ? new Date() : null }
-          : t,
-      );
-    },
-  );
+  const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, (state, action: OptimisticAction) => {
+    if (action.type === "remove") return state.filter((t) => t.id !== action.id);
+    return state.map((t) =>
+      t.id === action.id
+        ? { ...t, status: action.status, completedAt: action.status === "completed" ? new Date() : null }
+        : t,
+    );
+  });
 
   const goalTitleById = useMemo(() => new Map(goals.map((g) => [g.id, g.title])), [goals]);
   const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
   const goalOptions = useMemo(() => goals.map((g) => ({ id: g.id, title: g.title })), [goals]);
   const lifeAreaOptions = useMemo(() => lifeAreas.map((a) => ({ id: a.id, name: a.name })), [lifeAreas]);
 
-  const counts = useMemo(() => {
-    const map = new Map<TaskViewKey, number>();
-    for (const v of VIEWS) {
+  /** Life-area scoping applies to both layouts. */
+  const scoped = useMemo(
+    () =>
+      lifeAreaFilter === "all"
+        ? optimisticTasks
+        : optimisticTasks.filter((t) => t.lifeAreaId === lifeAreaFilter),
+    [optimisticTasks, lifeAreaFilter],
+  );
+
+  /** Live counts so each dropdown option states how much work it holds. */
+  const timeframeCounts = useMemo(() => {
+    const map = new Map<TaskTimeframeKey, number>();
+    for (const t of TIMEFRAMES) {
       map.set(
-        v.key,
-        optimisticTasks.filter((t) => taskMatchesView(t, v.key, now, weekStartsOn, timeZone)).length,
+        t.key,
+        scoped.filter(
+          (task) =>
+            taskMatchesTimeframe(task, t.key, now, weekStartsOn, timeZone) &&
+            taskMatchesProgress(task, progress, now, timeZone),
+        ).length,
       );
     }
     return map;
-  }, [optimisticTasks, now, weekStartsOn, timeZone]);
+  }, [scoped, now, weekStartsOn, timeZone, progress]);
 
-  const visibleTasks = useMemo(() => {
-    let list = optimisticTasks.filter((t) => taskMatchesView(t, view, now, weekStartsOn, timeZone));
-    if (lifeAreaFilter !== "all") list = list.filter((t) => t.lifeAreaId === lifeAreaFilter);
-    return sortTasks(list, sort);
-  }, [optimisticTasks, view, now, lifeAreaFilter, sort, weekStartsOn, timeZone]);
-
-  const activeView = VIEWS.find((v) => v.key === view)!;
-
-  /**
-   * When the current view is empty, the nearest view that DOES hold tasks.
-   * Inbox first (undated tasks are the ones users most often think vanished),
-   * then All. Prevents the "my task disappeared" dead end. Two map lookups,
-   * so it is computed inline rather than memoized.
-   */
-  const elsewhere = (() => {
-    if (visibleTasks.length > 0) return null;
-    for (const key of ["inbox", "all"] as const) {
-      if (key === view) continue;
-      const count = counts.get(key) ?? 0;
-      if (count > 0) {
-        return { key, count, label: VIEWS.find((v) => v.key === key)!.label };
-      }
+  const progressCounts = useMemo(() => {
+    const map = new Map<TaskProgressKey, number>();
+    for (const p of PROGRESS) {
+      map.set(
+        p.key,
+        scoped.filter(
+          (task) =>
+            taskMatchesTimeframe(task, timeframe, now, weekStartsOn, timeZone) &&
+            taskMatchesProgress(task, p.key, now, timeZone),
+        ).length,
+      );
     }
-    return null;
-  })();
+    return map;
+  }, [scoped, now, weekStartsOn, timeZone, timeframe]);
 
-  function openCreate() {
+  const visibleTasks = useMemo(
+    () =>
+      sortTasks(
+        scoped.filter(
+          (t) =>
+            taskMatchesTimeframe(t, timeframe, now, weekStartsOn, timeZone) &&
+            taskMatchesProgress(t, progress, now, timeZone),
+        ),
+        sort,
+      ),
+    [scoped, timeframe, progress, sort, now, weekStartsOn, timeZone],
+  );
+
+  /** Calendar spans a month of its own, so only the state filter applies. */
+  const calendarTasks = useMemo(
+    () => scoped.filter((t) => taskMatchesProgress(t, progress, now, timeZone)),
+    [scoped, progress, now, timeZone],
+  );
+
+  const lateCount = useMemo(
+    () => scoped.filter((t) => isTaskLate(t, now, timeZone)).length,
+    [scoped, now, timeZone],
+  );
+
+  function openCreate(date?: string) {
     setEditing(null);
+    setCreateDate(date);
+    setFormOpen(true);
+  }
+
+  function openEdit(task: Task) {
+    setEditing(task);
+    setCreateDate(undefined);
     setFormOpen(true);
   }
 
@@ -180,17 +219,16 @@ export function TasksView({
     const result = await createTaskAction(values);
     if (result.ok) {
       const task = result.data;
-      // A task must never save into a view the user isn't looking at and then
-      // seem to vanish. If the new task doesn't belong to the current view,
-      // switch to one where it IS visible and say where it went.
-      if (!taskMatchesView(task, view, now, weekStartsOn, timeZone)) {
-        const target: TaskViewKey =
-          taskEffectiveDate(task, timeZone) === null ? "inbox" : "all";
-        setView(target);
+      // A task must never save into a filter the user isn't looking at and then
+      // seem to vanish. Widen the filters until it is on screen.
+      const visible =
+        taskMatchesTimeframe(task, timeframe, now, weekStartsOn, timeZone) &&
+        taskMatchesProgress(task, progress, now, timeZone);
+      if (!visible) {
+        setTimeframe("all");
+        setProgress("all");
         setLifeAreaFilter("all");
-        toast.success(
-          `Added "${task.title}" to ${VIEWS.find((v) => v.key === target)!.label}`,
-        );
+        toast.success(`Added "${task.title}" — showing all tasks so you can see it`);
       } else {
         toast.success(`Added "${task.title}"`);
       }
@@ -264,188 +302,22 @@ export function TasksView({
     return result;
   }
 
-  const addButton = (
-    <Button data-testid="new-task" onClick={openCreate}>
-      <Plus />
-      Add Task
-    </Button>
-  );
-
-  if (optimisticTasks.length === 0) {
-    return (
-      <div className="flex flex-col gap-8">
-        <PageHeader title="To-dos" description="Plan, schedule, and complete the work that moves your goals." />
-        <EmptyState
-          icon={ListTodo}
-          title="No tasks yet"
-          description="Tasks are the actions that move your goals forward. Add your first one and schedule when you'll do it."
-          action={
-            <Button data-testid="new-task" onClick={openCreate}>
-              <Plus />
-              Create your first task
-            </Button>
-          }
-        />
-        <TaskFormModal
-          open={formOpen}
-          mode="create"
-          goals={goalOptions}
-          lifeAreas={lifeAreaOptions}
-          timeZone={timeZone}
-          onSubmit={handleCreate}
-          onClose={() => setFormOpen(false)}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
-        title="To-dos"
-        description="Plan, schedule, and complete the work that moves your goals."
-        action={addButton}
-      />
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        <aside className="lg:col-span-3">
-          <nav
-            aria-label="Task views"
-            className="flex gap-2 overflow-x-auto pb-2 lg:sticky lg:top-6 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0"
-          >
-            {VIEWS.map((v) => {
-              const Icon = v.icon;
-              const active = view === v.key;
-              const count = counts.get(v.key) ?? 0;
-              return (
-                <button
-                  key={v.key}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setView(v.key)}
-                  className={cn(
-                    "flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2.5 text-callout font-medium transition-colors",
-                    active
-                      ? "bg-blue/12 text-blue"
-                      : "text-label-secondary hover:bg-surface-hover hover:text-label",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" aria-hidden />
-                  <span>{v.label}</span>
-                  {count > 0 ? (
-                    <span
-                      className={cn(
-                        "ml-auto rounded-full px-1.5 py-0.5 font-mono text-footnote tabular-nums",
-                        active ? "bg-blue text-white" : "bg-surface-secondary text-label-secondary",
-                      )}
-                    >
-                      {count}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <div className="lg:col-span-9">
-          <div className="mb-6 flex flex-col gap-3 border-b border-separator pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-title-3 text-label">{activeView.label}</h2>
-            <div className="flex items-center gap-2">
-              <Select
-                aria-label="Filter by life area"
-                value={lifeAreaFilter}
-                onChange={setLifeAreaFilter}
-                className="w-44"
-                options={[
-                  { value: "all", label: "All life areas" },
-                  ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
-                ]}
-              />
-              <Select
-                aria-label="Sort tasks"
-                value={sort}
-                onChange={(v) => setSort(v as SortKey)}
-                className="w-36"
-                options={SORTS.map((s) => ({ value: s.key, label: `Sort: ${s.label}` }))}
-              />
-            </div>
-          </div>
-
-          {visibleTasks.length === 0 ? (
-            <div className="rounded-2xl bg-surface-secondary px-6 py-12 text-center">
-              <p className="text-callout text-label-secondary">
-                Nothing here yet.{" "}
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="cursor-pointer font-medium text-blue hover:underline"
-                >
-                  Add a task
-                </button>
-                .
-              </p>
-              {/* Never leave the user thinking their tasks vanished: if other
-                  views hold tasks, point straight at them. */}
-              {elsewhere ? (
-                <p className="mt-2 text-callout text-label-secondary">
-                  You have{" "}
-                  <button
-                    type="button"
-                    onClick={() => setView(elsewhere.key)}
-                    className="cursor-pointer font-medium text-blue hover:underline"
-                  >
-                    {elsewhere.count} task{elsewhere.count === 1 ? "" : "s"} in {elsewhere.label}
-                  </button>
-                  .
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <motion.ul
-              key={`${view}-${sort}-${lifeAreaFilter}`}
-              variants={listContainer}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-col gap-2"
-            >
-              {visibleTasks.map((task) => (
-                <motion.li key={task.id} variants={listItem} layout>
-                  <TaskCard
-                    task={task}
-                    goalTitle={task.goalId ? goalTitleById.get(task.goalId) ?? null : null}
-                    lifeArea={task.lifeAreaId ? lifeAreaById.get(task.lifeAreaId) ?? null : null}
-                    timeZone={timeZone}
-                    onToggleComplete={handleToggleComplete}
-                    onEdit={(t) => {
-                      setEditing(t);
-                      setFormOpen(true);
-                    }}
-                    onCancel={handleCancel}
-                    onDelete={setDeleting}
-                    onEditNote={setNoteTask}
-                  />
-                </motion.li>
-              ))}
-            </motion.ul>
-          )}
-        </div>
-      </div>
-
+  const modals = (
+    <>
       <TaskFormModal
         open={formOpen}
         mode={editing ? "edit" : "create"}
         task={editing}
         goals={goalOptions}
         lifeAreas={lifeAreaOptions}
-        defaultScheduledFor={!editing && view === "today" ? zonedToday(now, timeZone) : undefined}
+        defaultScheduledFor={
+          editing ? undefined : (createDate ?? (timeframe === "today" ? zonedToday(now, timeZone) : undefined))
+        }
         timeZone={timeZone}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />
-
       <CompletionNoteModal task={noteTask} onSave={handleSaveNote} onClose={() => setNoteTask(null)} />
-
       <Modal
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
@@ -463,6 +335,177 @@ export function TasksView({
           </Button>
         </div>
       </Modal>
+    </>
+  );
+
+  if (optimisticTasks.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="To-dos" description="Plan, schedule, and complete the work that moves your goals." />
+        <EmptyState
+          icon={ListTodo}
+          title="No tasks yet"
+          description="Tasks are the actions that move your goals forward. Add your first one and schedule when you'll do it."
+          action={
+            <Button data-testid="new-task" onClick={() => openCreate()}>
+              <Plus />
+              Create your first task
+            </Button>
+          }
+        />
+        {modals}
+      </div>
+    );
+  }
+
+  const label = (base: string, count: number) => (count > 0 ? `${base} · ${count}` : base);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="To-dos"
+        description="Plan, schedule, and complete the work that moves your goals."
+        action={
+          <Button data-testid="new-task" onClick={() => openCreate()}>
+            <Plus />
+            Add Task
+          </Button>
+        }
+      />
+
+      {/* One toolbar: how to look at the work, then how to narrow it. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl
+          value={layout}
+          onChange={(v) => setLayout(v as "list" | "calendar")}
+          ariaLabel="View as"
+          options={[
+            { value: "list", label: "List" },
+            { value: "calendar", label: "Calendar" },
+          ]}
+        />
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {layout === "list" ? (
+            <Select
+              aria-label="Filter by timeframe"
+              value={timeframe}
+              onChange={(v) => setTimeframe(v as TaskTimeframeKey)}
+              className="w-44"
+              options={TIMEFRAMES.map((t) => ({
+                value: t.key,
+                label: label(t.label, timeframeCounts.get(t.key) ?? 0),
+              }))}
+            />
+          ) : null}
+          <Select
+            aria-label="Filter by progress"
+            value={progress}
+            onChange={(v) => setProgress(v as TaskProgressKey)}
+            className="w-44"
+            options={PROGRESS.map((p) => ({
+              value: p.key,
+              label: label(p.label, progressCounts.get(p.key) ?? 0),
+            }))}
+          />
+          <Select
+            aria-label="Filter by life area"
+            value={lifeAreaFilter}
+            onChange={setLifeAreaFilter}
+            className="w-40"
+            options={[
+              { value: "all", label: "All life areas" },
+              ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
+            ]}
+          />
+          {layout === "list" ? (
+            <Select
+              aria-label="Sort tasks"
+              value={sort}
+              onChange={(v) => setSort(v as SortKey)}
+              className="w-36"
+              options={SORTS.map((s) => ({ value: s.key, label: `Sort: ${s.label}` }))}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      {/* Overdue work is the one thing worth interrupting for. */}
+      {lateCount > 0 && progress !== "late" ? (
+        <button
+          type="button"
+          onClick={() => {
+            setProgress("late");
+            setTimeframe("all");
+          }}
+          className="flex cursor-pointer items-center gap-2 self-start rounded-full bg-red/12 px-3 py-1.5 text-callout font-medium text-red transition-colors hover:bg-red/20"
+        >
+          <span className="font-mono tabular-nums">{lateCount}</span>
+          {lateCount === 1 ? "task is late" : "tasks are late"} — review
+        </button>
+      ) : null}
+
+      {layout === "calendar" ? (
+        <TaskCalendar
+          tasks={calendarTasks}
+          today={zonedToday(now, timeZone)}
+          weekStartsOn={weekStartsOn}
+          timeZone={timeZone}
+          onOpenTask={openEdit}
+          onCreateOn={(date) => openCreate(date)}
+        />
+      ) : visibleTasks.length === 0 ? (
+        <div className="rounded-2xl bg-surface-secondary px-6 py-12 text-center">
+          <p className="text-callout text-label-secondary">
+            Nothing matches these filters.{" "}
+            <button
+              type="button"
+              onClick={() => openCreate()}
+              className="cursor-pointer font-medium text-blue hover:underline"
+            >
+              Add a task
+            </button>
+            .
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setTimeframe("all");
+              setProgress("all");
+              setLifeAreaFilter("all");
+            }}
+            className="mt-2 cursor-pointer text-callout font-medium text-blue hover:underline"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <motion.ul
+          key={`${timeframe}-${progress}-${sort}-${lifeAreaFilter}`}
+          variants={listContainer}
+          initial="hidden"
+          animate="visible"
+          className="flex flex-col gap-2"
+        >
+          {visibleTasks.map((task) => (
+            <motion.li key={task.id} variants={listItem} layout>
+              <TaskCard
+                task={task}
+                goalTitle={task.goalId ? goalTitleById.get(task.goalId) ?? null : null}
+                lifeArea={task.lifeAreaId ? lifeAreaById.get(task.lifeAreaId) ?? null : null}
+                timeZone={timeZone}
+                onToggleComplete={handleToggleComplete}
+                onEdit={openEdit}
+                onCancel={handleCancel}
+                onDelete={setDeleting}
+                onEditNote={setNoteTask}
+              />
+            </motion.li>
+          ))}
+        </motion.ul>
+      )}
+
+      {modals}
     </div>
   );
 }

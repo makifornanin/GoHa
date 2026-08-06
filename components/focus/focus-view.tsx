@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Pause, Play, Plus, Target, X } from "lucide-react";
+import { Check, Pause, Play, Target, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -15,19 +15,16 @@ import {
 } from "@/app/(app)/focus/actions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { FocusSession } from "@/db";
-import {
-  FOCUS_PRESETS_MINUTES,
-  focusElapsedSeconds,
-  formatClock,
-} from "@/lib/focus";
+import { focusElapsedSeconds, formatClock } from "@/lib/focus";
 import { spring } from "@/lib/motion";
 import { useFocusTimer } from "@/stores/focus-timer";
 import { cn } from "@/lib/utils";
 
+import { DurationPicker } from "./duration-picker";
+import { ExtendControl } from "./extend-control";
 import { FocusStats, type FocusStatsData } from "./focus-stats";
 
 type TaskOption = { id: string; title: string };
@@ -79,7 +76,7 @@ export function FocusView({
   );
 
   return (
-    <div className="relative flex flex-col gap-10">
+    <div className="relative flex flex-col gap-8">
       {/* Canvas darkens while a session runs; content above stays lit. */}
       <AnimatePresence>
         {session ? (
@@ -94,7 +91,7 @@ export function FocusView({
         ) : null}
       </AnimatePresence>
 
-      <div className="relative z-10 flex flex-col gap-10">
+      <div className="relative z-10 flex flex-col gap-8">
         <PageHeader title="Focus" description="One task, one timer. Real focus time, saved." />
 
         {session ? (
@@ -126,11 +123,6 @@ function FocusSetup({
   const [minutes, setMinutes] = useState(25);
   const [pending, startTransition] = useTransition();
 
-  const presetOptions = FOCUS_PRESETS_MINUTES.map((preset) => ({
-    value: String(preset),
-    label: `${preset} min`,
-  }));
-
   function start() {
     startTransition(async () => {
       const result = await startFocusSessionAction({
@@ -151,12 +143,7 @@ function FocusSetup({
         <p className="mt-2 text-callout text-label-secondary">Choose a duration to begin</p>
       </div>
 
-      <SegmentedControl
-        value={String(minutes)}
-        onChange={(value) => setMinutes(Number(value))}
-        options={presetOptions}
-        ariaLabel="Session duration"
-      />
+      <DurationPicker minutes={minutes} onChange={setMinutes} disabled={pending} />
 
       <div className="w-full">
         <label htmlFor="focus-task" className="mb-1.5 block text-subhead text-label-secondary">
@@ -317,15 +304,10 @@ function ActiveTimer({
         </button>
       </div>
 
-      <button
-        type="button"
+      <ExtendControl
         disabled={pending}
-        onClick={() => runSession(() => extendFocusSessionAction(session.id))}
-        className="inline-flex cursor-pointer items-center gap-1.5 text-callout font-medium text-blue transition-opacity hover:underline disabled:opacity-50"
-      >
-        <Plus className="size-4" aria-hidden />
-        Need more time? Add 5 minutes
-      </button>
+        onExtend={(mins) => runSession(() => extendFocusSessionAction(session.id, mins))}
+      />
 
       <div className="w-full max-w-xl">
         <label htmlFor="focus-note" className="mb-1.5 flex items-center gap-1.5 text-subhead text-label-secondary">

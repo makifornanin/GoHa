@@ -87,7 +87,7 @@ export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title="Life Areas"
         description="A high-level overview of your life balance. Organize goals and habits across the domains that matter to you."
@@ -116,7 +116,7 @@ export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
           variants={listContainer}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
         >
           {optimisticAreas.map((area) => (
             <motion.div key={area.id} variants={listItem} layout>

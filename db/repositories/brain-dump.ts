@@ -47,11 +47,11 @@ export async function createBrainDumpItem(userId: string, content: string): Prom
   return row;
 }
 
-/** Edit an inbox/archived item's content (never a converted one). */
+/** Edit an inbox/archived item's content or colour (never a converted one). */
 export async function updateBrainDumpItem(
   userId: string,
   id: string,
-  input: { content?: string; sortOrder?: number },
+  input: { content?: string; sortOrder?: number; color?: string | null },
 ): Promise<BrainDumpItem | null> {
   const [row] = await db
     .update(brainDumpItems)

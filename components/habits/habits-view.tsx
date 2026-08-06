@@ -165,7 +165,7 @@ export function HabitsView({
   );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader title="Habits & Routines" description="Build systems, not just goals." action={headerActions} />
 
       {habits.length === 0 ? (
@@ -186,7 +186,7 @@ export function HabitsView({
           }
         />
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           <section className="rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1">
             <div className="mb-4 flex items-center gap-4">
               <ProgressRing percent={completion} label={`${doneToday} of ${scheduledToday.length} habits done today`} />
@@ -241,7 +241,7 @@ export function HabitsView({
 
           <section>
             <h3 className="mb-3 text-caption uppercase text-label-secondary">All habits</h3>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {views.map((view) => {
                 const color = lifeAreaColorConfig[toColorKey(view.habit.color)];
                 return (

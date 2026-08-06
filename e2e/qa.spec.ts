@@ -207,8 +207,8 @@ test("Tasks: create across views, link, complete, reflect, cancel, delete", asyn
   await expect(d).toBeHidden({ timeout: 15_000 });
 
   // Complete one and add a reflection
-  // The view buttons carry their live count in the accessible name ("All 3").
-  await page.getByRole("button", { name: /^All(\s|$)/ }).click();
+  // Timeframe and progress both default to "all", so the new task is
+  // already on screen; there is no separate "All" view button any more.
   await page.getByRole("checkbox", { name: "Complete Long run 12km" }).click();
   await expect(page.getByRole("checkbox", { name: "Reopen Long run 12km" })).toBeVisible({
     timeout: 15_000,
@@ -243,9 +243,9 @@ test("Tasks: create across views, link, complete, reflect, cancel, delete", asyn
   await expect(d).toBeHidden({ timeout: 15_000 });
   record("Tasks", "NOTE", "Delete requires confirmation and removes the row.");
 
-  // View counts should be present
-  const inboxCount = await page.getByRole("button", { name: /Inbox/ }).textContent();
-  record("Tasks", "NOTE", `View sub-nav shows live counts (Inbox reads "${inboxCount?.trim()}").`);
+  // Filters are dropdowns that carry live counts in their option labels.
+  const timeframe = await page.getByRole("combobox", { name: "Filter by timeframe" }).textContent();
+  record("Tasks", "NOTE", `Timeframe filter shows live counts (reads "${timeframe?.trim()}").`);
 });
 
 /* ------------------------------------------------------------------ */
@@ -347,7 +347,7 @@ test("Brain Dump: capture, edit, convert, archive", async ({ page }) => {
   ];
   for (const text of items) {
     await page.getByLabel("Capture a thought").fill(text);
-    await page.getByRole("button", { name: "Dump It" }).click();
+    await page.getByRole("button", { name: "Pin it" }).click();
     await expect(page.getByText(text).first()).toBeVisible({ timeout: 15_000 });
   }
   record("Brain Dump", "NOTE", "Capture is fast and items appear immediately (optimistic).");
@@ -375,10 +375,10 @@ test("Brain Dump: capture, edit, convert, archive", async ({ page }) => {
   );
 
   // It must be findable afterwards, not silently gone.
-  await page.getByRole("tab", { name: /Converted/ }).click();
+  await page.getByRole("radio", { name: /Converted/ }).click();
   await expect(page.getByText(firstItem).first()).toBeVisible({ timeout: 15_000 });
   record("Brain Dump", "NOTE", "Converted items are retained under the Converted tab.");
-  await page.getByRole("tab", { name: /Inbox/ }).click();
+  await page.getByRole("radio", { name: /Wall/ }).click();
 
   // Archive another
   const archive = page.getByRole("button", { name: "Archive" }).first();
@@ -398,9 +398,9 @@ test("Focus: durations, start, pause, resume, extend, complete with note", async
   await page.goto("/focus");
 
   // Duration segmented control
-  await page.getByRole("radio", { name: "45 min" }).click();
+  await page.getByRole("radio", { name: "45m", exact: true }).click();
   await expect(page.getByText("45:00")).toBeVisible();
-  await page.getByRole("radio", { name: "15 min" }).click();
+  await page.getByRole("radio", { name: "15m", exact: true }).click();
   await expect(page.getByText("15:00")).toBeVisible();
   record("Focus", "NOTE", "Duration segmented control updates the preview timer.");
 
@@ -423,9 +423,12 @@ test("Focus: durations, start, pause, resume, extend, complete with note", async
   await expect(page.getByRole("button", { name: "Pause" })).toBeVisible({ timeout: 15_000 });
   record("Focus", "NOTE", "Pause/resume works and the timer state is labelled.");
 
-  // Extend
-  await page.getByRole("button", { name: /Add 5 minutes/ }).click();
-  record("Focus", "NOTE", "'Add 5 minutes' extends a running session.");
+  // Extend: one-tap amounts plus a custom value.
+  await page.getByRole("button", { name: "10m", exact: true }).click();
+  await page.getByRole("button", { name: "Custom", exact: true }).click();
+  await page.getByLabel("Custom minutes to add").fill("7");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  record("Focus", "NOTE", "Extending accepts preset amounts and a custom value.");
 
   // Note + complete
   await page.getByLabel("Session notes", { exact: false }).fill("Deep work on the report intro.");

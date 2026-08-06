@@ -186,7 +186,7 @@ test("Brain Dump: capture an item", async ({ page }) => {
 
   const text = `Audit thought ${Date.now()}`;
   await page.getByLabel("Capture a thought").fill(text);
-  await page.getByRole("button", { name: "Dump It" }).click();
+  await page.getByRole("button", { name: "Pin it" }).click();
   await expect(page.getByText(text).first()).toBeVisible({ timeout: 15_000 });
 });
 

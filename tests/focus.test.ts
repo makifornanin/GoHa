@@ -113,7 +113,11 @@ describe("formatting", () => {
     expect(formatDurationHm(1500)).toBe("25m");
     expect(formatDurationHm(4800)).toBe("1h 20m");
     expect(formatDurationHm(3600)).toBe("1h");
-    expect(formatDurationHm(0)).toBe("0m");
+    // Sub-minute sessions report seconds, so a real session never reads "0m".
+    expect(formatDurationHm(0)).toBe("0s");
+    expect(formatDurationHm(45)).toBe("45s");
+    expect(formatDurationHm(59)).toBe("59s");
+    expect(formatDurationHm(60)).toBe("1m");
   });
 });
 
