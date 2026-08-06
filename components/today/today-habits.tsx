@@ -116,13 +116,16 @@ export function TodayHabits({
                   initial="hidden"
                   animate="visible"
                   custom={index}
-                  className="relative flex min-h-10 items-center gap-3 px-3 py-1 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator"
+                  // Wraps rather than crushing the name: in the narrow right
+                  // rail a numeric habit's control ("8 / 8 glasses  Log") left
+                  // so little room that names truncated to "Drin...".
+                  className="relative flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator"
                 >
                   {/* One indicator only: the 8px system-color dot (spec section 8). */}
                   <span className={cn("size-2 shrink-0 rounded-full", color.dot)} aria-hidden />
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-body transition-colors",
+                      "min-w-24 flex-1 truncate text-body transition-colors",
                       todayState === "done" ? "text-label-tertiary line-through" : "text-label",
                     )}
                   >

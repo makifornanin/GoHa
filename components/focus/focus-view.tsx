@@ -59,9 +59,19 @@ export function FocusView({
   const setSession = useFocusTimer((s) => s.setSession);
 
   // Recover the server's in-progress session (source of truth) on load / refresh.
+  //
+  // Adopt it ONLY when it identifies a different session (or clears it).
+  // `activeSession` is a fresh object on every server render, so re-syncing
+  // unconditionally clobbered newer local state: pause/resume/extend do not
+  // revalidate this route, so a re-render would overwrite a just-paused session
+  // with the stale running one. The timer then kept counting while the database
+  // held it paused.
+  const activeSessionId = activeSession?.id ?? null;
   useEffect(() => {
-    setSession(activeSession);
-  }, [activeSession, setSession]);
+    const current = useFocusTimer.getState().session;
+    if ((current?.id ?? null) !== activeSessionId) setSession(activeSession);
+    // `activeSession` is intentionally read fresh; the id is what gates the sync.
+  }, [activeSessionId, activeSession, setSession]);
 
   const taskTitleById = useMemo(
     () => new Map(allTaskTitles.map((t) => [t.id, t.title])),

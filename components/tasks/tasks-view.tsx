@@ -280,7 +280,7 @@ export function TasksView({
           title="No tasks yet"
           description="Tasks are the actions that move your goals forward. Add your first one and schedule when you'll do it."
           action={
-            <Button onClick={openCreate}>
+            <Button data-testid="new-task" onClick={openCreate}>
               <Plus />
               Create your first task
             </Button>

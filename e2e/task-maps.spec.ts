@@ -35,8 +35,12 @@ test("a task map persists node positions and edges across a reload", async ({ pa
   await createDialog.getByLabel("Name").fill(mapName);
   await createDialog.getByRole("button", { name: "Create map" }).click();
 
-  // The canvas mounts (dynamically imported, client-only).
+  // The canvas mounts (dynamically imported, client-only). Wait for the NEW
+  // map's header specifically: if another map was already open, `.react-flow`
+  // is visible immediately and the node clicks would race the canvas swap.
+  await expect(page.getByRole("heading", { name: mapName })).toBeVisible();
   await expect(page.locator(".react-flow")).toBeVisible();
+  await expect(page.locator(".react-flow__pane")).toBeVisible();
 
   // 2. Add two nodes of different types so they are distinguishable by text.
   //    `exact` avoids colliding with the app header's "Add Task" button.

@@ -36,20 +36,26 @@ test("completing a task updates its goal's derived progress", async ({ page }) =
     .click();
   const taskDialog = page.getByRole("dialog");
   await taskDialog.getByLabel("Title").fill(taskName);
-  await taskDialog.getByLabel(/^Goal/).selectOption({ label: goalName });
+  // The goal picker is a custom combobox (not a native <select>), and its
+  // options are portaled to <body>, so drive it by click rather than
+  // selectOption.
+  await page.locator("#task-goal").click();
+  await page.getByRole("option", { name: goalName, exact: true }).click();
   await taskDialog.getByRole("button", { name: "Create task" }).click();
 
   // 3. Open the "All" view (shows the task regardless of which date bucket it
   //    landed in) and complete it, matching by its unique name. Wait for the
   //    completion Server Action to COMMIT before reading /goals: completion runs
   //    in a transition, so navigating away too early would race the write.
-  await page.getByRole("button", { name: "All" }).click();
+  // View buttons carry their live count in the accessible name ("All 3").
+  await page.getByRole("button", { name: /^All(\s|$)/ }).click();
   const taskCard = page.getByTestId("task-card").filter({ hasText: taskName });
   await expect(taskCard).toBeVisible();
   const completeDone = page.waitForResponse(
     (r) => r.request().method() === "POST" && r.url().includes("/tasks"),
   );
-  await taskCard.getByRole("button", { name: `Complete ${taskName}` }).click();
+  // The completion control is a circular checkbox (role="checkbox").
+  await taskCard.getByRole("checkbox", { name: `Complete ${taskName}` }).click();
   await completeDone;
 
   // 4. The goal's derived progress now reflects the completed task: 1/1 = 100%.

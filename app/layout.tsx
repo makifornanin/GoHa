@@ -58,7 +58,11 @@ export default function RootLayout({
         >
           <MotionProvider>
             {children}
-            <Toaster position="bottom-right" />
+            {/* Top-right, matching platform convention. Bottom-right stacked
+                toasts sat on top of form controls (Settings' selects) and
+                intercepted their clicks until they timed out. The offset clears
+                the 56px app header so toasts never cover its actions either. */}
+            <Toaster position="top-right" duration={3500} offset={72} />
           </MotionProvider>
         </ThemeProvider>
       </body>

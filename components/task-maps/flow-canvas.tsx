@@ -422,7 +422,10 @@ function NodeInspector({
   const [isSaving, startSave] = useTransition();
 
   return (
-    <aside className="absolute right-3 top-3 z-10 flex w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e3">
+    // Anchored BOTTOM-right: pinned to the top it overlapped the centred
+    // add-node toolbar on a narrower canvas and swallowed its clicks, so
+    // "Milestone" could not be pressed while a node was selected.
+    <aside className="absolute bottom-3 right-3 z-10 flex max-h-[calc(100%-1.5rem)] w-72 max-w-[calc(100%-1.5rem)] flex-col gap-3 overflow-y-auto rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e3">
       <div className="flex items-center justify-between">
         <h3 className="text-headline text-label">Edit node</h3>
         <button

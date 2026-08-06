@@ -98,7 +98,12 @@ test("Today: completing a task works and persists", async ({ page }) => {
   await input.press("Enter");
   await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
 
-  await page.getByRole("checkbox", { name: `Complete ${title}` }).click();
+  // Let the list settle: rows animate (layout) for ~300ms after the add
+  // revalidates, and a click landing mid-reflow can be dropped.
+  const box = page.getByRole("checkbox", { name: `Complete ${title}` });
+  await expect(box).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(400);
+  await box.click();
 
   // A ticked task must STAY on screen (struck through, undoable), not vanish.
   const reopen = page.getByRole("checkbox", { name: `Reopen ${title}` });
