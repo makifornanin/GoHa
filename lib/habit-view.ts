@@ -1,6 +1,14 @@
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { HabitEntry } from "@/db";
-import { addDays, startOfWeek, weekdayOf, type IsoDate, type Weekday } from "@/lib/date";
+import {
+  addDays,
+  MANILA_TZ,
+  startOfWeek,
+  toZonedDate,
+  weekdayOf,
+  type IsoDate,
+  type Weekday,
+} from "@/lib/date";
 import {
   computeHabitStreaks,
   entryOutcome,
@@ -19,7 +27,13 @@ import { toNumberOrNull, type DayCellState } from "@/lib/habits";
  * today's state, and the current week's cells.
  */
 
-export type HabitDayCell = { date: IsoDate; weekday: Weekday; state: DayCellState };
+export type HabitDayCell = {
+  date: IsoDate;
+  weekday: Weekday;
+  state: DayCellState;
+  /** The one cell the user can still act on. */
+  isToday: boolean;
+};
 
 export type HabitView = {
   habit: HabitWithSchedule;
@@ -31,14 +45,22 @@ export type HabitView = {
   weekCells: HabitDayCell[];
 };
 
-/** Default schedule (daily) when a habit somehow has no schedule row. */
-function toScheduleLike(habit: HabitWithSchedule): ScheduleLike {
+/**
+ * Default schedule (daily) when a habit somehow has no schedule row.
+ *
+ * `startDate` falls back to the day the habit was CREATED. Without that floor a
+ * habit was treated as scheduled for all of recorded history, so every day
+ * before it existed rendered as "Missed": a brand new habit greeted the user
+ * with a wall of red and a broken streak it never had a chance to keep. A habit
+ * cannot be missed before it exists.
+ */
+function toScheduleLike(habit: HabitWithSchedule, timeZone: string): ScheduleLike {
   const s = habit.schedule;
   return {
     frequency: s?.frequency ?? "daily",
     daysOfWeek: s?.daysOfWeek ?? null,
     timesPerPeriod: s?.timesPerPeriod ?? null,
-    startDate: s?.startDate ?? null,
+    startDate: s?.startDate ?? toZonedDate(habit.createdAt, timeZone),
   };
 }
 
@@ -72,9 +94,11 @@ export function buildHabitViews(params: {
   entries: HabitEntry[];
   today: IsoDate;
   weekStartsOn?: Weekday;
+  timeZone?: string;
 }): HabitView[] {
   const { habits, entries, today } = params;
   const weekStartsOn = params.weekStartsOn ?? 1;
+  const timeZone = params.timeZone ?? MANILA_TZ;
   const weekStart = startOfWeek(today, weekStartsOn);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -86,7 +110,7 @@ export function buildHabitViews(params: {
   }
 
   return habits.map((habit) => {
-    const schedule = toScheduleLike(habit);
+    const schedule = toScheduleLike(habit, timeZone);
     const habitLike = toHabitLike(habit);
     const habitEntries = entriesByHabit.get(habit.id) ?? [];
 
@@ -116,6 +140,7 @@ export function buildHabitViews(params: {
         date,
         weekday: weekdayOf(date),
         state: resolveDayState(schedule, outcomes, date, today),
+        isToday: date === today,
       })),
     };
   });
@@ -141,10 +166,11 @@ export function deriveTodayHabits(
   habits: HabitWithSchedule[],
   todaysEntries: HabitEntry[],
   today: IsoDate,
+  timeZone: string = MANILA_TZ,
 ): TodayHabit[] {
   const result: TodayHabit[] = [];
   for (const habit of habits) {
-    const schedule = toScheduleLike(habit);
+    const schedule = toScheduleLike(habit, timeZone);
     if (!isDayScheduled(schedule, today)) continue;
     const entry = todaysEntries.find((e) => e.habitId === habit.id && e.entryDate === today) ?? null;
     const state: DayCellState = entry ? entryOutcome(toHabitLike(habit), toEntryLike(entry)) : "pending";

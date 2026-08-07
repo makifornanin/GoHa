@@ -8,11 +8,11 @@ import type { GoalWithCounts } from "@/db/repositories/goals";
 import { formatIsoDateMedium } from "@/lib/date";
 import { calculateGoalProgress } from "@/lib/goal-progress";
 import { goalStatusConfig } from "@/lib/goals";
-import { lifeAreaColorConfig, toColorKey } from "@/lib/life-areas";
+import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { spring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-export type LifeAreaRef = { name: string; color: string | null; icon: string | null };
+export type LifeAreaRef = { id: string; name: string; color: string | null; icon: string | null };
 
 const revealAction =
   "hit-44 hit-44-narrow flex size-7 cursor-pointer items-center justify-center rounded-full text-label-tertiary transition-all focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100";
@@ -47,16 +47,24 @@ export function GoalCard({
   });
   const countedTasks = Math.max(0, goal.totalTasks - goal.cancelledTasks);
   const dueLabel = formatIsoDateMedium(goal.targetDate);
-  const areaColor = lifeArea ? lifeAreaColorConfig[toColorKey(lifeArea.color)] : null;
+  const areaColor = lifeArea
+    ? lifeAreaColorConfig[resolveColorKey(lifeArea.color, lifeArea.id)]
+    : null;
 
   return (
     <div
       data-testid="goal-card"
       className={cn(
-        "group flex h-full flex-col rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 transition-shadow hover:shadow-e2",
+        "group relative flex h-full flex-col overflow-hidden rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 transition-shadow hover:shadow-e2",
         status.muted && "opacity-60",
       )}
     >
+      {/* The owning life area's colour, so a board of goals reads as colour-coded
+          by area rather than as a wall of identical grey cards. */}
+      {areaColor ? (
+        <span className={cn("absolute inset-x-0 top-0 h-1", areaColor.dot)} aria-hidden />
+      ) : null}
+
       <div className="flex items-start justify-between gap-2">
         {lifeArea && areaColor ? (
           <span className={cn("inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-footnote", areaColor.tile)}>
@@ -109,9 +117,11 @@ export function GoalCard({
             </span>
             <span className="font-mono text-footnote tabular-nums text-label-secondary">{percent}%</span>
           </div>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-gray-5">
+          {/* Taller than the old 1px hairline and on a fill rather than gray-5:
+              at 0% the previous bar was indistinguishable from the card. */}
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-fill-tertiary">
             <motion.div
-              className={cn("h-full rounded-full", status.bar)}
+              className={cn("h-full rounded-full", areaColor ? areaColor.dot : status.bar)}
               initial={{ width: 0 }}
               animate={{ width: `${percent}%` }}
               transition={spring.smooth}

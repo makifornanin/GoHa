@@ -14,11 +14,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Task } from "@/db";
 import { formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
-import { lifeAreaColorConfig, toColorKey } from "@/lib/life-areas";
+import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { taskPriorityConfig, taskStatusConfig } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 
-export type TaskLifeAreaRef = { name: string; color: string | null; icon: string | null };
+export type TaskLifeAreaRef = { id: string; name: string; color: string | null; icon: string | null };
 
 /**
  * A task card: circular checkbox (fills with the task's Life Area system
@@ -50,7 +50,9 @@ export function TaskCard({
   const status = taskStatusConfig[task.status];
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
-  const areaColor = lifeArea ? lifeAreaColorConfig[toColorKey(lifeArea.color)] : null;
+  const areaColor = lifeArea
+    ? lifeAreaColorConfig[resolveColorKey(lifeArea.color, lifeArea.id)]
+    : null;
   const scheduledLabel = formatIsoDateMedium(task.scheduledFor);
   const dueLabel = formatZonedDateTimeMedium(task.dueAt, timeZone);
 
@@ -58,10 +60,19 @@ export function TaskCard({
     <div
       data-testid="task-card"
       className={cn(
-        "group rounded-xl border border-separator-opaque bg-surface p-3 shadow-e1 transition-shadow hover:shadow-e2",
+        "group relative rounded-xl border border-separator-opaque bg-surface p-3 shadow-e1 transition-shadow hover:shadow-e2",
         (isCompleted || isCancelled) && "opacity-60",
       )}
     >
+      {/* The life area's colour on the leading edge: scanning the list tells you
+          which part of your life the work belongs to before you read a word. */}
+      {areaColor ? (
+        <span
+          className={cn("absolute inset-y-0 left-0 w-1 rounded-l-xl", areaColor.dot)}
+          aria-hidden
+        />
+      ) : null}
+
       <div className="flex items-start gap-3">
         <div className="mt-0.5">
           <Checkbox
@@ -140,7 +151,23 @@ export function TaskCard({
             </p>
           ) : null}
 
-          <div className="mt-2 flex flex-wrap items-center gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+          {/*
+            The actions FLOAT over the card's empty bottom-right corner rather
+            than occupying a row of their own. `opacity-0` hides a row but still
+            reserves its layout, which made every card ~30% taller than its
+            content (measured: 28px of a 126px card) and is what made the list
+            read as mostly empty space. Revealing them in flow instead would
+            resize the card under the pointer, so they overlay.
+
+            Touch devices have no hover to reveal anything, so there they drop
+            back into the flow and stay visible.
+          */}
+          <div
+            className={cn(
+              "absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-separator-opaque bg-surface p-1 opacity-0 shadow-e2 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100",
+              "[@media(hover:none)]:static [@media(hover:none)]:mt-2 [@media(hover:none)]:border-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:p-0 [@media(hover:none)]:opacity-100 [@media(hover:none)]:shadow-none",
+            )}
+          >
             <ActionButton onClick={() => onEdit(task)} icon={Pencil} label="Edit" />
             {isCompleted ? (
               <ActionButton
@@ -159,7 +186,7 @@ export function TaskCard({
               onClick={() => onDelete(task)}
               icon={Trash2}
               label="Delete"
-              className="ml-auto text-red hover:bg-red/12 hover:text-red"
+              className="text-red hover:bg-red/12 hover:text-red"
             />
           </div>
         </div>

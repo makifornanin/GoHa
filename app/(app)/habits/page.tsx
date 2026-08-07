@@ -1,3 +1,4 @@
+import { DateRolloverRefresh } from "@/components/date-rollover-refresh";
 import { HabitsView } from "@/components/habits/habits-view";
 import { goalsRepo, habitsRepo, lifeAreasRepo } from "@/db";
 import { addDays, zonedToday } from "@/lib/date";
@@ -21,13 +22,18 @@ export default async function HabitsPage() {
   ]);
 
   return (
-    <HabitsView
-      habits={habits}
-      entries={entries}
-      lifeAreas={lifeAreas}
-      goals={goals}
-      today={today}
-      weekStartsOn={weekStartsOn}
-    />
+    <>
+      {/* "today" is resolved on the server; keep it honest past midnight. */}
+      <DateRolloverRefresh today={today} timeZone={timeZone} />
+      <HabitsView
+        habits={habits}
+        entries={entries}
+        lifeAreas={lifeAreas}
+        goals={goals}
+        today={today}
+        timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
+      />
+    </>
   );
 }

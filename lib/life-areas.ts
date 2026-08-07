@@ -103,11 +103,82 @@ export const LIFE_AREA_ICON_KEYS = [
 export type LifeAreaIconKey = (typeof LIFE_AREA_ICON_KEYS)[number];
 export const DEFAULT_ICON_KEY: LifeAreaIconKey = "target";
 
+/**
+ * The colour to preselect for a NEW life area: the first one not already in use.
+ *
+ * Every area used to default to the same key, so a fresh system rendered its
+ * areas in identical colours with identical icons and they were impossible to
+ * tell apart at a glance. The colour is the spine of the whole app's palette:
+ * it tints this area's goals, tasks and habits everywhere else, so two areas
+ * sharing one is a real loss of meaning, not just a cosmetic one.
+ *
+ * Falls back to the default once the palette is exhausted; the user can always
+ * override the suggestion in the picker.
+ */
+export function nextUnusedColorKey(
+  used: readonly (string | null | undefined)[],
+): LifeAreaColorKey {
+  const taken = new Set(used.map(toColorKey));
+  return LIFE_AREA_COLOR_KEYS.find((key) => !taken.has(key)) ?? DEFAULT_COLOR_KEY;
+}
+
 /** Narrow an arbitrary stored value to a known color key, falling back to default. */
 export function toColorKey(value: string | null | undefined): LifeAreaColorKey {
   return LIFE_AREA_COLOR_KEYS.includes(value as LifeAreaColorKey)
     ? (value as LifeAreaColorKey)
     : DEFAULT_COLOR_KEY;
+}
+
+/** Stable hash so an id always resolves to the same palette slot. */
+function hashToIndex(id: string, length: number): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(hash) % length;
+}
+
+/**
+ * The colour to PAINT something with: an explicit choice if there is one,
+ * otherwise a stable colour derived from its id.
+ *
+ * `toColorKey` collapses every unset value to a single default, so anything
+ * created without opening the colour picker came out the same teal. Areas named
+ * "Health & Fitness" and "Career & Craft" were then visually identical, which
+ * defeats the point of a colour-coded system: nothing could be told apart at a
+ * glance, and the whole app read as monochrome.
+ *
+ * Deriving from the id keeps the choice stable across renders and sessions
+ * (never random), and an explicit colour always wins.
+ */
+export function resolveColorKey(
+  color: string | null | undefined,
+  id: string,
+): LifeAreaColorKey {
+  if (LIFE_AREA_COLOR_KEYS.includes(color as LifeAreaColorKey)) {
+    return color as LifeAreaColorKey;
+  }
+  return LIFE_AREA_COLOR_KEYS[hashToIndex(id, LIFE_AREA_COLOR_KEYS.length)];
+}
+
+/**
+ * The colour for something that BELONGS to a life area (a goal, task, or
+ * habit): its own explicit colour if set, otherwise its area's colour, and only
+ * then a stable colour of its own.
+ *
+ * Inheriting from the area is what makes the palette mean something: everything
+ * under "Health & Fitness" reads in one colour across Today, To-dos, Goals and
+ * Habits, so the colour answers "which part of my life is this?" rather than
+ * being decoration.
+ */
+export function entityColorKey(
+  ownColor: string | null | undefined,
+  area: { id: string; color: string | null } | null | undefined,
+  fallbackId: string,
+): LifeAreaColorKey {
+  if (LIFE_AREA_COLOR_KEYS.includes(ownColor as LifeAreaColorKey)) {
+    return ownColor as LifeAreaColorKey;
+  }
+  if (area) return resolveColorKey(area.color, area.id);
+  return resolveColorKey(null, fallbackId);
 }
 
 /** Narrow an arbitrary stored value to a known icon key, falling back to default. */

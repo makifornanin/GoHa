@@ -20,7 +20,7 @@ import { Modal } from "@/components/ui/modal";
 import type { Goal, HabitEntry, LifeArea } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { buildHabitViews, todayHabitViews } from "@/lib/habit-view";
-import { lifeAreaColorConfig, toColorKey } from "@/lib/life-areas";
+import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
 import type { HabitFormInput } from "@/lib/validations/habit";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export function HabitsView({
   lifeAreas,
   goals,
   today,
+  timeZone,
   weekStartsOn = 1,
 }: {
   habits: HabitWithSchedule[];
@@ -43,6 +44,7 @@ export function HabitsView({
   lifeAreas: LifeArea[];
   goals: Goal[];
   today: string;
+  timeZone?: string;
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -61,11 +63,22 @@ export function HabitsView({
   });
 
   const views = useMemo(
-    () => buildHabitViews({ habits, entries: optimisticEntries, today, weekStartsOn }),
-    [habits, optimisticEntries, today, weekStartsOn],
+    () => buildHabitViews({ habits, entries: optimisticEntries, today, weekStartsOn, timeZone }),
+    [habits, optimisticEntries, today, weekStartsOn, timeZone],
   );
   const scheduledToday = useMemo(() => todayHabitViews(views), [views]);
   const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
+
+  /** A habit wears its life area's colour unless it was given one of its own. */
+  const colorOf = useMemo(
+    () => (habit: { id: string; color: string | null; lifeAreaId: string | null }) =>
+      entityColorKey(
+        habit.color,
+        habit.lifeAreaId ? lifeAreaById.get(habit.lifeAreaId) ?? null : null,
+        habit.id,
+      ),
+    [lifeAreaById],
+  );
 
   const bestStreak = views.reduce((max, v) => Math.max(max, v.streaks.current), 0);
   const doneToday = scheduledToday.filter((v) => v.todayState === "done").length;
@@ -144,7 +157,7 @@ export function HabitsView({
   const headerActions = (
     <>
       {bestStreak > 0 ? (
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-surface-secondary px-3 text-footnote text-label-secondary">
+        <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-fill-tertiary px-3 text-footnote text-label-secondary">
           <Flame className="size-3.5 text-orange" aria-hidden />
           Best streak:{" "}
           <span className="font-mono tabular-nums text-label">{bestStreak}</span>{" "}
@@ -204,7 +217,7 @@ export function HabitsView({
               <ul className="flex flex-col">
                 {scheduledToday.map((view) => {
                   const area = view.habit.lifeAreaId ? lifeAreaById.get(view.habit.lifeAreaId) : null;
-                  const color = lifeAreaColorConfig[toColorKey(view.habit.color)];
+                  const color = lifeAreaColorConfig[colorOf(view.habit)];
                   return (
                     <li key={view.habit.id} className="relative flex min-h-10 flex-wrap items-center gap-3 rounded-xl px-3 py-1.5 transition-colors hover:bg-surface-hover [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator">
                       <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", color.tile)}>
@@ -237,43 +250,14 @@ export function HabitsView({
             ) : null}
           </section>
 
-          <HabitsWeekGrid views={views} onEdit={openEdit} />
-
-          <section>
-            <h3 className="mb-3 text-caption uppercase text-label-secondary">All habits</h3>
-            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {views.map((view) => {
-                const color = lifeAreaColorConfig[toColorKey(view.habit.color)];
-                return (
-                  <li
-                    key={view.habit.id}
-                    className="group flex items-center gap-3 rounded-xl border border-separator-opaque bg-surface p-3 shadow-e1 transition-shadow hover:shadow-e2"
-                  >
-                    <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", color.tile)}>
-                      <LifeAreaIcon iconKey={view.habit.icon} className="size-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-body font-medium text-label">{view.habit.name}</p>
-                      <p className="text-footnote text-label-secondary">
-                        Current{" "}
-                        <span className="font-mono tabular-nums text-label">{view.streaks.current}</span>{" "}
-                        · Best{" "}
-                        <span className="font-mono tabular-nums">{view.streaks.longest}</span>
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(view.habit.id)}>
-                        Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setArchiving(view.habit)}>
-                        Archive
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          {/* The grid is also where habits are managed, so the page no longer
+              renders the same habits a third time just to hold Edit/Archive. */}
+          <HabitsWeekGrid
+            views={views}
+            colorOf={colorOf}
+            onEdit={openEdit}
+            onArchive={(view) => setArchiving(view.habit)}
+          />
         </div>
       )}
 

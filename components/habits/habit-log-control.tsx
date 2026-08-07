@@ -123,7 +123,7 @@ function NumericControl({
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
         aria-label="Logged value"
-        className="h-7 w-16 rounded-md bg-surface-secondary px-2 text-right font-mono text-callout tabular-nums text-label transition-colors focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
+        className="h-7 w-16 rounded-md bg-fill-tertiary px-2 text-right font-mono text-callout tabular-nums text-label transition-colors focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
       />
       {target != null ? (
         <span className="whitespace-nowrap font-mono text-footnote tabular-nums text-label-secondary">

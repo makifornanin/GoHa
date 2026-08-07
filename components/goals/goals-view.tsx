@@ -174,7 +174,9 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
           </div>
 
           {visibleGoals.length === 0 ? (
-            <p className="rounded-2xl bg-surface-secondary px-6 py-10 text-center text-callout text-label-secondary">
+            /* A well sitting on the CANVAS, not inside a card: it needs its own
+               border, since `surface-secondary` matches the canvas in light mode. */
+            <p className="rounded-2xl border border-separator-opaque bg-surface px-6 py-10 text-center text-callout text-label-secondary">
               No goals in this timeframe yet.
             </p>
           ) : null}

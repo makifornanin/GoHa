@@ -13,7 +13,7 @@ export function Input({ className, type, ...props }: ComponentProps<"input">) {
       type={type}
       data-slot="input"
       className={cn(
-        "flex h-8 w-full rounded-lg bg-surface-secondary px-2.5 text-body text-label transition-colors duration-150 placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary",
+        "flex h-8 w-full rounded-lg bg-fill-tertiary px-2.5 text-body text-label transition-colors duration-150 placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary",
         className,
       )}
       {...props}

@@ -33,6 +33,7 @@ import {
   type TaskTimeframeKey,
 } from "@/lib/task-buckets";
 import { taskPriorityConfig } from "@/lib/tasks";
+import { useNow } from "@/lib/use-now";
 import type { TaskFormInput } from "@/lib/validations/task";
 
 import { CompletionNoteModal } from "./completion-note-modal";
@@ -123,7 +124,9 @@ export function TasksView({
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [, startTransition] = useTransition();
 
-  const now = useMemo(() => new Date(), []);
+  // Live, not frozen at mount: lateness and the date buckets below are derived
+  // from this (see lib/use-now.ts).
+  const now = useNow();
 
   const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, (state, action: OptimisticAction) => {
     if (action.type === "remove") return state.filter((t) => t.id !== action.id);
@@ -455,7 +458,8 @@ export function TasksView({
           onCreateOn={(date) => openCreate(date)}
         />
       ) : visibleTasks.length === 0 ? (
-        <div className="rounded-2xl bg-surface-secondary px-6 py-12 text-center">
+        /* On the canvas, so it carries its own border (see goals-view). */
+        <div className="rounded-2xl border border-separator-opaque bg-surface px-6 py-12 text-center">
           <p className="text-callout text-label-secondary">
             Nothing matches these filters.{" "}
             <button

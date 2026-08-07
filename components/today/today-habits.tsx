@@ -9,10 +9,10 @@ import { toast } from "sonner";
 import { clearHabitEntryAction, logHabitEntryAction } from "@/app/(app)/habits/actions";
 import { HabitLogControl, type LogInput } from "@/components/habits/habit-log-control";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { HabitEntry } from "@/db";
+import type { HabitEntry, LifeArea } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { deriveTodayHabits } from "@/lib/habit-view";
-import { lifeAreaColorConfig, toColorKey } from "@/lib/life-areas";
+import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
 import { listEntrance } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +27,19 @@ type EntryAction = { type: "upsert"; entry: HabitEntry } | { type: "remove"; hab
 export function TodayHabits({
   habits,
   entries,
+  lifeAreas,
   today,
+  timeZone,
 }: {
   habits: HabitWithSchedule[];
   entries: HabitEntry[];
+  lifeAreas: LifeArea[];
   today: string;
+  timeZone?: string;
 }) {
   const [, startTransition] = useTransition();
+
+  const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
 
   const [optimisticEntries, applyEntry] = useOptimistic(entries, (state, action: EntryAction) => {
     if (action.type === "remove") {
@@ -46,8 +52,8 @@ export function TodayHabits({
   });
 
   const todayHabits = useMemo(
-    () => deriveTodayHabits(habits, optimisticEntries, today),
-    [habits, optimisticEntries, today],
+    () => deriveTodayHabits(habits, optimisticEntries, today, timeZone),
+    [habits, optimisticEntries, today, timeZone],
   );
 
   function makeEntry(habitId: string, input: LogInput): HabitEntry {
@@ -108,7 +114,14 @@ export function TodayHabits({
         ) : (
           <ul className="flex flex-col">
             {todayHabits.map(({ habit, todayEntry, todayState }, index) => {
-              const color = lifeAreaColorConfig[toColorKey(habit.color)];
+              const color =
+                lifeAreaColorConfig[
+                  entityColorKey(
+                    habit.color,
+                    habit.lifeAreaId ? lifeAreaById.get(habit.lifeAreaId) ?? null : null,
+                    habit.id,
+                  )
+                ];
               return (
                 <motion.li
                   key={habit.id}

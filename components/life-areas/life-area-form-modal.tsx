@@ -15,6 +15,7 @@ import {
   LIFE_AREA_NAME_MAX,
   LIFE_AREA_WEIGHT_MAX,
   lifeAreaColorConfig,
+  nextUnusedColorKey,
   toColorKey,
   toIconKey,
   type LifeAreaColorKey,
@@ -42,6 +43,8 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 type FormProps = {
   mode: "create" | "edit";
   area?: LifeArea | null;
+  /** Colours already taken, so a new area is preselected a distinct one. */
+  usedColors?: readonly (string | null | undefined)[];
   onSubmit: (values: LifeAreaFormInput) => Promise<ActionResult<LifeArea>>;
   onClose: () => void;
   nameRef: React.RefObject<HTMLInputElement | null>;
@@ -51,10 +54,12 @@ type FormProps = {
  * The form fields. Rendered only while the modal is open, so its state
  * initializes fresh from `area` on every open (no reset effect needed).
  */
-function LifeAreaFormFields({ mode, area, onSubmit, onClose, nameRef }: FormProps) {
+function LifeAreaFormFields({ mode, area, usedColors, onSubmit, onClose, nameRef }: FormProps) {
   const [name, setName] = useState(() => area?.name ?? "");
   const [description, setDescription] = useState(() => area?.description ?? "");
-  const [color, setColor] = useState<LifeAreaColorKey>(() => toColorKey(area?.color));
+  const [color, setColor] = useState<LifeAreaColorKey>(() =>
+    area ? toColorKey(area.color) : nextUnusedColorKey(usedColors ?? []),
+  );
   const [icon, setIcon] = useState<LifeAreaIconKey>(() => toIconKey(area?.icon));
   const [weight, setWeight] = useState(() => area?.weight ?? 1);
   const [fieldErrors, setFieldErrors] = useState<LifeAreaFieldErrors>({});
@@ -240,12 +245,14 @@ export function LifeAreaFormModal({
   open,
   mode,
   area,
+  usedColors,
   onSubmit,
   onClose,
 }: {
   open: boolean;
   mode: "create" | "edit";
   area?: LifeArea | null;
+  usedColors?: readonly (string | null | undefined)[];
   onSubmit: (values: LifeAreaFormInput) => Promise<ActionResult<LifeArea>>;
   onClose: () => void;
 }) {
@@ -266,6 +273,7 @@ export function LifeAreaFormModal({
       <LifeAreaFormFields
         mode={mode}
         area={area}
+        usedColors={usedColors}
         onSubmit={onSubmit}
         onClose={onClose}
         nameRef={nameRef}

@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import type { LifeArea } from "@/db";
+import type { LifeAreaWithCounts } from "@/db/repositories/life-areas";
 import type { LifeAreaFormInput } from "@/lib/validations/life-area";
 
 import { LifeAreaCard } from "./life-area-card";
@@ -28,10 +28,10 @@ import { LifeAreaFormModal } from "./life-area-form-modal";
  * edit rely on Server Action revalidation; archive is optimistic with a visible
  * rollback if the save fails (CLAUDE.md section 9).
  */
-export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
+export function LifeAreasView({ areas }: { areas: LifeAreaWithCounts[] }) {
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<LifeArea | null>(null);
-  const [archiving, setArchiving] = useState<LifeArea | null>(null);
+  const [editing, setEditing] = useState<LifeAreaWithCounts | null>(null);
+  const [archiving, setArchiving] = useState<LifeAreaWithCounts | null>(null);
   const [, startTransition] = useTransition();
 
   // Optimistic archive: hide the area immediately; it reappears if the save fails.
@@ -45,7 +45,7 @@ export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
     setFormOpen(true);
   }
 
-  function openEdit(area: LifeArea) {
+  function openEdit(area: LifeAreaWithCounts) {
     setEditing(area);
     setFormOpen(true);
   }
@@ -116,10 +116,10 @@ export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
           variants={listContainer}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3"
         >
           {optimisticAreas.map((area) => (
-            <motion.div key={area.id} variants={listItem} layout>
+            <motion.div key={area.id} variants={listItem} layout className="h-full">
               <LifeAreaCard area={area} onEdit={openEdit} onArchive={setArchiving} />
             </motion.div>
           ))}
@@ -130,6 +130,7 @@ export function LifeAreasView({ areas }: { areas: LifeArea[] }) {
         open={formOpen}
         mode={editing ? "edit" : "create"}
         area={editing}
+        usedColors={optimisticAreas.map((a) => a.color)}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />

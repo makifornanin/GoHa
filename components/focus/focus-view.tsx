@@ -272,7 +272,7 @@ function ActiveTimer({
           disabled={pending}
           aria-label="Discard session"
           onClick={() => finish("discard")}
-          className="hit-44 flex size-11 cursor-pointer items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors hover:bg-red hover:text-white focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
+          className="hit-44 flex size-11 cursor-pointer items-center justify-center rounded-full bg-fill-tertiary text-label-secondary transition-colors hover:bg-red hover:text-white focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
         >
           <X className="size-5" aria-hidden />
         </button>
@@ -298,7 +298,7 @@ function ActiveTimer({
           disabled={pending}
           aria-label="Complete session"
           onClick={() => finish("complete")}
-          className="hit-44 flex size-11 cursor-pointer items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors hover:bg-green hover:text-white focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
+          className="hit-44 flex size-11 cursor-pointer items-center justify-center rounded-full bg-fill-tertiary text-label-secondary transition-colors hover:bg-green hover:text-white focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
         >
           <Check className="size-5" aria-hidden />
         </button>

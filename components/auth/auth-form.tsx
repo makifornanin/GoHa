@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { spring } from "@/lib/motion";
+import { useMounted } from "@/lib/use-mounted";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -46,6 +47,7 @@ export function AuthForm({
 }) {
   const isLogin = mode === "login";
   const router = useRouter();
+  const mounted = useMounted();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,7 +116,17 @@ export function AuthForm({
         </div>
       </div>
 
-      <form className="space-y-4" onSubmit={onSubmit} noValidate>
+      {/*
+        `method="post"` matters even though submission is handled in JS. A form
+        with no method defaults to GET, so a submit that happens BEFORE this
+        component hydrates (or if its script fails to load) navigates to
+        `/login?email=...&password=...`, writing the password into browser
+        history, the Referer header, and any proxy log in between. Observed in
+        testing during a slow first compile. POST keeps credentials in the body;
+        the button below stays disabled until hydration so it should not happen
+        at all.
+      */}
+      <form className="space-y-4" method="post" onSubmit={onSubmit} noValidate>
         {isLogin ? null : (
           <Field label="Name">
             <Input name="name" autoComplete="name" placeholder="Maki" disabled={pending} />
@@ -150,7 +162,14 @@ export function AuthForm({
           </p>
         ) : null}
 
-        <Button type="submit" size="lg" className="mt-2 w-full" loading={pending}>
+        <Button
+          type="submit"
+          size="lg"
+          className="mt-2 w-full"
+          // Until hydration there is no submit handler, so a click would do the
+          // wrong thing rather than nothing.
+          loading={pending || !mounted}
+        >
           {isLogin ? "Sign in" : "Create owner account"}
         </Button>
       </form>

@@ -103,7 +103,7 @@ export function ExtendControl({
                   placeholder="e.g. 20"
                   aria-label="Custom minutes to add"
                   aria-invalid={Boolean(error)}
-                  className="h-8 w-28 rounded-lg bg-surface-secondary px-3 text-center font-mono text-callout tabular-nums text-label focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+                  className="h-8 w-28 rounded-lg bg-fill-tertiary px-3 text-center font-mono text-callout tabular-nums text-label focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
                 />
                 <button
                   type="button"

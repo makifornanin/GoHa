@@ -128,7 +128,7 @@ export function BrainDumpItem({
       whileHover={{ rotate: 0, y: -4, scale: 1.02, zIndex: 10 }}
       transition={spring.snappy}
       className={cn(
-        "group relative flex min-h-44 flex-col rounded-sm p-4 shadow-e2",
+        "group relative flex h-full min-h-44 flex-col rounded-sm p-4 shadow-e2",
         color.surface,
         (isConverted || isArchived) && "opacity-70",
       )}

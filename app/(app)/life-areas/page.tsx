@@ -7,7 +7,7 @@ export const metadata = { title: "Life Areas" };
 export default async function LifeAreasPage() {
   // Identity from the session; the query is scoped to this user in the repo.
   const user = await requireUser();
-  const areas = await lifeAreasRepo.listLifeAreas(user.id);
+  const areas = await lifeAreasRepo.listLifeAreasWithCounts(user.id);
 
   return <LifeAreasView areas={areas} />;
 }

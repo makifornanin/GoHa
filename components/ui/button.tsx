@@ -21,7 +21,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-blue text-white hover:brightness-[1.06]",
-        secondary: "bg-surface-secondary text-label hover:brightness-[1.06]",
+        secondary: "bg-fill-tertiary text-label hover:bg-fill-secondary",
         outline:
           "border border-separator-opaque bg-transparent text-label-secondary hover:bg-surface-hover hover:text-label",
         ghost: "bg-transparent text-blue hover:bg-surface-hover",

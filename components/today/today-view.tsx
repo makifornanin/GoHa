@@ -21,7 +21,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dropdown, type DropdownItem } from "@/components/ui/dropdown";
 import { ProgressRing } from "@/components/ui/progress";
-import type { DailyPriority, HabitEntry, Task } from "@/db";
+import type { DailyPriority, HabitEntry, LifeArea, Task } from "@/db";
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { TaskStatus } from "@/db/schema/enums";
@@ -61,6 +61,7 @@ export function TodayView({
   priorities,
   habits,
   habitEntries,
+  lifeAreas,
 }: {
   userName: string;
   greetingPart: string;
@@ -72,6 +73,7 @@ export function TodayView({
   priorities: DailyPriority[];
   habits: HabitWithSchedule[];
   habitEntries: HabitEntry[];
+  lifeAreas: LifeArea[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -107,8 +109,8 @@ export function TodayView({
   );
 
   const scheduledHabitCount = useMemo(
-    () => deriveTodayHabits(habits, habitEntries, today).length,
-    [habits, habitEntries, today],
+    () => deriveTodayHabits(habits, habitEntries, today, timeZone).length,
+    [habits, habitEntries, today, timeZone],
   );
 
   const pinnedCount = data.priorities.filter((p) => p.task).length;
@@ -338,7 +340,13 @@ export function TodayView({
 
               <ActiveGoalsCard goals={data.activeGoals} />
 
-              <TodayHabits habits={habits} entries={habitEntries} today={today} />
+              <TodayHabits
+                habits={habits}
+                entries={habitEntries}
+                lifeAreas={lifeAreas}
+                today={today}
+                timeZone={timeZone}
+              />
             </div>
           </div>
 

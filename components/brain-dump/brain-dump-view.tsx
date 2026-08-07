@@ -230,11 +230,17 @@ export function BrainDumpView({
           }
         />
       ) : (
-        /* A wall of notes: columns so notes keep their natural height. */
-        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+        /* A wall of notes.
+           This was a CSS multi-column (`columns-*`) masonry, but the column
+           algorithm FRAGMENTS absolutely positioned descendants across column
+           boxes: each note's strip of tape was painted a second time below the
+           note (measured: a 56x16 tape reporting a 411x184 border box). A grid
+           has no fragmentation, and a wall of equal tiles reads more like a real
+           board than ragged columns did. */
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence initial={false}>
             {visible.map((item) => (
-              <div key={item.id} className="break-inside-avoid">
+              <div key={item.id}>
                 <BrainDumpItem
                   item={item}
                   busy={busyId === item.id}

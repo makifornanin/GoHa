@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
-import { lifeAreas } from "../schema";
+import { goals, habits, lifeAreas, tasks } from "../schema";
 import type { LifeArea } from "../types";
 
 /**
@@ -33,6 +33,76 @@ export async function listLifeAreas(
     .select()
     .from(lifeAreas)
     .where(where)
+    .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt));
+}
+
+/** A life area plus what actually lives inside it. */
+export type LifeAreaWithCounts = LifeArea & {
+  activeGoals: number;
+  openTasks: number;
+  completedTasks: number;
+  activeHabits: number;
+};
+
+/**
+ * Life areas with their rollups, so the page can say what each area CONTAINS
+ * rather than only what it is called. One pass: three grouped aggregates joined
+ * onto the areas, never a query per card.
+ *
+ * Each aggregate is filtered by `userId` in its own subquery as well as by the
+ * join, so a row can never be counted across users (CLAUDE.md section 5).
+ */
+export async function listLifeAreasWithCounts(
+  userId: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<LifeAreaWithCounts[]> {
+  const goalCounts = db
+    .select({
+      lifeAreaId: goals.lifeAreaId,
+      activeGoals: sql<number>`count(*) filter (where ${goals.status} = 'active')::int`.as("active_goals"),
+    })
+    .from(goals)
+    .where(and(eq(goals.userId, userId), eq(goals.isArchived, false), isNotNull(goals.lifeAreaId)))
+    .groupBy(goals.lifeAreaId)
+    .as("goal_counts");
+
+  const taskCounts = db
+    .select({
+      lifeAreaId: tasks.lifeAreaId,
+      openTasks: sql<number>`count(*) filter (where ${tasks.status} in ('todo', 'in_progress'))::int`.as("open_tasks"),
+      completedTasks: sql<number>`count(*) filter (where ${tasks.status} = 'completed')::int`.as("completed_tasks"),
+    })
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), isNotNull(tasks.lifeAreaId)))
+    .groupBy(tasks.lifeAreaId)
+    .as("task_counts");
+
+  const habitCounts = db
+    .select({
+      lifeAreaId: habits.lifeAreaId,
+      activeHabits: sql<number>`count(*)::int`.as("active_habits"),
+    })
+    .from(habits)
+    .where(and(eq(habits.userId, userId), eq(habits.isArchived, false), isNotNull(habits.lifeAreaId)))
+    .groupBy(habits.lifeAreaId)
+    .as("habit_counts");
+
+  const filters = [eq(lifeAreas.userId, userId)];
+  if (!options.includeArchived) filters.push(eq(lifeAreas.isArchived, false));
+
+  return db
+    .select({
+      ...getTableColumns(lifeAreas),
+      activeGoals: sql<number>`coalesce(${goalCounts.activeGoals}, 0)`,
+      openTasks: sql<number>`coalesce(${taskCounts.openTasks}, 0)`,
+      completedTasks: sql<number>`coalesce(${taskCounts.completedTasks}, 0)`,
+      activeHabits: sql<number>`coalesce(${habitCounts.activeHabits}, 0)`,
+    })
+    .from(lifeAreas)
+    .leftJoin(goalCounts, eq(goalCounts.lifeAreaId, lifeAreas.id))
+    .leftJoin(taskCounts, eq(taskCounts.lifeAreaId, lifeAreas.id))
+    .leftJoin(habitCounts, eq(habitCounts.lifeAreaId, lifeAreas.id))
+    .where(and(...filters))
     .orderBy(asc(lifeAreas.sortOrder), asc(lifeAreas.createdAt));
 }
 

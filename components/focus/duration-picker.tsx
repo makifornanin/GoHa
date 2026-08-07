@@ -98,7 +98,7 @@ export function DurationPicker({
                 aria-label="Custom session length"
                 aria-invalid={Boolean(error)}
                 className={cn(
-                  "h-8 w-40 rounded-lg bg-surface-secondary px-3 text-center font-mono text-callout tabular-nums text-label transition-colors focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+                  "h-8 w-40 rounded-lg bg-fill-tertiary px-3 text-center font-mono text-callout tabular-nums text-label transition-colors focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
                   error && "outline-solid outline-[3px] outline-offset-2 outline-red/40",
                 )}
               />

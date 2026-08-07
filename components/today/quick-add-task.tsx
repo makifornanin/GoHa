@@ -51,7 +51,7 @@ export function QuickAddTask({ today }: { today: string }) {
         onClick={submit}
         disabled={!canSubmit}
         aria-label="Save quick task"
-        className="hit-44 hit-44-narrow flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors hover:bg-surface-pressed hover:text-label focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary"
+        className="hit-44 hit-44-narrow flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-fill-tertiary text-label-secondary transition-colors hover:bg-fill-secondary hover:text-label focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary"
       >
         <CornerDownLeft className="size-4" aria-hidden />
       </button>

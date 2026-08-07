@@ -61,7 +61,7 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
       className={cn(
-        "inline-flex h-[30px] items-center rounded-full bg-surface-secondary p-[2px]",
+        "inline-flex h-[30px] items-center rounded-full bg-fill-tertiary p-[2px]",
         className,
       )}
     >

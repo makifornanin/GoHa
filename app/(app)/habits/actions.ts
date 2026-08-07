@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { goalsRepo, habitsRepo, lifeAreasRepo, type Habit, type HabitEntry } from "@/db";
+import { zonedToday } from "@/lib/date";
 import { requireUser } from "@/lib/session";
+import { getUserDatePrefs } from "@/lib/user-settings";
 import {
   habitFormSchema,
   habitIdSchema,
@@ -56,9 +58,18 @@ function habitColumns(values: HabitFormValues) {
   };
 }
 
-function scheduleColumns(values: HabitFormValues) {
+/**
+ * `startDate` is the day the habit begins counting. It is set once, on create,
+ * and deliberately NOT rewritten on edit: changing a habit's cadence must not
+ * erase the history it has already earned.
+ *
+ * Without it a habit was considered scheduled for all of recorded time, so every
+ * day before it existed showed as "Missed".
+ */
+function scheduleColumns(values: HabitFormValues, startDate?: string) {
+  const start = startDate ? { startDate } : {};
   if (values.scheduleType === "daily") {
-    return { frequency: "daily" as const, daysOfWeek: null, timesPerPeriod: null, isActive: true };
+    return { frequency: "daily" as const, daysOfWeek: null, timesPerPeriod: null, isActive: true, ...start };
   }
   if (values.scheduleType === "weekly_days") {
     return {
@@ -66,6 +77,7 @@ function scheduleColumns(values: HabitFormValues) {
       daysOfWeek: values.daysOfWeek,
       timesPerPeriod: null,
       isActive: true,
+      ...start,
     };
   }
   return {
@@ -73,6 +85,7 @@ function scheduleColumns(values: HabitFormValues) {
     daysOfWeek: null,
     timesPerPeriod: values.timesPerWeek,
     isActive: true,
+    ...start,
   };
 }
 
@@ -89,8 +102,13 @@ export async function createHabitAction(input: HabitFormInput): Promise<ActionRe
   }
 
   try {
+    const { timeZone } = await getUserDatePrefs(user.id);
     const habit = await habitsRepo.createHabit(user.id, habitColumns(parsed.data));
-    await habitsRepo.upsertHabitSchedule(user.id, habit.id, scheduleColumns(parsed.data));
+    await habitsRepo.upsertHabitSchedule(
+      user.id,
+      habit.id,
+      scheduleColumns(parsed.data, zonedToday(new Date(), timeZone)),
+    );
     revalidateHabitSurfaces();
     return { ok: true, data: habit };
   } catch (error) {
