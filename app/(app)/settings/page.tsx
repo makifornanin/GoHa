@@ -22,6 +22,8 @@ export default async function SettingsPage() {
           theme: settings.theme,
           timezone: settings.timezone,
           weekStartsOn: settings.weekStartsOn,
+          dailyPlanningTime: settings.dailyPlanningTime,
+          eveningReflectionTime: settings.eveningReflectionTime,
         }}
       />
     </div>

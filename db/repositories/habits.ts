@@ -104,6 +104,23 @@ export async function archiveHabit(userId: string, id: string): Promise<Habit | 
   return row ?? null;
 }
 
+/**
+ * Bring an archived habit back, with its entry history intact.
+ *
+ * Archiving is meant to be reversible (CLAUDE.md section 7: prefer archive over
+ * hard delete), but habits had no way back, so a mis-click destroyed a streak's
+ * visibility permanently. Entries were never deleted, so restoring returns the
+ * habit and its whole history.
+ */
+export async function restoreHabit(userId: string, id: string): Promise<Habit | null> {
+  const [row] = await db
+    .update(habits)
+    .set({ isArchived: false, archivedAt: null })
+    .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+    .returning();
+  return row ?? null;
+}
+
 // --- Schedules (one active schedule per habit) ---
 
 export async function getHabitSchedule(userId: string, habitId: string): Promise<HabitSchedule | null> {

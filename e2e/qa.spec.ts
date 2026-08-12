@@ -7,6 +7,18 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  *
  * Runs against the isolated harness account (scripts/test-account.mts), never
  * the real owner's data.
+ *
+ * NOT IDEMPOTENT, by design: it seeds fixed, realistic names ("Health &
+ * Fitness", "Review sprint board", "Long run 12km") because the screenshots are
+ * meant to look like a real system, and it does not delete what it creates. Run
+ * it against a freshly reset account:
+ *
+ *     pnpm test:account:destroy && pnpm test:account:create
+ *
+ * Where a locator would otherwise hit Playwright's strict mode on a re-used
+ * account, this spec uses `.first()` and says why. That is deliberate: two rows
+ * with the same seeded title is a property of the fixture, not a product bug,
+ * and either row satisfies the assertion.
  */
 
 const SHOTS = "qa-screenshots";
@@ -336,12 +348,14 @@ test("Today: quick add, pin priorities, complete, habits", async ({ page }) => {
     record("Today", "BUG", "No way to add a Top 3 priority.");
   }
 
-  // Complete from Today and confirm it stays
-  const cb = page.getByRole("checkbox", { name: "Complete Review sprint board" });
+  // Complete from Today and confirm it stays.
+  // `.first()` because this spec seeds fixed titles (see the file header): on a
+  // re-used account several "Review sprint board" rows legitimately exist.
+  const cb = page.getByRole("checkbox", { name: "Complete Review sprint board" }).first();
   await cb.click();
-  await expect(page.getByRole("checkbox", { name: "Reopen Review sprint board" })).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(
+    page.getByRole("checkbox", { name: "Reopen Review sprint board" }).first(),
+  ).toBeVisible({ timeout: 15_000 });
   record("Today", "NOTE", "Completed task remains visible and is undoable.");
 
   await shot(page, "05-today");

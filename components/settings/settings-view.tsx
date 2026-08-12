@@ -1,6 +1,18 @@
 "use client";
 
-import { Download, Monitor, Moon, Palette, SlidersHorizontal, Sun, User } from "lucide-react";
+import {
+  Archive,
+  Clock,
+  Download,
+  KeyRound,
+  Monitor,
+  Moon,
+  Palette,
+  RotateCcw,
+  SlidersHorizontal,
+  Sun,
+  User,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
@@ -15,15 +27,25 @@ import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import {
   updatePreferencesAction,
   updateProfileAction,
+  updateRhythmAction,
   updateThemeAction,
 } from "@/app/(app)/settings/actions";
+import {
+  listArchivedAction,
+  restoreArchivedAction,
+  type ArchivedItem,
+  type ArchivedKind,
+} from "@/app/(app)/settings/archive-actions";
 import { exportMyDataAction } from "@/app/(app)/settings/export-actions";
+import { authClient } from "@/lib/auth-client";
 import type { ThemeValue } from "@/lib/validations/settings";
 
 type SettingsData = {
   theme: ThemeValue;
   timezone: string;
   weekStartsOn: number;
+  dailyPlanningTime: string | null;
+  eveningReflectionTime: string | null;
 };
 
 
@@ -51,8 +73,260 @@ export function SettingsView({
       <ProfileCard className="lg:col-span-2" name={profile.name} email={profile.email} />
       <AppearanceCard dbTheme={settings.theme} />
       <PreferencesCard timezone={settings.timezone} weekStartsOn={settings.weekStartsOn} />
+      <RhythmCard
+        dailyPlanningTime={settings.dailyPlanningTime}
+        eveningReflectionTime={settings.eveningReflectionTime}
+      />
+      <SecurityCard />
+      <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />
     </div>
+  );
+}
+
+/**
+ * The daily rhythm: when you mean to plan, and when you mean to look back.
+ *
+ * The app does NOT deliver anything from these. Push and email infrastructure
+ * are out of scope (CLAUDE.md section 2), so promising a reminder here would be
+ * a lie. They are stated intentions, and a stable place an external automation
+ * can read from without the app growing a notification system.
+ */
+function RhythmCard({
+  dailyPlanningTime,
+  eveningReflectionTime,
+}: {
+  dailyPlanningTime: string | null;
+  eveningReflectionTime: string | null;
+}) {
+  // A `time` column comes back as "HH:MM:SS"; the input wants "HH:MM".
+  const trim = (t: string | null) => (t ? t.slice(0, 5) : "");
+  const [planning, setPlanning] = useState(trim(dailyPlanningTime));
+  const [reflection, setReflection] = useState(trim(eveningReflectionTime));
+  const [pending, startTransition] = useTransition();
+
+  function persist(next: { dailyPlanningTime: string; eveningReflectionTime: string }) {
+    startTransition(async () => {
+      const res = await updateRhythmAction(next);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Rhythm saved.");
+    });
+  }
+
+  return (
+    <SettingsCard
+      icon={<Clock className="size-5" />}
+      title="Daily rhythm"
+      description="When you intend to plan the day and look back at it."
+    >
+      <div className="flex flex-col gap-5">
+        <div className="space-y-1.5">
+          <label htmlFor="settings-planning" className="text-subhead text-label-secondary">
+            Plan the day
+          </label>
+          <Input
+            id="settings-planning"
+            type="time"
+            value={planning}
+            disabled={pending}
+            onChange={(e) => setPlanning(e.target.value)}
+            onBlur={() =>
+              persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="settings-reflection" className="text-subhead text-label-secondary">
+            Look back
+          </label>
+          <Input
+            id="settings-reflection"
+            type="time"
+            value={reflection}
+            disabled={pending}
+            onChange={(e) => setReflection(e.target.value)}
+            onBlur={() =>
+              persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
+            }
+          />
+        </div>
+        <p className="text-footnote text-label-tertiary">
+          GoHa does not send notifications. These are your stated intentions, and the times an
+          external automation can read if you set one up.
+        </p>
+      </div>
+    </SettingsCard>
+  );
+}
+
+/** Change the account password. Better Auth verifies the current one server-side. */
+function SecurityCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function change() {
+    if (next.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    startTransition(async () => {
+      const { error } = await authClient.changePassword({
+        currentPassword: current,
+        newPassword: next,
+        // Keep this device signed in; signing yourself out of the session you
+        // are using to change the password is a hostile default.
+        revokeOtherSessions: true,
+      });
+      if (error) {
+        toast.error(error.message || "Could not change your password.");
+        return;
+      }
+      setCurrent("");
+      setNext("");
+      toast.success("Password changed. Other devices were signed out.");
+    });
+  }
+
+  return (
+    <SettingsCard
+      icon={<KeyRound className="size-5" />}
+      title="Password"
+      description="Change the password for this account."
+    >
+      <div className="flex flex-col gap-5">
+        <div className="space-y-1.5">
+          <label htmlFor="settings-current-pw" className="text-subhead text-label-secondary">
+            Current password
+          </label>
+          <Input
+            id="settings-current-pw"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            disabled={pending}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="settings-new-pw" className="text-subhead text-label-secondary">
+            New password
+          </label>
+          <Input
+            id="settings-new-pw"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            disabled={pending}
+            onChange={(e) => setNext(e.target.value)}
+          />
+        </div>
+        <div className="flex justify-end">
+          <Button
+            onClick={change}
+            loading={pending}
+            disabled={current.length === 0 || next.length === 0}
+          >
+            Change password
+          </Button>
+        </div>
+      </div>
+    </SettingsCard>
+  );
+}
+
+/**
+ * The way back out of the archive.
+ *
+ * Archiving is meant to be reversible, but only Task Maps ever offered a
+ * restore: a mis-archived life area, goal or habit disappeared from every
+ * screen permanently. Loaded on demand, so it costs nothing until opened.
+ */
+const ARCHIVE_LABEL: Record<ArchivedKind, string> = {
+  "life-area": "Life area",
+  goal: "Goal",
+  habit: "Habit",
+  "task-map": "Task map",
+};
+
+function ArchiveCard({ className }: { className?: string }) {
+  const router = useRouter();
+  const [items, setItems] = useState<ArchivedItem[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function load() {
+    setOpen(true);
+    startTransition(async () => {
+      try {
+        setItems(await listArchivedAction());
+      } catch (error) {
+        console.error("listArchivedAction failed", error);
+        toast.error("Could not load your archive.");
+        setItems([]);
+      }
+    });
+  }
+
+  function restore(item: ArchivedItem) {
+    startTransition(async () => {
+      const res = await restoreArchivedAction(item.kind, item.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setItems((current) => current?.filter((i) => i.id !== item.id) ?? null);
+      toast.success(`Restored "${item.name}"`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <SettingsCard
+      icon={<Archive className="size-5" />}
+      title="Archive"
+      description="Anything you archived, and the way to bring it back."
+      className={className}
+    >
+      {!open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-xl text-callout text-label-secondary">
+            Archiving hides something without deleting it. Nothing here is ever lost, and habits
+            keep their full history.
+          </p>
+          <Button variant="secondary" onClick={load} loading={pending}>
+            Show archive
+          </Button>
+        </div>
+      ) : items === null ? (
+        <p className="py-4 text-center text-callout text-label-secondary">Loading your archive...</p>
+      ) : items.length === 0 ? (
+        <p className="rounded-xl bg-fill-quaternary px-4 py-6 text-center text-callout text-label-secondary">
+          Nothing is archived.
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {items.map((item) => (
+            <li
+              key={`${item.kind}-${item.id}`}
+              className="flex min-h-11 items-center gap-3 border-b border-separator py-1.5 last:border-0"
+            >
+              <span className="w-20 shrink-0 text-footnote uppercase text-label-tertiary">
+                {ARCHIVE_LABEL[item.kind]}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-body text-label">{item.name}</span>
+              <Button variant="ghost" size="sm" onClick={() => restore(item)} disabled={pending}>
+                <RotateCcw className="size-3.5" aria-hidden />
+                Restore
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SettingsCard>
   );
 }
 

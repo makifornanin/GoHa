@@ -9,8 +9,10 @@ import { requireUser } from "@/lib/session";
 import {
   displayNameSchema,
   preferencesSchema,
+  rhythmSchema,
   themeSchema,
   type PreferencesInput,
+  type RhythmInput,
   type ThemeValue,
 } from "@/lib/validations/settings";
 
@@ -47,6 +49,32 @@ export async function updateThemeAction(theme: ThemeValue): Promise<ActionResult
     return { ok: true };
   } catch (error) {
     console.error("updateThemeAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Persist the daily rhythm times.
+ *
+ * The app does not deliver anything from these (push and email are out of
+ * scope, CLAUDE.md section 2). They are stated intentions the app reflects back
+ * on Today, and a stable place an external automation can read from.
+ */
+export async function updateRhythmAction(input: RhythmInput): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = rhythmSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? GENERIC_ERROR };
+
+  try {
+    await settingsRepo.updateUserSettings(user.id, {
+      dailyPlanningTime: parsed.data.dailyPlanningTime,
+      eveningReflectionTime: parsed.data.eveningReflectionTime,
+    });
+    revalidatePath("/settings");
+    revalidatePath("/today");
+    return { ok: true };
+  } catch (error) {
+    console.error("updateRhythmAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }
