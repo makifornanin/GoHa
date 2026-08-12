@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor, Moon, Palette, SlidersHorizontal, Sun, User } from "lucide-react";
+import { Download, Monitor, Moon, Palette, SlidersHorizontal, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
@@ -17,6 +17,7 @@ import {
   updateProfileAction,
   updateThemeAction,
 } from "@/app/(app)/settings/actions";
+import { exportMyDataAction } from "@/app/(app)/settings/export-actions";
 import type { ThemeValue } from "@/lib/validations/settings";
 
 type SettingsData = {
@@ -50,7 +51,58 @@ export function SettingsView({
       <ProfileCard className="lg:col-span-2" name={profile.name} email={profile.email} />
       <AppearanceCard dbTheme={settings.theme} />
       <PreferencesCard timezone={settings.timezone} weekStartsOn={settings.weekStartsOn} />
+      <DataCard className="lg:col-span-2" />
     </div>
+  );
+}
+
+/**
+ * Your data, in your hands.
+ *
+ * A single-owner life system whose only copy lives in one hosted database
+ * needs a user-accessible way out. The download is built in the browser from
+ * the JSON the server returns, so nothing is written to disk on the server and
+ * no file ever has to be cleaned up.
+ */
+function DataCard({ className }: { className?: string }) {
+  const [pending, startTransition] = useTransition();
+
+  function exportData() {
+    startTransition(async () => {
+      try {
+        const { filename, json } = await exportMyDataAction();
+        const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success("Export downloaded");
+      } catch (error) {
+        console.error("exportMyDataAction failed", error);
+        toast.error("Could not build your export. Please try again.");
+      }
+    });
+  }
+
+  return (
+    <SettingsCard
+      icon={<Download className="size-4" />}
+      title="Your data"
+      description="Everything you have created, as one JSON file."
+      className={className}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-callout text-label-secondary">
+          Life areas, goals, tasks, habits and their history, focus sessions, brain dump, task maps,
+          and weekly reviews. Sign-in details are never included.
+        </p>
+        <Button onClick={exportData} loading={pending}>
+          <Download className="size-4" aria-hidden />
+          Export
+        </Button>
+      </div>
+    </SettingsCard>
   );
 }
 

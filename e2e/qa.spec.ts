@@ -232,7 +232,9 @@ test("Tasks: create across views, link, complete, reflect, cancel, delete", asyn
     await d.getByLabel("How did it go?").fill("Felt strong. Negative split on the back half.");
     await d.getByRole("button", { name: "Save reflection" }).click();
     await expect(d).toBeHidden({ timeout: 15_000 });
-    await expect(page.getByText("Negative split", { exact: false })).toBeVisible();
+    // `.first()` as elsewhere in this spec: it seeds fixed text and does not
+    // clean up, so a re-run against the same account has two matching cards.
+    await expect(page.getByText("Negative split", { exact: false }).first()).toBeVisible();
     record("Tasks", "NOTE", "Completion reflection saves and displays on the card.");
   } else {
     record("Tasks", "BUG", "No 'Add reflection' action on a completed task.");

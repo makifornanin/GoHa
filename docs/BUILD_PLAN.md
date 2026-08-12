@@ -151,11 +151,21 @@ Status: [x] Completed (2026-07-08)
 - Verification: `tsc --noEmit` clean, ESLint clean, `next build` green (18 routes, `/task-maps` dynamic), and a live Neon smoke (throwaway user, cascade cleanup) green: batch position update persisted (123.5/456.25), edge endpoints correct, duplicate edge a no-op, self-loop rejected by the check constraint, map user-scoped, and map delete cascaded nodes+edges.
 
 ## Phase 12: Calendar, Review, Progress surfaces (V1b)
-Status: [ ] Not started
+Status: [x] Completed (2026-08-13)
 
 - Calendar/schedule, weekly review and reflection, progress/life-score analytics. Derived from existing data; no new source of truth.
 - Key files: `app/(app)/calendar/*`, `app/(app)/review/*`, `app/(app)/progress/*`.
 - Note (2026-07-08): Phase 13 (Settings + polish) was built ahead of this phase by owner request, with no re-architecture. These three routes remain the `ComingSoon` placeholders from Phase 1. Their sidebar/mobile nav entries already exist and are live.
+
+- Progress (2026-08-13): `/progress` is a real dashboard driven entirely by records the app was already writing and never reading back: completed-task timestamps, focus session durations, habit entries. `lib/progress.ts` (pure, unit-tested) derives weekly completions, weekly focus minutes, and a 26-week habit heatmap. The heatmap reuses `buildHabitViews`, so a day can never read as missed there and done on the Habits screen. Charts are divs plus design tokens rather than a charting dependency, which would have brought its own colour system to re-bridge for light/dark. Comparison windows are honest: no prior period reads "no earlier data", never "no change".
+
+- Review (2026-08-13): the "Reflect" end of the chain finally has a home. Migration `0009_shiny_vengeance.sql` adds `weekly_reviews` (the reflections table the Phase 2 schema listed but never created): `week_start DATE`, three prose prompts, an optional 1-5 rating, and `completed_at` for draft-versus-done, unique on (user_id, week_start) so saving is an idempotent upsert instead of a pile of drafts. It is the ONLY thing the screen stores: every statistic (completed, slipped, habit consistency, focus time, goals completed) stays derived on read via `lib/review.ts`, so reopening a task later corrects the history rather than leaving a frozen snapshot. Week navigation cannot go past the current week.
+
+- Calendar (2026-08-13): `/calendar` is the unified schedule (tasks, habit occurrences, focus minutes on one month grid), distinct from the task-only calendar inside To-dos, which stays an editing surface. Habit occurrences resolve from the same schedule rules `buildHabitViews` uses, so a day cannot read as scheduled here and unscheduled on Habits. Layer filter (All/Tasks/Habits/Focus) plus a selected-day detail rail. Reuses `lib/calendar.ts` (`buildMonthGrid`, `monthLabel`, `weekdayHeaders`) rather than a second grid implementation.
+
+- Also in this slice: `plannedNav` is now empty and all twelve routes are in the sidebar, since the rule is that every nav entry must lead to a working screen. `loading.tsx` and `error.tsx` boundaries added for both new routes. "Focus on this" carries `?taskId=` so Focus preselects the task instead of opening an empty picker. Settings gained a data export (`exportMyDataAction`): every canonical row the user owns as one JSON file, built in the browser from the server's JSON, with auth rows excluded. Derived values are deliberately not exported, since they are recomputed on read everywhere else.
+
+- Verification: `tsc`, `eslint`, 150 unit tests (`tests/review.test.ts` covers completion-week attribution, slipped detection, cancelled exclusion, per-area grouping, focus windowing, habit consistency and the carry-over cap), 31/31 Playwright, `pnpm build`, plus a scripted browser sweep of all twelve routes at 390 and 1600 wide.
 
 ## Phase 13: Settings + polish pass (V1b)
 Status: [x] Completed (2026-07-08)

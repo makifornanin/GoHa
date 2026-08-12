@@ -13,4 +13,5 @@ export * as focusRepo from "./focus";
 export * as brainDumpRepo from "./brain-dump";
 export * as dailyPrioritiesRepo from "./daily-priorities";
 export * as taskMapsRepo from "./task-maps";
+export * as reviewsRepo from "./reviews";
 export * as settingsRepo from "./settings";

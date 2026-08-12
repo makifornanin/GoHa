@@ -37,29 +37,31 @@ export type NavItem = {
  * Route slugs follow the CLAUDE.md naming (for example /tasks, labelled "To-dos").
  */
 /**
- * Every entry here MUST lead to a working screen. Calendar, Review, and
- * Progress are still placeholders, so they are deliberately absent: a quarter
- * of the menu leading to "coming soon" made the app feel broken. Their routes
- * still exist for direct URLs; add them back here when they are built.
+ * Every entry here MUST lead to a working screen. That rule once kept Calendar,
+ * Review and Progress out of the menu while they were placeholders, because a
+ * quarter of the navigation leading to "coming soon" made the app feel broken.
+ * All three are built now, so all three are listed.
+ *
+ * Order follows the conceptual chain (CLAUDE.md section 1): plan the day, aim
+ * at goals, do the work, then look back at it.
  */
 export const primaryNav: NavItem[] = [
   { label: "Today", href: "/today", icon: CalendarDays, stage: "mvp" },
   { label: "Goals", href: "/goals", icon: Trophy, stage: "mvp" },
   { label: "To-dos", href: "/tasks", icon: ListChecks, stage: "mvp" },
+  { label: "Calendar", href: "/calendar", icon: Calendar, stage: "expansion" },
   { label: "Habits", href: "/habits", icon: Repeat, stage: "expansion" },
   { label: "Focus", href: "/focus", icon: Focus, stage: "expansion" },
   { label: "Brain Dump", href: "/brain-dump", icon: Brain, stage: "expansion" },
   { label: "Task Map", href: "/task-maps", icon: Waypoints, stage: "expansion" },
+  { label: "Review", href: "/review", icon: NotebookPen, stage: "expansion" },
   { label: "Progress", href: "/progress", icon: TrendingUp, stage: "expansion" },
   { label: "Life Areas", href: "/life-areas", icon: Shapes, stage: "mvp" },
   { label: "Settings", href: "/settings", icon: Settings, stage: "mvp" },
 ];
 
-/** Unbuilt surfaces. Routes exist, but they are kept out of the navigation. */
-export const plannedNav: NavItem[] = [
-  { label: "Calendar", href: "/calendar", icon: Calendar, stage: "expansion" },
-  { label: "Review", href: "/review", icon: NotebookPen, stage: "expansion" },
-];
+/** Nothing is unbuilt any more; kept so a future surface has an obvious home. */
+export const plannedNav: NavItem[] = [];
 
 /** Looked up by href, not index, so reordering primaryNav can never break this. */
 function navItem(href: string): NavItem {

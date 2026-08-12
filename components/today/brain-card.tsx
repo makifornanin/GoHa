@@ -71,7 +71,13 @@ export function BrainCard({
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {signal.task ? (
           <>
-            <Link href="/focus" className={buttonVariants({ size: "lg" })}>
+            {/* Carry the task through: Focus reads `?taskId=` and preselects
+                it, so "Focus on this" starts on THIS task rather than dropping
+                the user on an empty picker. */}
+            <Link
+              href={`/focus?taskId=${signal.task.id}`}
+              className={buttonVariants({ size: "lg" })}
+            >
               <Play className="size-4" aria-hidden />
               Focus on this
             </Link>

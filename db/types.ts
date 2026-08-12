@@ -22,6 +22,7 @@ import type {
   user,
   userSettings,
   verification,
+  weeklyReviews,
 } from "./schema";
 
 export type User = typeof user.$inferSelect;
@@ -62,6 +63,9 @@ export type TaskMapNode = typeof taskMapNodes.$inferSelect;
 export type NewTaskMapNode = typeof taskMapNodes.$inferInsert;
 export type TaskMapEdge = typeof taskMapEdges.$inferSelect;
 export type NewTaskMapEdge = typeof taskMapEdges.$inferInsert;
+
+export type WeeklyReview = typeof weeklyReviews.$inferSelect;
+export type NewWeeklyReview = typeof weeklyReviews.$inferInsert;
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;

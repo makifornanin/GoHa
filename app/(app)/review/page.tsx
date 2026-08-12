@@ -1,20 +1,76 @@
-import { NotebookPen } from "lucide-react";
-
-import { ComingSoon } from "@/components/coming-soon";
+import { ReviewView, type ReviewData } from "@/components/review/review-view";
+import {
+  focusRepo,
+  goalsRepo,
+  habitsRepo,
+  lifeAreasRepo,
+  reviewsRepo,
+  tasksRepo,
+} from "@/db";
+import { addDays, startOfWeek, zonedToday } from "@/lib/date";
+import { deriveReviewStats, weekBounds } from "@/lib/review";
+import { requireUser } from "@/lib/session";
+import { getUserDatePrefs } from "@/lib/user-settings";
 
 export const metadata = { title: "Review" };
 
-export default function ReviewPage() {
-  return (
-    <ComingSoon
-      icon={NotebookPen}
-      title="Review"
-      description="Weekly review and reflection to close the loop."
-      empty={{
-        title: "Review is on the way",
-        description:
-          "Weekly review and reflection arrive in a later expansion slice.",
-      }}
-    />
-  );
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
+  // Identity from the session; every query is user-scoped in the repositories.
+  const user = await requireUser();
+  const [{ timeZone, weekStartsOn }, { week }] = await Promise.all([
+    getUserDatePrefs(user.id),
+    searchParams,
+  ]);
+
+  const today = zonedToday(new Date(), timeZone);
+  const currentWeekStart = startOfWeek(today, weekStartsOn);
+
+  // A malformed or future `?week=` falls back to the current week rather than
+  // rendering an empty page for a date that cannot exist.
+  const requested = week && ISO_DATE.test(week) ? startOfWeek(week, weekStartsOn) : currentWeekStart;
+  const weekStart = requested > currentWeekStart ? currentWeekStart : requested;
+  const bounds = weekBounds(weekStart);
+
+  const [tasks, habits, entries, sessions, goals, lifeAreas, review] = await Promise.all([
+    tasksRepo.listTasksForUser(user.id),
+    habitsRepo.listHabitsWithSchedule(user.id),
+    habitsRepo.listEntriesInRange(user.id, { from: bounds.start, to: bounds.end }),
+    focusRepo.listCompletedSessionsInRange(user.id, { from: bounds.start, to: bounds.end }),
+    goalsRepo.listGoalsWithTaskCounts(user.id, { includeArchived: true }),
+    lifeAreasRepo.listLifeAreas(user.id),
+    reviewsRepo.getWeeklyReview(user.id, weekStart),
+  ]);
+
+  const stats = deriveReviewStats({
+    week: bounds,
+    tasks,
+    habits,
+    habitEntries: entries,
+    sessions,
+    goals,
+    today,
+    weekStartsOn,
+    timeZone,
+  });
+
+  const data: ReviewData = {
+    weekStart,
+    weekEnd: bounds.end,
+    prevWeekStart: addDays(weekStart, -7),
+    // There is no "next" past the current week: a review of the future is not
+    // a thing, and an enabled arrow that goes nowhere reads as broken.
+    nextWeekStart: weekStart < currentWeekStart ? addDays(weekStart, 7) : null,
+    isCurrentWeek: weekStart === currentWeekStart,
+    stats,
+    review,
+    lifeAreas,
+  };
+
+  return <ReviewView data={data} />;
 }
