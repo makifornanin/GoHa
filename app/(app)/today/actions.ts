@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { dailyPrioritiesRepo, tasksRepo, type DailyPriority } from "@/db";
+import { dailyPrioritiesRepo, goalsRepo, tasksRepo, type DailyPriority } from "@/db";
 import { zonedToday } from "@/lib/date";
 import { requireUser } from "@/lib/session";
+import { scoreTasks } from "@/lib/today-brain";
 import { getUserDatePrefs } from "@/lib/user-settings";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -51,6 +52,68 @@ export async function addDailyPriorityAction(taskId: string): Promise<ActionResu
   } catch (error) {
     console.error("addDailyPriorityAction failed", error);
     return { ok: false, error: "Could not pin that priority. Please try again." };
+  }
+}
+
+/**
+ * Fill today's empty Top 3 slots with the highest-ranked open work.
+ *
+ * Only ever ADDS: existing pins are the user's own stated intent and are never
+ * reordered or dropped. Ranking is the shared `scoreTasks` engine, so the picks
+ * match exactly what Today already told the user it would choose.
+ */
+export async function planMyDayAction(): Promise<
+  ActionResult<{ pinned: { id: string; title: string; reason: string }[]; slotsLeft: number }>
+> {
+  const user = await requireUser();
+  const { timeZone } = await getUserDatePrefs(user.id);
+  const today = zonedToday(new Date(), timeZone);
+
+  try {
+    const [tasks, goals, existing] = await Promise.all([
+      tasksRepo.listTasksForUser(user.id),
+      goalsRepo.listGoalsWithTaskCounts(user.id),
+      dailyPrioritiesRepo.listDailyPriorities(user.id, today),
+    ]);
+
+    const used = new Set(existing.map((p) => p.position));
+    const free = [1, 2, 3].filter((slot) => !used.has(slot));
+    if (free.length === 0) {
+      return { ok: false, error: "Today's three priorities are already set." };
+    }
+
+    const alreadyPinned = new Set(
+      existing.map((p) => p.taskId).filter((id): id is string => Boolean(id)),
+    );
+    const ranked = scoreTasks({
+      tasks,
+      today,
+      timeZone,
+      goalById: new Map(goals.map((g) => [g.id, g])),
+      excludeIds: alreadyPinned,
+    }).slice(0, free.length);
+
+    if (ranked.length === 0) {
+      return { ok: false, error: "There is no open work to pin yet." };
+    }
+
+    const pinned: { id: string; title: string; reason: string }[] = [];
+    for (const [index, candidate] of ranked.entries()) {
+      await dailyPrioritiesRepo.setDailyPriority(user.id, today, free[index], {
+        taskId: candidate.task.id,
+      });
+      pinned.push({
+        id: candidate.task.id,
+        title: candidate.task.title,
+        reason: candidate.reason,
+      });
+    }
+
+    revalidatePath("/today");
+    return { ok: true, data: { pinned, slotsLeft: free.length - pinned.length } };
+  } catch (error) {
+    console.error("planMyDayAction failed", error);
+    return { ok: false, error: "Could not plan your day. Please try again." };
   }
 }
 

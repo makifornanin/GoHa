@@ -50,6 +50,7 @@ export const primaryNav: NavItem[] = [
   { label: "Focus", href: "/focus", icon: Focus, stage: "expansion" },
   { label: "Brain Dump", href: "/brain-dump", icon: Brain, stage: "expansion" },
   { label: "Task Map", href: "/task-maps", icon: Waypoints, stage: "expansion" },
+  { label: "Progress", href: "/progress", icon: TrendingUp, stage: "expansion" },
   { label: "Life Areas", href: "/life-areas", icon: Shapes, stage: "mvp" },
   { label: "Settings", href: "/settings", icon: Settings, stage: "mvp" },
 ];
@@ -58,7 +59,6 @@ export const primaryNav: NavItem[] = [
 export const plannedNav: NavItem[] = [
   { label: "Calendar", href: "/calendar", icon: Calendar, stage: "expansion" },
   { label: "Review", href: "/review", icon: NotebookPen, stage: "expansion" },
-  { label: "Progress", href: "/progress", icon: TrendingUp, stage: "expansion" },
 ];
 
 /** Looked up by href, not index, so reordering primaryNav can never break this. */

@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/shell/app-header";
 import { AppSidebar } from "@/components/shell/app-sidebar";
+import { CommandPalette } from "@/components/shell/command-palette";
 import { MobileBottomNav } from "@/components/shell/mobile-bottom-nav";
 import { MobileHeader } from "@/components/shell/mobile-header";
 import { ThemeSync } from "@/components/theme-sync";
@@ -35,6 +36,8 @@ export default async function AppLayout({
         </main>
       </div>
       <MobileBottomNav className="md:hidden" />
+      {/* Mounted once at the shell so Cmd/Ctrl+K works on every screen. */}
+      <CommandPalette />
     </div>
   );
 }

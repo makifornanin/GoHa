@@ -15,6 +15,7 @@ import {
   saveCompletionNoteAction,
   updateTaskAction,
 } from "@/app/(app)/tasks/actions";
+import { Celebration, type Milestone } from "@/components/celebration";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,7 @@ export function TasksView({
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [milestone, setMilestone] = useState<Milestone | null>(null);
   const [, startTransition] = useTransition();
 
   // Live, not frozen at mount: lateness and the date buckets below are derived
@@ -280,12 +282,18 @@ export function TasksView({
         applyOptimistic({ type: "status", id: task.id, status: "completed" });
         const result = await completeTaskAction(task.id);
         if (result.ok) {
-          toast.success(`Completed "${task.title}"`, {
-            action: {
-              label: "Add reflection",
-              onClick: () => setNoteTask({ ...task, status: "completed", completionNote: null }),
-            },
-          });
+          // A finished goal is the bigger event; it owns the moment instead of
+          // competing with a routine completion toast.
+          if (result.goalCompleted) {
+            setMilestone({ kind: "goal", title: result.goalCompleted.title });
+          } else {
+            toast.success(`Completed "${task.title}"`, {
+              action: {
+                label: "Add reflection",
+                onClick: () => setNoteTask({ ...task, status: "completed", completionNote: null }),
+              },
+            });
+          }
         } else {
           toast.error(result.error);
         }
@@ -400,6 +408,8 @@ export function TasksView({
           </Button>
         </div>
       </Modal>
+
+      <Celebration milestone={milestone} onDone={() => setMilestone(null)} />
     </>
   );
 

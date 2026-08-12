@@ -31,7 +31,12 @@ import type { DailyPriority, HabitEntry, LifeArea, Task } from "@/db";
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { TaskStatus } from "@/db/schema/enums";
-import { formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
+import {
+  formatIsoDateMedium,
+  formatZonedDateTimeMedium,
+  MANILA_TZ,
+  type Weekday,
+} from "@/lib/date";
 import { deriveTodayHabits } from "@/lib/habit-view";
 import { listEntrance, rowExit } from "@/lib/motion";
 import { taskEffectiveDate } from "@/lib/task-buckets";
@@ -39,10 +44,14 @@ import { taskPriorityConfig } from "@/lib/tasks";
 import { deriveTodayData } from "@/lib/today";
 import { cn } from "@/lib/utils";
 
+import { Celebration, type Milestone } from "@/components/celebration";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { deriveDaySignal } from "@/lib/today-brain";
 import type { TaskFormInput } from "@/lib/validations/task";
 
 import { ActiveGoalsCard } from "./active-goals-card";
+import { BrainCard } from "./brain-card";
+import { MomentumCard, type MomentumData } from "./momentum-card";
 import { QuickAddTask } from "./quick-add-task";
 import { TaskChecklistItem } from "./task-checklist-item";
 import { TodayHabits } from "./today-habits";
@@ -72,6 +81,10 @@ export function TodayView({
   habitEntries,
   lifeAreas,
   subtasks = [],
+  momentum,
+  hour,
+  allHabitEntries = [],
+  weekStartsOn = 1,
 }: {
   userName: string;
   greetingPart: string;
@@ -85,10 +98,17 @@ export function TodayView({
   habitEntries: HabitEntry[];
   lifeAreas: LifeArea[];
   subtasks?: Task[];
+  momentum: MomentumData;
+  /** Local hour 0-23, resolved on the server in the user's timezone. */
+  hour: number;
+  /** Full habit history, used only for streak-milestone detection. */
+  allHabitEntries?: HabitEntry[];
+  weekStartsOn?: Weekday;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [milestone, setMilestone] = useState<Milestone | null>(null);
 
   const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, (state, action: OptimisticAction) =>
     state.map((t) =>
@@ -125,6 +145,22 @@ export function TodayView({
     [habits, habitEntries, today, timeZone],
   );
 
+  // Today's opinion, from the same canonical records the sections below render.
+  const signal = useMemo(
+    () =>
+      deriveDaySignal({
+        tasks: optimisticTasks,
+        goals,
+        priorities,
+        habits,
+        habitEntries,
+        today,
+        timeZone,
+        hour,
+      }),
+    [optimisticTasks, goals, priorities, habits, habitEntries, today, timeZone, hour],
+  );
+
   const pinnedCount = data.priorities.filter((p) => p.task).length;
   const dayIsEmpty =
     data.focus === null &&
@@ -143,8 +179,17 @@ export function TodayView({
       } else {
         applyOptimistic({ type: "status", id: task.id, status: "completed" });
         const result = await completeTaskAction(task.id);
-        if (result.ok) toast.success(`Completed "${task.title}"`);
-        else toast.error(result.error);
+        if (result.ok) {
+          // A goal reaching 100% is the rarer, bigger event: let it own the
+          // moment instead of stacking a toast on top of a celebration.
+          if (result.goalCompleted) {
+            setMilestone({ kind: "goal", title: result.goalCompleted.title });
+          } else {
+            toast.success(`Completed "${task.title}"`);
+          }
+        } else {
+          toast.error(result.error);
+        }
       }
     });
   }
@@ -240,7 +285,11 @@ export function TodayView({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
             {/* Main column */}
             <div className="flex flex-col gap-4 md:col-span-8">
-              <FocusCard task={data.focus} timeZone={timeZone} onToggle={toggle} />
+              <BrainCard
+                signal={signal}
+                canPlan={pinnedCount < 3}
+                onOpenTask={(task) => setDetailId(task.id)}
+              />
 
               <TopPriorities
                 priorities={data.priorities}
@@ -384,14 +433,19 @@ export function TodayView({
                 </CardContent>
               </Card>
 
+              <MomentumCard data={momentum} />
+
               <ActiveGoalsCard goals={data.activeGoals} />
 
               <TodayHabits
                 habits={habits}
                 entries={habitEntries}
+                allEntries={allHabitEntries}
                 lifeAreas={lifeAreas}
                 today={today}
                 timeZone={timeZone}
+                weekStartsOn={weekStartsOn}
+                onMilestone={setMilestone}
               />
             </div>
           </div>
@@ -410,67 +464,15 @@ export function TodayView({
         onClose={() => setDetailId(null)}
         handlers={detailHandlers}
       />
+
+      <Celebration milestone={milestone} onDone={() => setMilestone(null)} />
     </div>
   );
 }
 
-/**
- * The day's single anchor. A SOLID card (glass is chrome-only); the blue
- * primary action is the one accent moment on the screen.
- */
-function FocusCard({
-  task,
-  timeZone,
-  onToggle,
-}: {
-  task: Task | null;
-  timeZone: string;
-  onToggle: (task: Task) => void;
-}) {
-  const due = task ? formatZonedDateTimeMedium(task.dueAt, timeZone) : null;
-
-  return (
-    <Card className="p-4 sm:p-5">
-      <p className="flex items-center gap-2 text-caption uppercase text-label-secondary">
-        <Play className="size-3.5 text-blue" aria-hidden />
-        Today&apos;s Focus
-      </p>
-
-      {task ? (
-        <>
-          <h2 className="mt-3 text-title-3 text-label">{task.title}</h2>
-          <p className="mt-1 font-mono text-footnote tabular-nums text-label-secondary">
-            {due ? `Due ${due}  ·  ` : ""}
-            {taskPriorityConfig[task.priority].label} priority
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <Link href="/focus" className={buttonVariants({ size: "lg" })}>
-              <Play className="size-4" aria-hidden />
-              Start Focus Session
-            </Link>
-            <Button variant="secondary" onClick={() => onToggle(task)}>
-              Mark done
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="mt-3 max-w-md text-body text-label-secondary">
-            No focus set. Pin a Top 3 priority or schedule a task for today to give your day a clear
-            anchor.
-          </p>
-          <Link
-            href="/tasks"
-            className={cn(buttonVariants({ variant: "secondary" }), "mt-5")}
-          >
-            Choose today&apos;s focus
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        </>
-      )}
-    </Card>
-  );
-}
+/* The old passive FocusCard lived here. It stated "No focus set" while overdue
+   work sat directly below it, so it was replaced by BrainCard, which forms an
+   opinion from the same data instead of asking the user to. */
 
 /** Real empty state: 28px icon at stroke 1.5, one clear next step. */
 function EmptyDay() {

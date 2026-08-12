@@ -11,8 +11,11 @@ import { HabitLogControl, type LogInput } from "@/components/habits/habit-log-co
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { HabitEntry, LifeArea } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
+import type { Milestone } from "@/components/celebration";
+import type { Weekday } from "@/lib/date";
 import { deriveTodayHabits } from "@/lib/habit-view";
 import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
+import { isStreakMilestone, streakAfterLogging } from "@/lib/milestones";
 import { listEntrance } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -27,15 +30,23 @@ type EntryAction = { type: "upsert"; entry: HabitEntry } | { type: "remove"; hab
 export function TodayHabits({
   habits,
   entries,
+  allEntries = [],
   lifeAreas,
   today,
   timeZone,
+  weekStartsOn = 1,
+  onMilestone,
 }: {
   habits: HabitWithSchedule[];
+  /** Today's entries, which is all this card renders. */
   entries: HabitEntry[];
+  /** Full history, needed only to tell whether a log completes a streak. */
+  allEntries?: HabitEntry[];
   lifeAreas: LifeArea[];
   today: string;
   timeZone?: string;
+  weekStartsOn?: Weekday;
+  onMilestone?: (milestone: Milestone) => void;
 }) {
   const [, startTransition] = useTransition();
 
@@ -72,8 +83,25 @@ export function TodayHabits({
   }
 
   function log(habitId: string, input: LogInput) {
+    const habit = habits.find((h) => h.id === habitId);
+    const entry = makeEntry(habitId, input);
+
+    // Same rule as the Habits screen: a streak milestone belongs to the habit,
+    // not to the surface it happened to be logged from.
+    if (habit && input.status === "done" && allEntries.length > 0) {
+      const days = streakAfterLogging({
+        habit,
+        entries: allEntries,
+        entry,
+        today,
+        weekStartsOn,
+        timeZone,
+      });
+      if (isStreakMilestone(days)) onMilestone?.({ kind: "streak", habit: habit.name, days });
+    }
+
     startTransition(async () => {
-      applyEntry({ type: "upsert", entry: makeEntry(habitId, input) });
+      applyEntry({ type: "upsert", entry });
       const result = await logHabitEntryAction(habitId, today, input);
       if (!result.ok) toast.error(result.error);
     });

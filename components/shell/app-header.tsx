@@ -1,6 +1,6 @@
 "use client";
 
-import { Focus, Plus } from "lucide-react";
+import { Focus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,26 @@ export function AppHeader({ className }: { className?: string }) {
         className,
       )}
     >
+      {/* A shortcut nobody knows about does not exist. This is the palette's
+          discoverable surface; it dispatches the same Cmd/Ctrl+K the shell
+          listens for, so there is one code path and no duplicated state. */}
+      <button
+        type="button"
+        onClick={() =>
+          window.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+          )
+        }
+        aria-label="Open command palette"
+        className="mr-auto flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-fill-tertiary pl-2.5 pr-2 text-left text-body text-label-tertiary transition-colors hover:bg-fill-secondary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 lg:w-64"
+      >
+        <Search className="size-4 shrink-0" aria-hidden />
+        <span className="hidden flex-1 lg:inline">Search or jump to...</span>
+        <kbd className="hidden shrink-0 rounded-md bg-fill-tertiary px-1.5 font-mono text-footnote lg:block">
+          ⌘K
+        </kbd>
+      </button>
+
       <Button variant="secondary" onClick={() => router.push("/focus")}>
         <Focus />
         <span className="hidden lg:inline">Focus Mode</span>

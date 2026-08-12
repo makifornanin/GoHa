@@ -11,6 +11,7 @@ import {
   logHabitEntryAction,
   updateHabitAction,
 } from "@/app/(app)/habits/actions";
+import { Celebration, type Milestone } from "@/components/celebration";
 import { LifeAreaIcon } from "@/components/life-areas/icon";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -21,6 +22,7 @@ import type { Goal, HabitEntry, LifeArea } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { buildHabitViews, todayHabitViews } from "@/lib/habit-view";
 import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
+import { isStreakMilestone, streakAfterLogging } from "@/lib/milestones";
 import type { HabitFormInput } from "@/lib/validations/habit";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +52,7 @@ export function HabitsView({
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<HabitWithSchedule | null>(null);
+  const [milestone, setMilestone] = useState<Milestone | null>(null);
   const [, startTransition] = useTransition();
 
   const [optimisticEntries, applyEntry] = useOptimistic(entries, (state, action: EntryAction) => {
@@ -104,8 +107,26 @@ export function HabitsView({
   }
 
   function log(habitId: string, input: LogInput) {
+    const habit = habits.find((h) => h.id === habitId);
+    const entry = makeEntry(habitId, input);
+
+    // Decide the milestone from the entry set this log is about to create, so
+    // it fires exactly once at the moment of logging rather than on any later
+    // re-render that happens to recompute the same streak.
+    if (habit && input.status === "done") {
+      const days = streakAfterLogging({
+        habit,
+        entries: optimisticEntries,
+        entry,
+        today,
+        weekStartsOn,
+        timeZone,
+      });
+      if (isStreakMilestone(days)) setMilestone({ kind: "streak", habit: habit.name, days });
+    }
+
     startTransition(async () => {
-      applyEntry({ type: "upsert", entry: makeEntry(habitId, input) });
+      applyEntry({ type: "upsert", entry });
       const result = await logHabitEntryAction(habitId, today, input);
       if (!result.ok) toast.error(result.error);
     });
@@ -282,6 +303,8 @@ export function HabitsView({
           <Button variant="destructive" onClick={confirmArchive}>Archive</Button>
         </div>
       </Modal>
+
+      <Celebration milestone={milestone} onDone={() => setMilestone(null)} />
     </div>
   );
 }

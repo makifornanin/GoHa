@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { goalsRepo, lifeAreasRepo, tasksRepo, type Task } from "@/db";
+import { calculateGoalProgress } from "@/lib/goal-progress";
 import { requireUser } from "@/lib/session";
 import { getUserDatePrefs } from "@/lib/user-settings";
 import {
@@ -123,11 +124,37 @@ export async function updateTaskAction(
   }
 }
 
+/**
+ * Did finishing this task just finish its GOAL?
+ *
+ * Goal progress is derived, never stored, so the only way to know a goal
+ * crossed 100% is to recompute it after the write. Runs only for a task that
+ * actually belongs to an auto-progress goal, so the common case costs nothing.
+ */
+async function goalJustCompleted(
+  userId: string,
+  task: Task,
+): Promise<{ id: string; title: string } | null> {
+  if (!task.goalId) return null;
+  const goal = await goalsRepo.getGoal(userId, task.goalId);
+  if (!goal || goal.isArchived || goal.progressMode !== "auto") return null;
+  if (goal.status === "completed") return null;
+
+  const counts = await goalsRepo.getTaskCounts(userId, goal.id);
+  const { percent } = calculateGoalProgress({
+    status: goal.status,
+    progressMode: goal.progressMode,
+    manualProgress: goal.manualProgress,
+    tasks: counts,
+  });
+  return percent === 100 ? { id: goal.id, title: goal.title } : null;
+}
+
 /** Mark a task complete, optionally capturing completion feedback in one step. */
 export async function completeTaskAction(
   id: string,
   note?: string,
-): Promise<ActionResult<Task>> {
+): Promise<ActionResult<Task> & { goalCompleted?: { id: string; title: string } }> {
   const user = await requireUser();
 
   const idResult = taskIdSchema.safeParse(id);
@@ -143,8 +170,17 @@ export async function completeTaskAction(
       completionNote: noteResult.data,
     });
     if (!task) return { ok: false, error: "That task could not be found." };
+
+    // Never let the celebration check break the completion itself.
+    let goalCompleted: { id: string; title: string } | null = null;
+    try {
+      goalCompleted = await goalJustCompleted(user.id, task);
+    } catch (error) {
+      console.error("goalJustCompleted failed", error);
+    }
+
     revalidateTaskSurfaces();
-    return { ok: true, data: task };
+    return { ok: true, data: task, ...(goalCompleted ? { goalCompleted } : {}) };
   } catch (error) {
     console.error("completeTaskAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
