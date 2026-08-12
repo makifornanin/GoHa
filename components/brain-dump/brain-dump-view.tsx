@@ -178,7 +178,11 @@ export function BrainDumpView({
           className="min-h-24 bg-transparent text-body-lg focus-visible:bg-transparent focus-visible:outline-none"
         />
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-separator p-2">
-          <div className="flex items-center gap-1.5 pl-1" role="radiogroup" aria-label="Note colour">
+          {/* The tap target is the padded button; the dot inside stays 20px.
+              Growing the dot itself would be heavy, and the shared `hit-44`
+              helper cannot be used on a tight row like this: six 36px hit areas
+              on a 26px pitch would overlap and steal each other's taps. */}
+          <div className="flex items-center" role="radiogroup" aria-label="Note colour">
             {NOTE_COLOR_KEYS.map((key) => (
               <button
                 key={key}
@@ -187,13 +191,18 @@ export function BrainDumpView({
                 aria-checked={draftColor === key}
                 aria-label={noteColorConfig[key].label}
                 onClick={() => setDraftColor(key)}
-                className={cn(
-                  "size-5 cursor-pointer rounded-full transition-transform hover:scale-110",
-                  noteColorConfig[key].swatch,
-                  draftColor === key &&
-                    "outline-solid outline-2 outline-offset-2 outline-label-tertiary",
-                )}
-              />
+                className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-blue/40"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-5 rounded-full",
+                    noteColorConfig[key].swatch,
+                    draftColor === key &&
+                      "outline-solid outline-2 outline-offset-2 outline-label-tertiary",
+                  )}
+                />
+              </button>
             ))}
           </div>
           <div className="flex items-center gap-2">

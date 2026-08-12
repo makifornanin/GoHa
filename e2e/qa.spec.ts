@@ -213,13 +213,17 @@ test("Tasks: create across views, link, complete, reflect, cancel, delete", asyn
   await d.getByRole("button", { name: "Create task" }).click();
   await expect(d).toBeHidden({ timeout: 15_000 });
 
-  // Complete one and add a reflection
+  // Complete one and add a reflection.
   // Timeframe and progress both default to "all", so the new task is
   // already on screen; there is no separate "All" view button any more.
-  await page.getByRole("checkbox", { name: "Complete Long run 12km" }).click();
-  await expect(page.getByRole("checkbox", { name: "Reopen Long run 12km" })).toBeVisible({
-    timeout: 15_000,
-  });
+  //
+  // `.first()` for the same reason as `chooseOption`: this spec seeds fixed
+  // titles and does not clean them up, so a second run against the same account
+  // legitimately has two "Long run 12km" rows. Either satisfies the assertion.
+  await page.getByRole("checkbox", { name: "Complete Long run 12km" }).first().click();
+  await expect(
+    page.getByRole("checkbox", { name: "Reopen Long run 12km" }).first(),
+  ).toBeVisible({ timeout: 15_000 });
 
   const reflect = page.getByRole("button", { name: "Add reflection" }).first();
   if (await reflect.count()) {

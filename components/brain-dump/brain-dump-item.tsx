@@ -203,12 +203,17 @@ export function BrainDumpItem({
                       onRecolor(item.id, key);
                       setPicking(false);
                     }}
-                    className={cn(
-                      "flex size-6 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110",
-                      noteColorConfig[key].swatch,
-                    )}
+                    // Padded target, 24px dot inside (see the capture bar).
+                    className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-blue/40"
                   >
-                    {selected ? <Check className="size-3.5 text-white" aria-hidden /> : null}
+                    <span
+                      className={cn(
+                        "flex size-6 items-center justify-center rounded-full",
+                        noteColorConfig[key].swatch,
+                      )}
+                    >
+                      {selected ? <Check className="size-3.5 text-white" aria-hidden /> : null}
+                    </span>
                   </button>
                 );
               })}

@@ -85,7 +85,10 @@ export function HabitsWeekGrid({
                     <button
                       type="button"
                       onClick={() => onEdit(habit.id)}
-                      className="flex max-w-full cursor-pointer items-center gap-2 text-left"
+                      // `hit-44` is safe here: the name is the only control in
+                      // its cell, so a taller hit area has no neighbour to
+                      // steal taps from (unlike the colour swatch rows).
+                      className="hit-44 flex max-w-full cursor-pointer items-center gap-2 text-left"
                     >
                       <span className={cn("size-2 shrink-0 rounded-full", color.dot)} aria-hidden />
                       <span className="truncate text-body text-label hover:text-blue">
