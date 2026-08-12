@@ -218,6 +218,7 @@ export function TaskMapsWorkspace({
                   initialNodes={graph.nodes}
                   initialEdges={graph.edges}
                   initialViewport={graph.map.viewport ?? null}
+                  initialLegend={graph.map.legend ?? null}
                   tasks={tasks}
                 />
               </div>

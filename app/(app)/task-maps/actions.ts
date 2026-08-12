@@ -8,6 +8,8 @@ import {
   createEdgeSchema,
   createNodeSchema,
   edgeIdSchema,
+  importTasksSchema,
+  legendSchema,
   moveNodesSchema,
   nodeIdSchema,
   taskMapIdSchema,
@@ -17,6 +19,8 @@ import {
   viewportSchema,
   type CreateEdgeInput,
   type CreateNodeInput,
+  type ImportTasksInput,
+  type LegendInput,
   type MoveNodesInput,
   type UpdateNodeInput,
 } from "@/lib/validations/task-maps";
@@ -148,14 +152,18 @@ export async function addNodeAction(input: CreateNodeInput): Promise<ActionResul
   const user = await requireUser();
   const parsed = createNodeSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message);
-  const { taskMapId, taskId, ...node } = parsed.data;
+  const { taskMapId, taskId, color, ...node } = parsed.data;
 
   try {
     if (!(await assertMapOwner(user.id, taskMapId))) return fail(NOT_FOUND);
     if (taskId && !(await tasksRepo.getTask(user.id, taskId))) {
       return fail("That task could not be found.");
     }
-    const created = await taskMapsRepo.createTaskMapNode(user.id, taskMapId, { ...node, taskId });
+    const created = await taskMapsRepo.createTaskMapNode(user.id, taskMapId, {
+      ...node,
+      taskId,
+      data: { color },
+    });
     return { ok: true, data: created };
   } catch (error) {
     console.error("addNodeAction failed", error);
@@ -177,7 +185,11 @@ export async function updateNodeAction(
     if (parsed.data.taskId && !(await tasksRepo.getTask(user.id, parsed.data.taskId))) {
       return fail("That task could not be found.");
     }
-    const node = await taskMapsRepo.updateTaskMapNode(user.id, idResult.data, parsed.data);
+    const { color, ...fields } = parsed.data;
+    const node = await taskMapsRepo.updateTaskMapNode(user.id, idResult.data, {
+      ...fields,
+      data: { color },
+    });
     if (!node) return fail("That node could not be found.");
     return { ok: true, data: node };
   } catch (error) {
@@ -216,6 +228,91 @@ export async function deleteNodeAction(id: string): Promise<ActionResult<{ id: s
     return { ok: true, data: { id: idResult.data } };
   } catch (error) {
     console.error("deleteNodeAction failed", error);
+    return fail(GENERIC_ERROR);
+  }
+}
+
+/**
+ * Save what the map's colours MEAN. Stored per map because "red" is a different
+ * idea on a house-move map than on a product roadmap.
+ */
+export async function saveLegendAction(
+  id: string,
+  legend: LegendInput,
+): Promise<ActionResult<{ id: string }>> {
+  const user = await requireUser();
+  const idResult = taskMapIdSchema.safeParse(id);
+  if (!idResult.success) return fail(NOT_FOUND);
+  const parsed = legendSchema.safeParse(legend);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message);
+
+  try {
+    const map = await taskMapsRepo.updateTaskMap(user.id, idResult.data, {
+      legend: parsed.data as Record<string, string>,
+    });
+    if (!map) return fail(NOT_FOUND);
+    revalidatePath("/task-maps");
+    return { ok: true, data: { id: map.id } };
+  } catch (error) {
+    console.error("saveLegendAction failed", error);
+    return fail(GENERIC_ERROR);
+  }
+}
+
+/**
+ * Drop existing tasks onto the map as linked nodes, laid out in a grid.
+ *
+ * Building a useful map one node at a time, retyping titles that already exist,
+ * was enough friction that maps stayed at three nodes and never described real
+ * work. Every id is checked against the caller's own tasks before anything is
+ * written.
+ */
+export async function importTasksAction(
+  input: ImportTasksInput,
+): Promise<ActionResult<TaskMapNode[]>> {
+  const user = await requireUser();
+  const parsed = importTasksSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message);
+  const { taskMapId, taskIds, originX, originY } = parsed.data;
+
+  try {
+    if (!(await assertMapOwner(user.id, taskMapId))) return fail(NOT_FOUND);
+
+    const owned = await Promise.all(taskIds.map((id) => tasksRepo.getTask(user.id, id)));
+    const tasks = owned.filter((t): t is NonNullable<typeof t> => t !== null);
+    if (tasks.length === 0) return fail("Those tasks could not be found.");
+
+    const COLUMNS = 4;
+    const COL_GAP = 240;
+    const ROW_GAP = 160;
+
+    const created = await Promise.all(
+      tasks.map((task, index) =>
+        taskMapsRepo.createTaskMapNode(user.id, taskMapId, {
+          nodeType: "task",
+          label: task.title,
+          taskId: task.id,
+          positionX: originX + (index % COLUMNS) * COL_GAP,
+          positionY: originY + Math.floor(index / COLUMNS) * ROW_GAP,
+          // Priority is the one thing worth colouring automatically; the user
+          // can recolour anything afterwards and rename what the colour means.
+          data: {
+            color:
+              task.priority === "urgent"
+                ? "red"
+                : task.priority === "high"
+                  ? "orange"
+                  : task.priority === "low"
+                    ? "neutral"
+                    : "blue",
+          },
+        }),
+      ),
+    );
+
+    return { ok: true, data: created };
+  } catch (error) {
+    console.error("importTasksAction failed", error);
     return fail(GENERIC_ERROR);
   }
 }

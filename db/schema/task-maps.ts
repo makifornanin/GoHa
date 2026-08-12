@@ -27,6 +27,12 @@ export const taskMaps = pgTable(
     lifeAreaId: uuid().references(() => lifeAreas.id, { onDelete: "set null" }),
     /** React Flow viewport { x, y, zoom }. */
     viewport: jsonb().$type<{ x: number; y: number; zoom: number }>(),
+    /**
+     * What each node colour MEANS on this map, keyed by colour token, e.g.
+     * `{ red: "Hard", green: "Quick win" }`. The meaning is the user's to
+     * define, so it is stored per map rather than fixed in code.
+     */
+    legend: jsonb().$type<Record<string, string>>(),
     isArchived: boolean().notNull().default(false),
     archivedAt: timestamp({ withTimezone: true }),
     ...auditTimestamps,

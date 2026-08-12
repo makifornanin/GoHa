@@ -237,7 +237,7 @@ export function BrainDumpView({
            note (measured: a 56x16 tape reporting a 411x184 border box). A grid
            has no fragmentation, and a wall of equal tiles reads more like a real
            board than ragged columns did. */
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <AnimatePresence initial={false}>
             {visible.map((item) => (
               <div key={item.id}>

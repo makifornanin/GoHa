@@ -8,16 +8,17 @@ export const metadata = { title: "To-dos" };
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; goalId?: string }>;
 }) {
   // Identity from the session; every query is user-scoped in the repositories.
   const user = await requireUser();
-  const [{ timeZone, weekStartsOn }, { new: newParam }] = await Promise.all([
+  const [{ timeZone, weekStartsOn }, { new: newParam, goalId }] = await Promise.all([
     getUserDatePrefs(user.id),
     searchParams,
   ]);
-  const [tasks, goals, lifeAreas] = await Promise.all([
+  const [tasks, subtasks, goals, lifeAreas] = await Promise.all([
     tasksRepo.listTasksForUser(user.id),
+    tasksRepo.listSubtasksForUser(user.id),
     goalsRepo.listGoals(user.id),
     lifeAreasRepo.listLifeAreas(user.id),
   ]);
@@ -25,6 +26,7 @@ export default async function TasksPage({
   return (
     <TasksView
       tasks={tasks}
+      subtasks={subtasks}
       goals={goals}
       lifeAreas={lifeAreas}
       timeZone={timeZone}
@@ -32,6 +34,9 @@ export default async function TasksPage({
       // `/tasks?new=1` opens the create form straight away, so the shell's
       // "Add Task" / "Quick Action" / mobile "+" actually open a form.
       openCreateOnMount={newParam === "1"}
+      // "Add task" from a goal's detail panel arrives with the goal preselected.
+      // Ownership is still verified server-side on submit.
+      defaultGoalId={goalId}
     />
   );
 }

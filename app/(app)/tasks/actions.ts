@@ -8,6 +8,7 @@ import { getUserDatePrefs } from "@/lib/user-settings";
 import {
   completionNoteSchema,
   makeTaskFormSchema,
+  subtaskTitleSchema,
   taskIdSchema,
   toTaskFieldErrors,
   type TaskFieldErrors,
@@ -178,6 +179,41 @@ export async function cancelTaskAction(id: string): Promise<ActionResult<Task>> 
     return { ok: true, data: task };
   } catch (error) {
     console.error("cancelTaskAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Add a checklist step to a task. The parent must belong to the caller, and a
+ * step may not itself be a parent: one level keeps the checkbox meaning
+ * "this step is done" rather than opening an unbounded tree.
+ */
+export async function createSubtaskAction(
+  parentTaskId: string,
+  title: string,
+): Promise<ActionResult<Task>> {
+  const user = await requireUser();
+
+  const idResult = taskIdSchema.safeParse(parentTaskId);
+  if (!idResult.success) return { ok: false, error: "That task could not be found." };
+
+  const titleResult = subtaskTitleSchema.safeParse(title);
+  if (!titleResult.success) {
+    return { ok: false, error: titleResult.error.issues[0]?.message ?? GENERIC_ERROR };
+  }
+
+  const parent = await tasksRepo.getTask(user.id, idResult.data);
+  if (!parent) return { ok: false, error: "That task could not be found." };
+  if (parent.parentTaskId) {
+    return { ok: false, error: "A step cannot have steps of its own." };
+  }
+
+  try {
+    const subtask = await tasksRepo.createSubtask(user.id, idResult.data, titleResult.data);
+    revalidateTaskSurfaces();
+    return { ok: true, data: subtask };
+  } catch (error) {
+    console.error("createSubtaskAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }

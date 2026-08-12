@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, isNotNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { tasks } from "../schema";
@@ -18,6 +18,7 @@ export type TaskInput = {
   description?: string | null;
   goalId?: string | null;
   lifeAreaId?: string | null;
+  parentTaskId?: string | null;
   status?: TaskStatus;
   priority?: Priority;
   scheduledFor?: string | null;
@@ -26,13 +27,32 @@ export type TaskInput = {
   sortOrder?: number;
 };
 
-/** All of a user's tasks (any status). The Tasks page filters/sorts client-side. */
+/**
+ * A user's TOP-LEVEL tasks (any status). Subtasks are deliberately excluded:
+ * they are checklist steps belonging to a parent, and every consumer of this
+ * function (the To-dos list, Today, the Focus picker, the Task Map link picker)
+ * wants real work items, not the steps inside them. Fetch those with
+ * `listSubtasksForUser`.
+ */
 export async function listTasksForUser(userId: string): Promise<Task[]> {
   return db
     .select()
     .from(tasks)
-    .where(eq(tasks.userId, userId))
+    .where(and(eq(tasks.userId, userId), isNull(tasks.parentTaskId)))
     .orderBy(asc(tasks.sortOrder), asc(tasks.scheduledFor), asc(tasks.createdAt));
+}
+
+/**
+ * Every subtask the user owns, oldest first, for grouping under their parents.
+ * One query for the whole page rather than one per opened task: a personal
+ * system's checklist steps are few, and the detail panel must open instantly.
+ */
+export async function listSubtasksForUser(userId: string): Promise<Task[]> {
+  return db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), isNotNull(tasks.parentTaskId)))
+    .orderBy(asc(tasks.sortOrder), asc(tasks.createdAt));
 }
 
 export async function getTask(userId: string, id: string): Promise<Task | null> {
@@ -42,6 +62,27 @@ export async function getTask(userId: string, id: string): Promise<Task | null> 
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Add a checklist step to a task.
+ *
+ * A subtask carries ONLY a title and its parent: no goal, no life area, no
+ * dates. That is deliberate. Goal progress and the life-area rollups count
+ * tasks by `goal_id` / `life_area_id`, so giving steps those links would inflate
+ * both denominators and make a goal look less complete the more finely its work
+ * was broken down. Steps belong to their parent; the parent belongs to the goal.
+ */
+export async function createSubtask(
+  userId: string,
+  parentTaskId: string,
+  title: string,
+): Promise<Task> {
+  const [row] = await db
+    .insert(tasks)
+    .values({ userId, parentTaskId, title })
+    .returning();
+  return row;
 }
 
 export async function createTask(userId: string, input: TaskInput): Promise<Task> {

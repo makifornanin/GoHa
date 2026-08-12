@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CalendarDays,
   Flag,
+  ListChecks,
   MessageSquarePlus,
   Pencil,
   RotateCcw,
@@ -27,9 +28,11 @@ export type TaskLifeAreaRef = { id: string; name: string; color: string | null; 
  */
 export function TaskCard({
   task,
+  subtaskCount,
   goalTitle,
   lifeArea,
   timeZone = MANILA_TZ,
+  onOpen,
   onToggleComplete,
   onEdit,
   onCancel,
@@ -37,9 +40,12 @@ export function TaskCard({
   onEditNote,
 }: {
   task: Task;
+  subtaskCount?: { done: number; total: number };
   goalTitle?: string | null;
   lifeArea?: TaskLifeAreaRef | null;
   timeZone?: string;
+  /** Open the detail panel. The card body is the trigger. */
+  onOpen?: (task: Task) => void;
   onToggleComplete: (task: Task) => void;
   onEdit: (task: Task) => void;
   onCancel: (task: Task) => void;
@@ -74,7 +80,8 @@ export function TaskCard({
       ) : null}
 
       <div className="flex items-start gap-3">
-        <div className="mt-0.5">
+        {/* Above the stretched title hit area, so ticking never opens details. */}
+        <div className="relative z-10 mt-0.5">
           <Checkbox
             checked={isCompleted}
             onToggle={() => onToggleComplete(task)}
@@ -85,14 +92,33 @@ export function TaskCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <h3
-              className={cn(
-                "text-body font-medium text-label",
-                (isCompleted || isCancelled) && "text-label-tertiary line-through",
-              )}
-            >
-              {task.title}
-            </h3>
+            {/*
+              The title is the card's trigger, stretched over the whole card via
+              `after:inset-0`. That gives one real, focusable, correctly named
+              control instead of a click handler on a div, and keeps the card
+              body a big target the way Asana's rows are.
+            */}
+            {onOpen ? (
+              <button
+                type="button"
+                onClick={() => onOpen(task)}
+                className={cn(
+                  "min-w-0 rounded-sm text-left text-body font-medium text-label after:absolute after:inset-0 after:content-[''] hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+                  (isCompleted || isCancelled) && "text-label-tertiary line-through",
+                )}
+              >
+                {task.title}
+              </button>
+            ) : (
+              <h3
+                className={cn(
+                  "text-body font-medium text-label",
+                  (isCompleted || isCancelled) && "text-label-tertiary line-through",
+                )}
+              >
+                {task.title}
+              </h3>
+            )}
             <span className={cn("shrink-0 rounded-sm px-1.5 py-0.5 text-footnote", status.badge)}>
               {status.label}
             </span>
@@ -142,6 +168,16 @@ export function TaskCard({
                 Due {dueLabel}
               </span>
             ) : null}
+
+            {subtaskCount && subtaskCount.total > 0 ? (
+              <span
+                className="inline-flex items-center gap-1 font-mono text-footnote tabular-nums text-label-secondary"
+                title={`${subtaskCount.done} of ${subtaskCount.total} steps done`}
+              >
+                <ListChecks className="size-3" aria-hidden />
+                {subtaskCount.done}/{subtaskCount.total}
+              </span>
+            ) : null}
           </div>
 
           {isCompleted && task.completionNote ? (
@@ -164,8 +200,11 @@ export function TaskCard({
           */}
           <div
             className={cn(
-              "absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-separator-opaque bg-surface p-1 opacity-0 shadow-e2 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100",
-              "[@media(hover:none)]:static [@media(hover:none)]:mt-2 [@media(hover:none)]:border-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:p-0 [@media(hover:none)]:opacity-100 [@media(hover:none)]:shadow-none",
+              "absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-separator-opaque bg-surface p-1 opacity-0 shadow-e2 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100",
+              // In flow on touch, and allowed to WRAP: four actions in a single
+              // no-wrap row ran past the edge of a phone-width card and clipped
+              // "Delete" to "Del".
+              "[@media(hover:none)]:static [@media(hover:none)]:mt-2 [@media(hover:none)]:flex-wrap [@media(hover:none)]:gap-x-1 [@media(hover:none)]:gap-y-0.5 [@media(hover:none)]:border-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:p-0 [@media(hover:none)]:opacity-100 [@media(hover:none)]:shadow-none",
             )}
           >
             <ActionButton onClick={() => onEdit(task)} icon={Pencil} label="Edit" />
@@ -211,7 +250,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-footnote font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-label focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+        "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-footnote font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-label focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
         className,
       )}
     >

@@ -1,10 +1,14 @@
 import { z } from "zod";
 
 import {
+  DEFAULT_NODE_COLOR,
+  LEGEND_LABEL_MAX,
+  NODE_COLOR_KEYS,
   NODE_LABEL_MAX,
   TASK_MAP_DESCRIPTION_MAX,
   TASK_MAP_NAME_MAX,
   TASK_MAP_NODE_TYPES,
+  type NodeColorKey,
 } from "@/lib/task-maps";
 
 export const taskMapIdSchema = z.uuid("That map could not be found.");
@@ -47,10 +51,13 @@ export const viewportSchema = z.object({
   zoom: finiteNumber,
 });
 
+export const nodeColorSchema = z.enum(NODE_COLOR_KEYS).default(DEFAULT_NODE_COLOR);
+
 export const createNodeSchema = z.object({
   taskMapId: taskMapIdSchema,
   nodeType: nodeTypeSchema.default("task"),
   label: nodeLabelSchema,
+  color: nodeColorSchema,
   taskId: z.uuid().nullish().transform((v) => v ?? null),
   positionX: finiteNumber,
   positionY: finiteNumber,
@@ -59,7 +66,41 @@ export const createNodeSchema = z.object({
 export const updateNodeSchema = z.object({
   label: nodeLabelSchema,
   nodeType: nodeTypeSchema.optional(),
+  color: nodeColorSchema,
   taskId: z.uuid().nullish().transform((v) => v ?? null),
+});
+
+/**
+ * The map's colour legend: colour key -> the user's own label.
+ *
+ * Keyed by plain string and narrowed afterwards, NOT by `z.enum(...)`: in Zod 4
+ * an enum-keyed record is exhaustive, so naming a single colour failed with
+ * "expected string, received undefined" for every colour left blank. Unknown
+ * keys are dropped here rather than rejected, so the canvas is never asked to
+ * render a colour it has no styling for.
+ */
+export const legendSchema = z
+  .record(
+    z.string(),
+    z
+      .string()
+      .trim()
+      .max(LEGEND_LABEL_MAX, `Keep each label under ${LEGEND_LABEL_MAX} characters.`),
+  )
+  .transform((raw) =>
+    Object.fromEntries(
+      Object.entries(raw).filter(
+        ([key, value]) => NODE_COLOR_KEYS.includes(key as NodeColorKey) && value.length > 0,
+      ),
+    ),
+  );
+
+/** Bulk-import existing tasks onto a map as linked nodes. */
+export const importTasksSchema = z.object({
+  taskMapId: taskMapIdSchema,
+  taskIds: z.array(z.uuid()).min(1, "Choose at least one task.").max(100),
+  originX: finiteNumber,
+  originY: finiteNumber,
 });
 
 export const moveNodesSchema = z.object({
@@ -89,5 +130,7 @@ export const createEdgeSchema = z
 
 export type CreateNodeInput = z.input<typeof createNodeSchema>;
 export type UpdateNodeInput = z.input<typeof updateNodeSchema>;
+export type ImportTasksInput = z.input<typeof importTasksSchema>;
+export type LegendInput = z.input<typeof legendSchema>;
 export type MoveNodesInput = z.input<typeof moveNodesSchema>;
 export type CreateEdgeInput = z.input<typeof createEdgeSchema>;

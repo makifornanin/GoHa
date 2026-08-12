@@ -1,15 +1,21 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, Ref } from "react";
 
 import { cn } from "@/lib/utils";
 
 /**
  * Input per spec section 8: height 32, padding-x 10, radius 10, filled-field
- * style (surface-secondary, no border at rest). Focus: 3px blue ring at 40%
+ * style (a translucent fill, no border at rest). Focus: 3px blue ring at 40%
  * and the background lifts to surface.
  */
-export function Input({ className, type, ...props }: ComponentProps<"input">) {
+export function Input({
+  className,
+  type,
+  ref,
+  ...props
+}: ComponentProps<"input"> & { ref?: Ref<HTMLInputElement> }) {
   return (
     <input
+      ref={ref}
       type={type}
       data-slot="input"
       className={cn(

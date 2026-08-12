@@ -116,7 +116,7 @@ export function LifeAreasView({ areas }: { areas: LifeAreaWithCounts[] }) {
           variants={listContainer}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
         >
           {optimisticAreas.map((area) => (
             <motion.div key={area.id} variants={listItem} layout className="h-full">

@@ -37,9 +37,10 @@ test("capture a brain dump item and convert it to a task", async ({ page }) => {
     page.getByTestId("brain-dump-item").filter({ hasText: content }),
   ).toContainText("→ Task");
 
-  // The Task exists in To-dos (filters default to showing everything).
+  // The Task exists in To-dos (filters default to showing everything). The
+  // card's title is a BUTTON, not a heading: it opens the task's detail panel.
   await page.goto("/tasks");
-  await expect(page.getByRole("heading", { name: content })).toBeVisible({
+  await expect(page.getByRole("button", { name: content, exact: true })).toBeVisible({
     timeout: 15_000,
   });
 });

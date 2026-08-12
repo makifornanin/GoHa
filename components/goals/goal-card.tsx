@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Archive, CalendarDays, CheckCircle2, CornerDownRight, Pencil } from "lucide-react";
+import { Archive, CalendarDays, CheckCircle2, CornerDownRight, Pencil, Target } from "lucide-react";
 
 import { LifeAreaIcon } from "@/components/life-areas/icon";
 import type { GoalWithCounts } from "@/db/repositories/goals";
@@ -25,12 +25,17 @@ export function GoalCard({
   goal,
   lifeArea,
   parentTitle,
+  subGoalCount = 0,
+  onOpen,
   onEdit,
   onArchive,
 }: {
   goal: GoalWithCounts;
   lifeArea?: LifeAreaRef | null;
   parentTitle?: string | null;
+  subGoalCount?: number;
+  /** Open the detail panel. The title is the trigger, stretched over the card. */
+  onOpen?: (goal: GoalWithCounts) => void;
   onEdit: (goal: GoalWithCounts) => void;
   onArchive: (goal: GoalWithCounts) => void;
 }) {
@@ -77,7 +82,7 @@ export function GoalCard({
           </span>
         )}
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => onEdit(goal)}
@@ -104,7 +109,17 @@ export function GoalCard({
         </p>
       ) : null}
 
-      <h3 className="mt-3 text-headline text-label">{goal.title}</h3>
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={() => onOpen(goal)}
+          className="mt-3 rounded-sm text-left text-headline text-label after:absolute after:inset-0 after:content-[''] hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+        >
+          {goal.title}
+        </button>
+      ) : (
+        <h3 className="mt-3 text-headline text-label">{goal.title}</h3>
+      )}
       {goal.description ? (
         <p className="mt-1 line-clamp-2 text-callout text-label-secondary">{goal.description}</p>
       ) : null}
@@ -136,12 +151,20 @@ export function GoalCard({
               {goal.completedTasks}/{countedTasks}
             </span>
           </span>
-          {dueLabel ? (
-            <span className="inline-flex items-center gap-1.5" title="Target date">
-              <CalendarDays className="size-3.5" aria-hidden />
-              <span className="font-mono tabular-nums">{dueLabel}</span>
-            </span>
-          ) : null}
+          <span className="flex items-center gap-3">
+            {subGoalCount > 0 ? (
+              <span className="inline-flex items-center gap-1.5" title="Sub-goals">
+                <Target className="size-3.5" aria-hidden />
+                <span className="font-mono tabular-nums">{subGoalCount}</span>
+              </span>
+            ) : null}
+            {dueLabel ? (
+              <span className="inline-flex items-center gap-1.5" title="Target date">
+                <CalendarDays className="size-3.5" aria-hidden />
+                <span className="font-mono tabular-nums">{dueLabel}</span>
+              </span>
+            ) : null}
+          </span>
         </div>
       </div>
     </div>

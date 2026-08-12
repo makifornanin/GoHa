@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { Plus, Target } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -13,13 +14,14 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import type { GoalWithCounts } from "@/db/repositories/goals";
-import type { LifeArea } from "@/db";
+import type { LifeArea, Task } from "@/db";
 import { GOAL_TIMEFRAME_ORDER, goalTimeframeConfig } from "@/lib/goals";
 import type { GoalTimeframe } from "@/db/schema/enums";
 import type { GoalFormInput } from "@/lib/validations/goal";
 import { cn } from "@/lib/utils";
 
 import { GoalCard } from "./goal-card";
+import { GoalDetailPanel } from "./goal-detail-panel";
 import { GoalFormModal, type LifeAreaOption, type ParentOption } from "./goal-form-modal";
 
 type TabKey = "all" | GoalTimeframe;
@@ -48,11 +50,21 @@ function descendantIds(goals: GoalWithCounts[], rootId: string): Set<string> {
   return result;
 }
 
-export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeAreas: LifeArea[] }) {
+export function GoalsView({
+  goals,
+  lifeAreas,
+  tasks = [],
+}: {
+  goals: GoalWithCounts[];
+  lifeAreas: LifeArea[];
+  tasks?: Task[];
+}) {
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<GoalWithCounts | null>(null);
   const [archiving, setArchiving] = useState<GoalWithCounts | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const [optimisticGoals, removeOptimistically] = useOptimistic(
@@ -75,6 +87,24 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
 
   const visibleGoals = optimisticGoals.filter(
     (goal) => tab === "all" || goal.timeframe === tab,
+  );
+
+  const subGoalCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const goal of optimisticGoals) {
+      if (goal.parentGoalId) map.set(goal.parentGoalId, (map.get(goal.parentGoalId) ?? 0) + 1);
+    }
+    return map;
+  }, [optimisticGoals]);
+
+  const detailGoal = detailId ? optimisticGoals.find((g) => g.id === detailId) ?? null : null;
+  const detailSubGoals = useMemo(
+    () => (detailId ? optimisticGoals.filter((g) => g.parentGoalId === detailId) : []),
+    [optimisticGoals, detailId],
+  );
+  const detailTasks = useMemo(
+    () => (detailId ? tasks.filter((t) => t.goalId === detailId) : []),
+    [tasks, detailId],
   );
 
   const parentOptions: ParentOption[] = useMemo(() => {
@@ -186,7 +216,7 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
             variants={listContainer}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
           >
             {visibleGoals.map((goal) => (
               <motion.div key={goal.id} variants={listItem} layout>
@@ -194,6 +224,8 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
                   goal={goal}
                   lifeArea={goal.lifeAreaId ? lifeAreaMap.get(goal.lifeAreaId) ?? null : null}
                   parentTitle={goal.parentGoalId ? goalTitleById.get(goal.parentGoalId) ?? null : null}
+                  subGoalCount={subGoalCounts.get(goal.id) ?? 0}
+                  onOpen={(g) => setDetailId(g.id)}
                   onEdit={openEdit}
                   onArchive={setArchiving}
                 />
@@ -216,6 +248,22 @@ export function GoalsView({ goals, lifeAreas }: { goals: GoalWithCounts[]; lifeA
           </motion.div>
         </div>
       )}
+
+      <GoalDetailPanel
+        goal={detailGoal}
+        subGoals={detailSubGoals}
+        tasks={detailTasks}
+        lifeAreas={lifeAreas}
+        onClose={() => setDetailId(null)}
+        onEdit={(goal) => {
+          setDetailId(null);
+          openEdit(goal);
+        }}
+        onOpenSubGoal={(goal) => setDetailId(goal.id)}
+        // Creating the task where it belongs: the To-dos form opens with this
+        // goal already selected, so the link is never forgotten.
+        onAddTask={(goal) => router.push(`/tasks?new=1&goalId=${goal.id}`)}
+      />
 
       <GoalFormModal
         open={formOpen}

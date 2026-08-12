@@ -1,3 +1,4 @@
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { check, date, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -27,6 +28,13 @@ export const tasks = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     goalId: uuid().references(() => goals.id, { onDelete: "set null" }),
     lifeAreaId: uuid().references(() => lifeAreas.id, { onDelete: "set null" }),
+    /**
+     * Subtask parent. A checklist step that only exists as part of its parent,
+     * so it CASCADES: deleting the parent removes its steps rather than leaving
+     * them orphaned at the top level. One level deep by convention (the UI never
+     * offers a subtask of a subtask); goal hierarchy is the tool for real depth.
+     */
+    parentTaskId: uuid().references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
     title: text().notNull(),
     description: text(),
     status: taskStatus().notNull().default("todo"),
@@ -48,6 +56,8 @@ export const tasks = pgTable(
     index("tasks_user_due_at_idx").on(t.userId, t.dueAt),
     index("tasks_goal_id_idx").on(t.goalId),
     index("tasks_life_area_id_idx").on(t.lifeAreaId),
+    index("tasks_parent_task_id_idx").on(t.parentTaskId),
+    check("tasks_no_self_parent", sql`${t.parentTaskId} is null or ${t.parentTaskId} <> ${t.id}`),
     check(
       "tasks_estimate_minutes_positive",
       sql`${t.estimateMinutes} is null or ${t.estimateMinutes} > 0`,

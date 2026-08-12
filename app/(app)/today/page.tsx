@@ -15,8 +15,9 @@ export default async function TodayPage() {
   const now = new Date();
   const today = zonedToday(now, timeZone);
 
-  const [tasks, goals, priorities, habits, habitEntries, lifeAreas] = await Promise.all([
+  const [tasks, subtasks, goals, priorities, habits, habitEntries, lifeAreas] = await Promise.all([
     tasksRepo.listTasksForUser(user.id),
+    tasksRepo.listSubtasksForUser(user.id),
     goalsRepo.listGoalsWithTaskCounts(user.id),
     dailyPrioritiesRepo.listDailyPriorities(user.id, today),
     habitsRepo.listHabitsWithSchedule(user.id),
@@ -37,6 +38,7 @@ export default async function TodayPage() {
         today={today}
         timeZone={timeZone}
         tasks={tasks}
+        subtasks={subtasks}
         goals={goals}
         priorities={priorities}
         habits={habits}

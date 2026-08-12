@@ -37,12 +37,14 @@ export function TopPriorities({
   priorities,
   candidates,
   onToggle,
+  onOpen,
   onAdd,
   onRemove,
 }: {
   priorities: ResolvedPriority[];
   candidates: Task[];
   onToggle: (task: Task) => void;
+  onOpen?: (task: Task) => void;
   onAdd: (taskId: string) => void;
   onRemove: (priorityId: string) => void;
 }) {
@@ -78,6 +80,7 @@ export function TopPriorities({
                   <TaskChecklistItem
                     task={task}
                     onToggle={onToggle}
+                    onOpen={onOpen}
                     meta={<PriorityChip task={task} />}
                     onRemove={() => onRemove(priority.id)}
                     removeLabel={`Unpin ${task.title}`}

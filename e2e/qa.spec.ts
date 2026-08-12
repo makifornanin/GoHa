@@ -31,10 +31,17 @@ function watch(page: Page, area: string) {
   page.on("pageerror", (e) => consoleProblems.push(`[${area}] UNCAUGHT ${e.message.slice(0, 200)}`));
 }
 
-/** The custom Select is a combobox button; its options are portaled to <body>. */
+/**
+ * The custom Select is a combobox button; its options are portaled to <body>.
+ *
+ * `.first()` because this spec seeds fixed names ("Health & Fitness", ...) and
+ * does not clean them up, so a second run against the same account legitimately
+ * offers two identical options. Picking either satisfies the assertion; failing
+ * on strict mode only reported that the suite had been run twice.
+ */
 async function chooseOption(page: Page, triggerSelector: string, optionLabel: string) {
   await page.locator(triggerSelector).click();
-  await page.getByRole("option", { name: optionLabel, exact: true }).click();
+  await page.getByRole("option", { name: optionLabel, exact: true }).first().click();
 }
 
 async function shot(page: Page, name: string) {
@@ -281,8 +288,15 @@ test("Habits: boolean + numeric, schedules, logging", async ({ page }) => {
   await expect(page.getByText("Morning meditation").first()).toBeVisible();
   await expect(page.getByText("Drink water").first()).toBeVisible();
 
-  // Log the boolean habit as done
-  const done = page.getByRole("button", { name: "Mark done" }).first();
+  // Log the boolean habit as done. Scoped to the row for the habit this test
+  // just created: `.first()` picked whichever habit happened to sit at the top
+  // of today's list, which on a re-used account is one seeded by another spec.
+  const meditationRow = page
+    .locator("li")
+    .filter({ hasText: "Morning meditation" })
+    .filter({ has: page.getByRole("button", { name: "Mark done" }) })
+    .first();
+  const done = meditationRow.getByRole("button", { name: "Mark done" });
   await done.click();
   await expect(done).toHaveAttribute("aria-pressed", "true", { timeout: 15_000 });
   record("Habits", "NOTE", "Boolean habit logging toggles and persists.");

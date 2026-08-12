@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   cancelTaskAction,
   completeTaskAction,
+  createSubtaskAction,
   createTaskAction,
   deleteTaskAction,
   reopenTaskAction,
@@ -39,6 +40,7 @@ import type { TaskFormInput } from "@/lib/validations/task";
 import { CompletionNoteModal } from "./completion-note-modal";
 import { TaskCalendar } from "./task-calendar";
 import { TaskCard } from "./task-card";
+import { TaskDetailPanel } from "./task-detail-panel";
 import { TaskFormModal } from "./task-form-modal";
 
 /** WHEN. One dropdown instead of a column of mutually exclusive buttons. */
@@ -99,18 +101,22 @@ function sortTasks(list: Task[], sort: SortKey): Task[] {
 
 export function TasksView({
   tasks,
+  subtasks = [],
   goals,
   lifeAreas,
   timeZone = MANILA_TZ,
   weekStartsOn = 1,
   openCreateOnMount = false,
+  defaultGoalId,
 }: {
   tasks: Task[];
+  subtasks?: Task[];
   goals: Goal[];
   lifeAreas: LifeArea[];
   timeZone?: string;
   weekStartsOn?: Weekday;
   openCreateOnMount?: boolean;
+  defaultGoalId?: string;
 }) {
   const [layout, setLayout] = useState<"list" | "calendar">("list");
   const [timeframe, setTimeframe] = useState<TaskTimeframeKey>("all");
@@ -122,6 +128,7 @@ export function TasksView({
   const [createDate, setCreateDate] = useState<string | undefined>(undefined);
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   // Live, not frozen at mount: lateness and the date buckets below are derived
@@ -136,6 +143,19 @@ export function TasksView({
         : t,
     );
   });
+
+  /** done/total steps per parent, so a card can show its checklist at a glance. */
+  const subtaskCounts = useMemo(() => {
+    const map = new Map<string, { done: number; total: number }>();
+    for (const s of subtasks) {
+      if (!s.parentTaskId) continue;
+      const entry = map.get(s.parentTaskId) ?? { done: 0, total: 0 };
+      entry.total += 1;
+      if (s.status === "completed") entry.done += 1;
+      map.set(s.parentTaskId, entry);
+    }
+    return map;
+  }, [subtasks]);
 
   const goalTitleById = useMemo(() => new Map(goals.map((g) => [g.id, g.title])), [goals]);
   const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
@@ -305,8 +325,49 @@ export function TasksView({
     return result;
   }
 
+  /**
+   * The panel reads its task from the LIVE list, not from a snapshot taken when
+   * it opened. Holding the task object itself left the panel showing stale
+   * values after a save (the list re-rendered from the server; the panel did
+   * not), so an id is the only thing worth remembering.
+   */
+  const detailTask = detailId ? optimisticTasks.find((t) => t.id === detailId) ?? null : null;
+  const detailSubtasks = useMemo(
+    () => (detailId ? subtasks.filter((s) => s.parentTaskId === detailId) : []),
+    [subtasks, detailId],
+  );
+
+  const detailHandlers = {
+    onSave: (id: string, values: TaskFormInput) => updateTaskAction(id, values),
+    onToggleComplete: handleToggleComplete,
+    onAddSubtask: (parentId: string, title: string) => createSubtaskAction(parentId, title),
+    onToggleSubtask: (subtask: Task) =>
+      startTransition(async () => {
+        const result =
+          subtask.status === "completed"
+            ? await reopenTaskAction(subtask.id)
+            : await completeTaskAction(subtask.id);
+        if (!result.ok) toast.error(result.error);
+      }),
+    onDeleteSubtask: (subtask: Task) =>
+      startTransition(async () => {
+        const result = await deleteTaskAction(subtask.id);
+        if (!result.ok) toast.error(result.error);
+      }),
+    onDelete: setDeleting,
+  };
+
   const modals = (
     <>
+      <TaskDetailPanel
+        task={detailTask}
+        subtasks={detailSubtasks}
+        goals={goals}
+        lifeAreas={lifeAreas}
+        timeZone={timeZone}
+        onClose={() => setDetailId(null)}
+        handlers={detailHandlers}
+      />
       <TaskFormModal
         open={formOpen}
         mode={editing ? "edit" : "create"}
@@ -316,6 +377,7 @@ export function TasksView({
         defaultScheduledFor={
           editing ? undefined : (createDate ?? (timeframe === "today" ? zonedToday(now, timeZone) : undefined))
         }
+        defaultGoalId={editing ? undefined : defaultGoalId}
         timeZone={timeZone}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
@@ -495,9 +557,11 @@ export function TasksView({
             <motion.li key={task.id} variants={listItem} layout>
               <TaskCard
                 task={task}
+                subtaskCount={subtaskCounts.get(task.id)}
                 goalTitle={task.goalId ? goalTitleById.get(task.goalId) ?? null : null}
                 lifeArea={task.lifeAreaId ? lifeAreaById.get(task.lifeAreaId) ?? null : null}
                 timeZone={timeZone}
+                onOpen={(t) => setDetailId(t.id)}
                 onToggleComplete={handleToggleComplete}
                 onEdit={openEdit}
                 onCancel={handleCancel}

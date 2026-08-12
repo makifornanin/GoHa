@@ -52,6 +52,8 @@ type FormProps = {
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
+  /** Preselected goal for a new task (e.g. "Add task" from a goal's details). */
+  defaultGoalId?: string;
   /** The user's saved timezone: due-at wall-clock times are shown/read in it. */
   timeZone?: string;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
@@ -65,6 +67,7 @@ function TaskFormFields({
   goals,
   lifeAreas,
   defaultScheduledFor,
+  defaultGoalId,
   timeZone = MANILA_TZ,
   onSubmit,
   onClose,
@@ -72,7 +75,7 @@ function TaskFormFields({
 }: FormProps) {
   const [title, setTitle] = useState(() => task?.title ?? "");
   const [description, setDescription] = useState(() => task?.description ?? "");
-  const [goalId, setGoalId] = useState(() => task?.goalId ?? "");
+  const [goalId, setGoalId] = useState(() => task?.goalId ?? defaultGoalId ?? "");
   const [lifeAreaId, setLifeAreaId] = useState(() => task?.lifeAreaId ?? "");
   const [status, setStatus] = useState<TaskStatus>(() => task?.status ?? "todo");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
@@ -258,6 +261,7 @@ export function TaskFormModal({
   goals,
   lifeAreas,
   defaultScheduledFor,
+  defaultGoalId,
   timeZone,
   onSubmit,
   onClose,
@@ -268,6 +272,8 @@ export function TaskFormModal({
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
+  /** Preselected goal for a new task (e.g. "Add task" from a goal's details). */
+  defaultGoalId?: string;
   timeZone?: string;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
   onClose: () => void;
@@ -291,6 +297,7 @@ export function TaskFormModal({
         goals={goals}
         lifeAreas={lifeAreas}
         defaultScheduledFor={defaultScheduledFor}
+        defaultGoalId={defaultGoalId}
         timeZone={timeZone}
         onSubmit={onSubmit}
         onClose={onClose}

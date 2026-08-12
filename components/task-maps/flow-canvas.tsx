@@ -23,7 +23,19 @@ import {
   type NodeProps,
   type OnNodeDrag,
 } from "@xyflow/react";
-import { ExternalLink, Link2, Plus, StickyNote, Target, Trash2 } from "lucide-react";
+import {
+  Boxes,
+  Check,
+  Download,
+  ExternalLink,
+  Link2,
+  Palette,
+  Plus,
+  Search,
+  StickyNote,
+  Target,
+  Trash2,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
@@ -34,10 +46,17 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { TaskMapEdge, TaskMapNode } from "@/db/types";
 import {
+  DEFAULT_NODE_COLOR,
   DEFAULT_NODE_LABEL,
+  LEGEND_LABEL_MAX,
+  NODE_COLOR_KEYS,
   NODE_TYPE_LABELS,
+  nodeColorConfig,
+  nodeColorOf,
   POSITION_SAVE_DEBOUNCE_MS,
+  SUGGESTED_LEGEND,
   TASK_MAP_NODE_TYPES,
+  type NodeColorKey,
   type TaskMapNodeTypeValue,
 } from "@/lib/task-maps";
 import { cn } from "@/lib/utils";
@@ -46,7 +65,9 @@ import {
   addNodeAction,
   deleteEdgeAction,
   deleteNodeAction,
+  importTasksAction,
   moveNodesAction,
+  saveLegendAction,
   saveViewportAction,
   updateNodeAction,
 } from "@/app/(app)/task-maps/actions";
@@ -57,6 +78,9 @@ type GohaNodeData = {
   label: string;
   nodeType: TaskMapNodeTypeValue;
   taskId: string | null;
+  color: NodeColorKey;
+  /** What this colour means on this map, if the user has named it. */
+  colorMeaning?: string;
 };
 type GohaNode = Node<GohaNodeData, "goha">;
 
@@ -67,15 +91,33 @@ const NODE_CHIP: Record<TaskMapNodeTypeValue, string> = {
   group: "bg-gray-5 text-label-secondary",
 };
 
-/** Custom node: a card matching the design's step/note tiles, with connect handles. */
+/**
+ * Custom node. The colour is the node's own, tinting its surface, border and a
+ * top rail, so a glance across the canvas reads as a map of what is hard, quick
+ * or blocked rather than a wall of identical cards.
+ */
 function GohaNodeView({ data, selected }: NodeProps<GohaNode>) {
+  const color = nodeColorConfig[data.color];
+  const isNeutral = data.color === "neutral";
+
   return (
     <div
+      // NOT `overflow-hidden`: React Flow's connect handles sit ON the node's
+      // edges and are clipped by it, which silently made nodes impossible to
+      // connect. The colour rail rounds its own corners instead.
       className={cn(
-        "w-48 rounded-xl border bg-surface p-3 shadow-e2 transition-shadow",
-        selected ? "border-blue ring-[3px] ring-blue/40" : "border-separator-opaque",
+        "relative w-48 rounded-xl border p-3 shadow-e2 transition-shadow",
+        isNeutral ? "bg-surface" : color.tint,
+        selected ? "border-blue ring-[3px] ring-blue/40" : color.border,
       )}
+      title={data.colorMeaning ? `${color.label}: ${data.colorMeaning}` : undefined}
     >
+      {!isNeutral ? (
+        <span
+          className={cn("absolute inset-x-0 top-0 h-1 rounded-t-[11px]", color.dot)}
+          aria-hidden
+        />
+      ) : null}
       <Handle type="target" position={Position.Top} className="!size-2 !border !border-surface !bg-blue" />
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className={cn("rounded-full px-2 py-0.5 text-footnote", NODE_CHIP[data.nodeType])}>
@@ -86,6 +128,9 @@ function GohaNodeView({ data, selected }: NodeProps<GohaNode>) {
       <p className="line-clamp-3 break-words text-body text-label">
         {data.label || DEFAULT_NODE_LABEL}
       </p>
+      {data.colorMeaning ? (
+        <p className="mt-1.5 truncate text-footnote text-label-secondary">{data.colorMeaning}</p>
+      ) : null}
       <Handle type="source" position={Position.Bottom} className="!size-2 !border !border-surface !bg-blue" />
     </div>
   );
@@ -121,7 +166,8 @@ const EDGE_OPTIONS = {
   style: { stroke: "var(--gray-2)", strokeWidth: 2 },
 };
 
-function dbNodeToFlow(n: TaskMapNode): GohaNode {
+function dbNodeToFlow(n: TaskMapNode, legend: Record<string, string> = {}): GohaNode {
+  const color = nodeColorOf(n.data);
   return {
     id: n.id,
     type: "goha",
@@ -130,6 +176,8 @@ function dbNodeToFlow(n: TaskMapNode): GohaNode {
       label: n.label ?? DEFAULT_NODE_LABEL,
       nodeType: n.nodeType,
       taskId: n.taskId,
+      color,
+      colorMeaning: legend[color] || undefined,
     },
   };
 }
@@ -149,17 +197,24 @@ function FlowCanvasInner({
   initialNodes,
   initialEdges,
   initialViewport,
+  initialLegend,
   tasks,
 }: {
   taskMapId: string;
   initialNodes: TaskMapNode[];
   initialEdges: TaskMapEdge[];
   initialViewport: { x: number; y: number; zoom: number } | null;
+  initialLegend: Record<string, string> | null;
   tasks: TaskOption[];
 }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<GohaNode>(initialNodes.map(dbNodeToFlow));
+  const [legend, setLegend] = useState<Record<string, string>>(initialLegend ?? {});
+  const [nodes, setNodes, onNodesChange] = useNodesState<GohaNode>(
+    initialNodes.map((n) => dbNodeToFlow(n, initialLegend ?? {})),
+  );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges.map(dbEdgeToFlow));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [isAdding, startAdd] = useTransition();
   const { screenToFlowPosition } = useReactFlow();
   const { resolvedTheme } = useTheme();
@@ -271,6 +326,7 @@ function FlowCanvasInner({
           taskMapId,
           nodeType,
           label: NODE_TYPE_LABELS[nodeType],
+          color: DEFAULT_NODE_COLOR,
           positionX: position.x,
           positionY: position.y,
         });
@@ -278,16 +334,75 @@ function FlowCanvasInner({
           toast.error(res.error);
           return;
         }
-        setNodes((nds) => nds.concat(dbNodeToFlow(res.data)));
+        setNodes((nds) => nds.concat(dbNodeToFlow(res.data, legend)));
         setSelectedId(res.data.id);
       });
     },
-    [taskMapId, screenToFlowPosition, setNodes],
+    [taskMapId, screenToFlowPosition, setNodes, legend],
+  );
+
+  /** Drop a batch of existing tasks onto the canvas as linked nodes. */
+  const importTasks = useCallback(
+    (taskIds: string[]) => {
+      const wrapper = wrapperRef.current;
+      const rect = wrapper?.getBoundingClientRect();
+      const viewOrigin = rect
+        ? screenToFlowPosition({ x: rect.left + 80, y: rect.top + 80 })
+        : { x: 0, y: 0 };
+      // Land BELOW whatever is already on the canvas. Importing into the
+      // viewport's corner every time dropped each batch straight on top of the
+      // last one, so a second import looked like it had done nothing.
+      const lowest = nodes.reduce((max, n) => Math.max(max, n.position.y), Number.NEGATIVE_INFINITY);
+      const origin = {
+        x: viewOrigin.x,
+        y: nodes.length > 0 ? lowest + 200 : viewOrigin.y,
+      };
+      startAdd(async () => {
+        const res = await importTasksAction({
+          taskMapId,
+          taskIds,
+          originX: origin.x,
+          originY: origin.y,
+        });
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        setNodes((nds) => nds.concat(res.data.map((n) => dbNodeToFlow(n, legend))));
+        setImportOpen(false);
+        toast.success(`Added ${res.data.length} ${res.data.length === 1 ? "task" : "tasks"} to the map.`);
+      });
+    },
+    [taskMapId, screenToFlowPosition, setNodes, legend, nodes],
+  );
+
+  /** Persist the colour legend and re-label every node that uses those colours. */
+  const saveLegend = useCallback(
+    async (next: Record<string, string>) => {
+      setLegend(next);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: { ...n.data, colorMeaning: next[n.data.color] || undefined },
+        })),
+      );
+      const res = await saveLegendAction(taskMapId, next);
+      if (!res.ok) toast.error(res.error);
+    },
+    [taskMapId, setNodes],
   );
 
   // --- Edit / delete a single node from the inspector ---
   const saveNode = useCallback(
-    (id: string, input: { label: string; nodeType: TaskMapNodeTypeValue; taskId: string | null }) =>
+    (
+      id: string,
+      input: {
+        label: string;
+        nodeType: TaskMapNodeTypeValue;
+        taskId: string | null;
+        color: NodeColorKey;
+      },
+    ) =>
       updateNodeAction(id, input).then((res) => {
         if (!res.ok) {
           toast.error(res.error);
@@ -295,21 +410,15 @@ function FlowCanvasInner({
         }
         setNodes((nds) =>
           nds.map((n) =>
-            n.id === id
-              ? {
-                  ...n,
-                  data: {
-                    label: res.data.label ?? DEFAULT_NODE_LABEL,
-                    nodeType: res.data.nodeType,
-                    taskId: res.data.taskId,
-                  },
-                }
-              : n,
+            // Keep the on-canvas position: a drag may not have flushed to the
+            // database yet, and taking the server's coordinates here would snap
+            // the node back to where it was before the user moved it.
+            n.id === id ? { ...dbNodeToFlow(res.data, legend), position: n.position } : n,
           ),
         );
         toast.success("Node saved.");
       }),
-    [setNodes],
+    [setNodes, legend],
   );
 
   const deleteNode = useCallback(
@@ -370,7 +479,7 @@ function FlowCanvasInner({
           maskColor="color-mix(in oklab, var(--surface) 55%, transparent)"
         />
         <Panel position="top-center">
-          <div className="glass-regular flex items-center gap-1 rounded-full p-1 shadow-e2">
+          <div className="glass-regular flex flex-wrap items-center gap-1 rounded-full p-1 shadow-e2">
             <button type="button" onClick={() => addNode("task")} disabled={isAdding} className={toolbarButton}>
               <Plus className="size-4" aria-hidden /> Task
             </button>
@@ -380,15 +489,57 @@ function FlowCanvasInner({
             <button type="button" onClick={() => addNode("milestone")} disabled={isAdding} className={toolbarButton}>
               <Target className="size-4" aria-hidden /> Milestone
             </button>
+            <button type="button" onClick={() => addNode("group")} disabled={isAdding} className={toolbarButton}>
+              <Boxes className="size-4" aria-hidden /> Group
+            </button>
+
+            <span className="mx-1 h-4 w-px bg-separator" aria-hidden />
+
+            {/* The fast way to a map with real work on it. */}
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              disabled={isAdding || tasks.length === 0}
+              className={toolbarButton}
+              title={tasks.length === 0 ? "No tasks to import yet" : "Add existing tasks to this map"}
+            >
+              <Download className="size-4" aria-hidden /> Import tasks
+            </button>
+            <button
+              type="button"
+              onClick={() => setLegendOpen((v) => !v)}
+              className={cn(toolbarButton, legendOpen && "text-blue")}
+            >
+              <Palette className="size-4" aria-hidden /> Legend
+            </button>
           </div>
         </Panel>
+
+        {legendOpen ? (
+          <Panel position="top-left">
+            <LegendEditor legend={legend} onSave={saveLegend} onClose={() => setLegendOpen(false)} />
+          </Panel>
+        ) : (
+          <LegendKey legend={legend} />
+        )}
       </ReactFlow>
+
+      {importOpen ? (
+        <ImportTasksDialog
+          tasks={tasks}
+          alreadyOnMap={new Set(nodes.map((n) => n.data.taskId).filter(Boolean) as string[])}
+          busy={isAdding}
+          onImport={importTasks}
+          onClose={() => setImportOpen(false)}
+        />
+      ) : null}
 
       {selectedNode ? (
         <NodeInspector
           key={selectedNode.id}
           node={selectedNode}
           tasks={tasks}
+          legend={legend}
           onSave={saveNode}
           onDelete={deleteNode}
           onClose={() => setSelectedId(null)}
@@ -398,20 +549,234 @@ function FlowCanvasInner({
   );
 }
 
+/**
+ * Name what each colour means on THIS map. Empty labels are dropped, so an
+ * unused colour never clutters the key.
+ */
+function LegendEditor({
+  legend,
+  onSave,
+  onClose,
+}: {
+  legend: Record<string, string>;
+  onSave: (next: Record<string, string>) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>(legend);
+
+  function commit(next: Record<string, string>) {
+    const cleaned = Object.fromEntries(
+      Object.entries(next)
+        .map(([k, v]) => [k, v.trim()])
+        .filter(([, v]) => v.length > 0),
+    );
+    void onSave(cleaned);
+  }
+
+  return (
+    <aside className="glass-regular flex w-64 flex-col gap-2 rounded-2xl p-3 shadow-e3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-headline text-label">What colours mean</h3>
+        <button
+          type="button"
+          onClick={() => {
+            commit(draft);
+            onClose();
+          }}
+          className="hit-44 cursor-pointer rounded-md px-2 text-footnote font-medium text-blue hover:underline"
+        >
+          Done
+        </button>
+      </div>
+      <p className="text-footnote text-label-secondary">
+        Yours to define. Leave one blank to hide it.
+      </p>
+
+      {NODE_COLOR_KEYS.filter((key) => key !== "neutral").map((key) => (
+        <label key={key} className="flex items-center gap-2">
+          <span className={cn("size-4 shrink-0 rounded-full", nodeColorConfig[key].swatch)} aria-hidden />
+          <input
+            value={draft[key] ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+            onBlur={() => commit(draft)}
+            maxLength={LEGEND_LABEL_MAX}
+            placeholder={SUGGESTED_LEGEND[key] ?? nodeColorConfig[key].label}
+            aria-label={`What ${nodeColorConfig[key].label} means`}
+            className="h-7 w-full min-w-0 rounded-md bg-fill-tertiary px-2 text-callout text-label placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+          />
+        </label>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(SUGGESTED_LEGEND);
+          commit(SUGGESTED_LEGEND);
+        }}
+        className="mt-1 cursor-pointer self-start text-footnote font-medium text-blue hover:underline"
+      >
+        Use suggested labels
+      </button>
+    </aside>
+  );
+}
+
+/** The read-only key, shown on the canvas once colours have been named. */
+function LegendKey({ legend }: { legend: Record<string, string> }) {
+  const entries = NODE_COLOR_KEYS.filter((key) => legend[key]);
+  if (entries.length === 0) return null;
+
+  return (
+    <Panel position="top-left">
+      <div className="glass-regular flex max-w-56 flex-col gap-1.5 rounded-xl p-2.5 shadow-e2">
+        {entries.map((key) => (
+          <span key={key} className="flex items-center gap-2 text-footnote text-label-secondary">
+            <span className={cn("size-2.5 shrink-0 rounded-full", nodeColorConfig[key].swatch)} aria-hidden />
+            <span className="truncate">{legend[key]}</span>
+          </span>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+/** Pick existing tasks to drop onto the canvas, laid out for you. */
+function ImportTasksDialog({
+  tasks,
+  alreadyOnMap,
+  busy,
+  onImport,
+  onClose,
+}: {
+  tasks: TaskOption[];
+  alreadyOnMap: Set<string>;
+  busy: boolean;
+  onImport: (taskIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
+
+  const available = tasks.filter((t) => !alreadyOnMap.has(t.id));
+  const visible = query.trim()
+    ? available.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : available;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-overlay"
+      />
+      <div className="glass-thick relative flex max-h-full w-full max-w-md flex-col gap-3 rounded-3xl p-4 shadow-e3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-headline text-label">Add tasks to this map</h3>
+          <span className="font-mono text-footnote tabular-nums text-label-secondary">
+            {selected.size} selected
+          </span>
+        </div>
+
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-label-tertiary"
+            aria-hidden
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search your tasks..."
+            aria-label="Search tasks"
+            className="pl-8"
+          />
+        </div>
+
+        {available.length === 0 ? (
+          <p className="rounded-lg bg-fill-quaternary px-3 py-6 text-center text-callout text-label-secondary">
+            Every one of your tasks is already on this map.
+          </p>
+        ) : (
+          <ul className="flex max-h-72 flex-col overflow-y-auto">
+            {visible.map((task) => {
+              const isSelected = selected.has(task.id);
+              return (
+                <li key={task.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(task.id)}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-hover"
+                  >
+                    <span
+                      className={cn(
+                        "flex size-4 shrink-0 items-center justify-center rounded-sm border-[1.5px] transition-colors",
+                        isSelected ? "border-transparent bg-blue text-white" : "border-gray-3",
+                      )}
+                      aria-hidden
+                    >
+                      {isSelected ? <Check className="size-3 stroke-2" /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-body text-label">{task.title}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {visible.length === 0 ? (
+              <li className="px-2 py-6 text-center text-callout text-label-secondary">
+                Nothing matches “{query}”.
+              </li>
+            ) : null}
+          </ul>
+        )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-separator pt-3">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            loading={busy}
+            disabled={selected.size === 0}
+            onClick={() => onImport([...selected])}
+          >
+            Add {selected.size > 0 ? selected.size : ""} to map
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Right-hand editor for the selected node. Remounted per node id (key) so its
  * fields initialise from the node without a reset effect. */
 function NodeInspector({
   node,
   tasks,
+  legend,
   onSave,
   onDelete,
   onClose,
 }: {
   node: GohaNode;
   tasks: TaskOption[];
+  legend: Record<string, string>;
   onSave: (
     id: string,
-    input: { label: string; nodeType: TaskMapNodeTypeValue; taskId: string | null },
+    input: {
+      label: string;
+      nodeType: TaskMapNodeTypeValue;
+      taskId: string | null;
+      color: NodeColorKey;
+    },
   ) => Promise<void>;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -419,6 +784,7 @@ function NodeInspector({
   const [label, setLabel] = useState(node.data.label);
   const [nodeType, setNodeType] = useState<TaskMapNodeTypeValue>(node.data.nodeType);
   const [taskId, setTaskId] = useState<string>(node.data.taskId ?? "");
+  const [color, setColor] = useState<NodeColorKey>(node.data.color);
   const [isSaving, startSave] = useTransition();
 
   return (
@@ -450,6 +816,34 @@ function NodeInspector({
           options={TASK_MAP_NODE_TYPES.map((t) => ({ value: t, label: NODE_TYPE_LABELS[t] }))}
         />
       </label>
+
+      <div className="space-y-1.5">
+        <span className="text-subhead text-label-secondary">Colour</span>
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Node colour">
+          {NODE_COLOR_KEYS.map((key) => {
+            const meaning = legend[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={color === key}
+                aria-label={meaning ? `${nodeColorConfig[key].label}: ${meaning}` : nodeColorConfig[key].label}
+                title={meaning ?? nodeColorConfig[key].label}
+                onClick={() => setColor(key)}
+                className={cn(
+                  "size-6 cursor-pointer rounded-full transition-transform hover:scale-110",
+                  nodeColorConfig[key].swatch,
+                  color === key && "outline-solid outline-2 outline-offset-2 outline-label-tertiary",
+                )}
+              />
+            );
+          })}
+        </div>
+        {legend[color] ? (
+          <p className="text-footnote text-label-secondary">Means: {legend[color]}</p>
+        ) : null}
+      </div>
 
       <label className="space-y-1">
         <span className="text-subhead text-label-secondary">Linked task</span>
@@ -486,7 +880,7 @@ function NodeInspector({
           loading={isSaving}
           onClick={() =>
             startSave(async () => {
-              await onSave(node.id, { label: label.trim(), nodeType, taskId: taskId || null });
+              await onSave(node.id, { label: label.trim(), nodeType, taskId: taskId || null, color });
             })
           }
         >
@@ -502,6 +896,7 @@ export default function FlowCanvas(props: {
   initialNodes: TaskMapNode[];
   initialEdges: TaskMapEdge[];
   initialViewport: { x: number; y: number; zoom: number } | null;
+  initialLegend: Record<string, string> | null;
   tasks: TaskOption[];
 }) {
   return (

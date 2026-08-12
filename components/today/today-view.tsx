@@ -12,10 +12,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { completeTaskAction, reopenTaskAction } from "@/app/(app)/tasks/actions";
+import {
+  completeTaskAction,
+  createSubtaskAction,
+  deleteTaskAction,
+  reopenTaskAction,
+  updateTaskAction,
+} from "@/app/(app)/tasks/actions";
 import { addDailyPriorityAction, removeDailyPriorityAction } from "@/app/(app)/today/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +38,9 @@ import { taskEffectiveDate } from "@/lib/task-buckets";
 import { taskPriorityConfig } from "@/lib/tasks";
 import { deriveTodayData } from "@/lib/today";
 import { cn } from "@/lib/utils";
+
+import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import type { TaskFormInput } from "@/lib/validations/task";
 
 import { ActiveGoalsCard } from "./active-goals-card";
 import { QuickAddTask } from "./quick-add-task";
@@ -62,6 +71,7 @@ export function TodayView({
   habits,
   habitEntries,
   lifeAreas,
+  subtasks = [],
 }: {
   userName: string;
   greetingPart: string;
@@ -74,9 +84,11 @@ export function TodayView({
   habits: HabitWithSchedule[];
   habitEntries: HabitEntry[];
   lifeAreas: LifeArea[];
+  subtasks?: Task[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const [optimisticTasks, applyOptimistic] = useOptimistic(tasks, (state, action: OptimisticAction) =>
     state.map((t) =>
@@ -159,6 +171,37 @@ export function TodayView({
     { label: "Start a focus session", icon: Play, onSelect: () => router.push("/focus") },
   ];
 
+  const detailTask = detailId ? optimisticTasks.find((t) => t.id === detailId) ?? null : null;
+  const detailSubtasks = useMemo(
+    () => (detailId ? subtasks.filter((s) => s.parentTaskId === detailId) : []),
+    [subtasks, detailId],
+  );
+
+  const detailHandlers = {
+    onSave: (id: string, values: TaskFormInput) => updateTaskAction(id, values),
+    onToggleComplete: toggle,
+    onAddSubtask: (parentId: string, title: string) => createSubtaskAction(parentId, title),
+    onToggleSubtask: (subtask: Task) =>
+      startTransition(async () => {
+        const result =
+          subtask.status === "completed"
+            ? await reopenTaskAction(subtask.id)
+            : await completeTaskAction(subtask.id);
+        if (!result.ok) toast.error(result.error);
+      }),
+    onDeleteSubtask: (subtask: Task) =>
+      startTransition(async () => {
+        const result = await deleteTaskAction(subtask.id);
+        if (!result.ok) toast.error(result.error);
+      }),
+    onDelete: (task: Task) =>
+      startTransition(async () => {
+        const result = await deleteTaskAction(task.id);
+        if (result.ok) toast.success(`Deleted "${task.title}"`);
+        else toast.error(result.error);
+      }),
+  };
+
   return (
     /* Page sections are 32 apart; groups within a section are 24 apart. */
     <div className="flex flex-col gap-6">
@@ -203,6 +246,7 @@ export function TodayView({
                 priorities={data.priorities}
                 candidates={candidates}
                 onToggle={toggle}
+                onOpen={(t) => setDetailId(t.id)}
                 onAdd={addPriority}
                 onRemove={removePriority}
               />
@@ -248,6 +292,7 @@ export function TodayView({
                             <TaskChecklistItem
                               task={task}
                               onToggle={toggle}
+                              onOpen={(t) => setDetailId(t.id)}
                               meta={
                                 <span className="flex items-center gap-2">
                                   {task.dueAt ? (
@@ -301,6 +346,7 @@ export function TodayView({
                             <TaskChecklistItem
                               task={task}
                               onToggle={toggle}
+                              onOpen={(t) => setDetailId(t.id)}
                               meta={
                                 <span className="flex items-center gap-2">
                                   <span className="font-mono text-footnote tabular-nums text-red">
@@ -352,6 +398,18 @@ export function TodayView({
 
         </>
       )}
+
+      {/* Opening a task from Today shows the SAME panel as To-dos, editing the
+          same record. One task, one detail surface. */}
+      <TaskDetailPanel
+        task={detailTask}
+        subtasks={detailSubtasks}
+        goals={goals}
+        lifeAreas={lifeAreas}
+        timeZone={timeZone}
+        onClose={() => setDetailId(null)}
+        handlers={detailHandlers}
+      />
     </div>
   );
 }

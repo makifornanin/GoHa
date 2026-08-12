@@ -66,6 +66,8 @@ export async function updateTaskMap(
     goalId?: string | null;
     lifeAreaId?: string | null;
     viewport?: { x: number; y: number; zoom: number };
+    /** Colour key -> the user's own label for what that colour means. */
+    legend?: Record<string, string>;
   },
 ): Promise<TaskMap | null> {
   const [row] = await db

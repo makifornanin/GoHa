@@ -19,6 +19,7 @@ import type { Task } from "@/db";
 export function TaskChecklistItem({
   task,
   onToggle,
+  onOpen,
   meta,
   onRemove,
   removeLabel,
@@ -26,6 +27,8 @@ export function TaskChecklistItem({
 }: {
   task: Task;
   onToggle: (task: Task) => void;
+  /** Open the task's detail panel. The title becomes the trigger. */
+  onOpen?: (task: Task) => void;
   meta?: ReactNode;
   onRemove?: (task: Task) => void;
   removeLabel?: string;
@@ -50,14 +53,27 @@ export function TaskChecklistItem({
       />
 
       <span className="relative min-w-0 flex-1 truncate">
-        <span
-          className={cn(
-            "text-body transition-colors duration-200",
-            completed ? "text-label-tertiary" : "text-label",
-          )}
-        >
-          {task.title}
-        </span>
+        {onOpen ? (
+          <button
+            type="button"
+            onClick={() => onOpen(task)}
+            className={cn(
+              "max-w-full truncate rounded-sm text-left text-body transition-colors duration-200 hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+              completed ? "text-label-tertiary" : "text-label",
+            )}
+          >
+            {task.title}
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "text-body transition-colors duration-200",
+              completed ? "text-label-tertiary" : "text-label",
+            )}
+          >
+            {task.title}
+          </span>
+        )}
         {/* Strikethrough sweeps left to right, 200ms. */}
         <motion.span
           aria-hidden

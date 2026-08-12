@@ -84,6 +84,13 @@ export type TaskFormValues = z.output<typeof taskFormSchema>;
 
 export const taskIdSchema = z.uuid("That task could not be found.");
 
+/** A checklist step's title. Same limit as a task; a step is still a task. */
+export const subtaskTitleSchema = z
+  .string()
+  .trim()
+  .min(1, "Give this step a title.")
+  .max(TASK_TITLE_MAX, `Keep the title to ${TASK_TITLE_MAX} characters or fewer.`);
+
 /** Optional completion feedback, normalized to null when blank. */
 export const completionNoteSchema = z
   .string()
