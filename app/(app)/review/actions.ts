@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { reviewsRepo, type WeeklyReview } from "@/db";
+import { startOfWeek } from "@/lib/date";
 import { REVIEW_FIELD_MAX } from "@/lib/review";
 import { requireUser } from "@/lib/session";
+import { getUserDatePrefs } from "@/lib/user-settings";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -55,6 +57,26 @@ export async function saveWeeklyReviewAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check your review." };
   }
   const { weekStart, ...fields } = parsed.data;
+
+  /*
+   * The posted week must actually BE a week boundary (audit R-05).
+   *
+   * `weekly_reviews` is unique on (user_id, week_start), so the value is a
+   * primary key in all but name: a mid-week date silently creates a second,
+   * overlapping row for the same seven days, and both then show up in history
+   * with different prose. Zod can only prove the string is a date; only the
+   * user's own week-start preference can say whether it is a Monday.
+   *
+   * Checked server-side because the client can be wrong about it: an old tab
+   * open when the preference changes still posts the previous boundary.
+   */
+  const { weekStartsOn } = await getUserDatePrefs(user.id);
+  if (startOfWeek(weekStart, weekStartsOn) !== weekStart) {
+    return {
+      ok: false,
+      error: "That is not the start of a week. Reload the page and try again.",
+    };
+  }
 
   try {
     const review = await reviewsRepo.upsertWeeklyReview(user.id, weekStart, {

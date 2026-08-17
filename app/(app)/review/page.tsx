@@ -72,5 +72,18 @@ export default async function ReviewPage({
     lifeAreas,
   };
 
-  return <ReviewView data={data} />;
+  /*
+   * `key={weekStart}` is load-bearing, not a lint appeasement (audit R-05).
+   *
+   * ReviewView seeds its prose and rating from props with useState, which runs
+   * ONCE per mounted instance. Navigating weeks via ?week= re-renders the same
+   * instance in the same tree position, so React keeps the old week's state
+   * while `data.weekStart` becomes the new week. Saving then wrote last week's
+   * reflection into this week's row, silently, over the top of whatever was
+   * there.
+   *
+   * Keying on the week makes each week a distinct instance, so the state is
+   * rebuilt from that week's own review.
+   */
+  return <ReviewView key={weekStart} data={data} />;
 }

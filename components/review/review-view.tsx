@@ -81,14 +81,52 @@ export function ReviewView({ data }: { data: ReviewData }) {
   const router = useRouter();
   const { stats, review } = data;
 
-  const [wins, setWins] = useState(review?.wins ?? "");
-  const [challenges, setChallenges] = useState(review?.challenges ?? "");
-  const [focusNextWeek, setFocusNextWeek] = useState(review?.focusNextWeek ?? "");
-  const [rating, setRating] = useState<number | null>(review?.rating ?? null);
+  /*
+   * The saved values this week started from. The page keys this component on
+   * the week (audit R-05), so a remount rebuilds these from the right review,
+   * and after a save the revalidated props make them match state again.
+   */
+  const saved = {
+    wins: review?.wins ?? "",
+    challenges: review?.challenges ?? "",
+    focusNextWeek: review?.focusNextWeek ?? "",
+    rating: review?.rating ?? null,
+  };
+
+  const [wins, setWins] = useState(saved.wins);
+  const [challenges, setChallenges] = useState(saved.challenges);
+  const [focusNextWeek, setFocusNextWeek] = useState(saved.focusNextWeek);
+  const [rating, setRating] = useState<number | null>(saved.rating);
   const [pending, startTransition] = useTransition();
 
   const isComplete = Boolean(review?.completedAt);
   const areaById = new Map(data.lifeAreas.map((a) => [a.id, a]));
+
+  /** Edits not yet written to the row backing THIS week. */
+  const isDirty =
+    wins !== saved.wins ||
+    challenges !== saved.challenges ||
+    focusNextWeek !== saved.focusNextWeek ||
+    rating !== saved.rating;
+
+  /**
+   * Move weeks, asking first if there is unsaved prose.
+   *
+   * The key fix stops unsaved text leaking into the next week's row, but it
+   * also means navigating now DISCARDS it. Losing a paragraph you just wrote
+   * without being asked is its own failure, so the discard is made explicit.
+   */
+  function goToWeek(target: string) {
+    if (
+      isDirty &&
+      !window.confirm(
+        "You have unsaved changes to this week's review.\n\nLeave without saving? Your edits will be lost.",
+      )
+    ) {
+      return;
+    }
+    router.push(`/review?week=${target}`);
+  }
 
   function save(complete: boolean) {
     startTransition(async () => {
@@ -128,7 +166,7 @@ export function ReviewView({ data }: { data: ReviewData }) {
               variant="outline"
               size="icon"
               aria-label="Previous week"
-              onClick={() => router.push(`/review?week=${data.prevWeekStart}`)}
+              onClick={() => goToWeek(data.prevWeekStart)}
             >
               <ChevronLeft />
             </Button>
@@ -137,7 +175,7 @@ export function ReviewView({ data }: { data: ReviewData }) {
               size="icon"
               aria-label="Next week"
               disabled={!data.nextWeekStart}
-              onClick={() => data.nextWeekStart && router.push(`/review?week=${data.nextWeekStart}`)}
+              onClick={() => data.nextWeekStart && goToWeek(data.nextWeekStart)}
             >
               <ChevronRight />
             </Button>
