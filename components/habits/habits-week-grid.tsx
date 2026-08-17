@@ -40,9 +40,20 @@ export function HabitsWeekGrid({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-footnote text-label-secondary">
-          {(["done", "partial", "miss", "skip"] as const).map((state) => (
+          {/* All six states the grid can draw. "Pending" (dashed) and "Not
+              scheduled" (blank) were both visible in the rows but missing here,
+              so an empty cell had no explanation. The blank swatch gets an
+              outline in the legend only, otherwise there would be nothing to
+              point at. */}
+          {(["done", "partial", "miss", "skip", "pending", "off"] as const).map((state) => (
             <span key={state} className="flex items-center gap-1.5">
-              <span className={cn("size-3 rounded-sm", dayCellConfig[state].className)} />
+              <span
+                className={cn(
+                  "size-3 rounded-sm",
+                  dayCellConfig[state].className,
+                  state === "off" && "border border-separator-opaque",
+                )}
+              />
               {dayCellConfig[state].label}
             </span>
           ))}
@@ -70,7 +81,13 @@ export function HabitsWeekGrid({
                   {WEEKDAY_ABBR[cell.weekday][0]}
                 </th>
               ))}
-              <th className="w-20">
+              {/* `relative` is load-bearing. `.sr-only` is position:absolute, so
+                  without a positioned ancestor its containing block is the
+                  viewport itself: it sat at x=456 on a 390px phone, escaped the
+                  card's overflow-x-auto (which cannot clip a box whose
+                  containing block is above it), and scrolled the whole PAGE
+                  sideways by 67px. */}
+              <th className="relative w-20">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>

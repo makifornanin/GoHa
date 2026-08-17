@@ -58,7 +58,12 @@ export function TaskChecklistItem({
             type="button"
             onClick={() => onOpen(task)}
             className={cn(
-              "max-w-full truncate rounded-sm text-left text-body transition-colors duration-200 hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+              // `py-2.5` makes the title fill the row's 40px height, so tapping
+              // the name on a phone is a 40px target instead of the 20px the
+              // text happened to occupy. Sized to the row exactly rather than
+              // with `hit-44`, whose 44px box would overhang into the
+              // neighbouring row and steal its taps.
+              "max-w-full truncate rounded-sm py-2.5 text-left text-body transition-colors duration-200 hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
               completed ? "text-label-tertiary" : "text-label",
             )}
           >

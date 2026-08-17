@@ -81,7 +81,12 @@ function Button({
       {loading ? (
         <Loader2 className="absolute inset-0 m-auto size-4 animate-spin" aria-hidden />
       ) : null}
-      <span className={cn("inline-flex items-center gap-2", loading && "invisible")}>
+      {/* `opacity-0`, NOT `invisible`. Both hide the label while keeping the
+          button's width stable, but `visibility: hidden` also drops it out of
+          the accessibility tree: a saving button announced itself as an unnamed
+          button, and its name vanished for anything querying by role+name.
+          Opacity keeps the name; `aria-busy` above says it is working. */}
+      <span className={cn("inline-flex items-center gap-2", loading && "opacity-0")}>
         {children}
       </span>
     </button>

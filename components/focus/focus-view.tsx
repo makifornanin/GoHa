@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Pause, Play, Target, X } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -122,6 +122,11 @@ function FocusSetup({
   const [taskId, setTaskId] = useState(preselectTaskId ?? "");
   const [minutes, setMinutes] = useState(25);
   const [pending, startTransition] = useTransition();
+  // Generated, not hardcoded. Two of this screen can be mounted at once during a
+  // route transition, and a literal id="focus-task" then appears twice: invalid
+  // HTML, and `label[for]` resolves to whichever copy is first in the document
+  // rather than the one being looked at.
+  const taskFieldId = useId();
 
   function start() {
     startTransition(async () => {
@@ -146,11 +151,11 @@ function FocusSetup({
       <DurationPicker minutes={minutes} onChange={setMinutes} disabled={pending} />
 
       <div className="w-full">
-        <label htmlFor="focus-task" className="mb-1.5 block text-subhead text-label-secondary">
+        <label htmlFor={taskFieldId} className="mb-1.5 block text-subhead text-label-secondary">
           Focus on <span className="text-label-tertiary">(optional)</span>
         </label>
         <Select
-          id="focus-task"
+          id={taskFieldId}
           value={taskId}
           onChange={setTaskId}
           disabled={pending}
@@ -181,6 +186,7 @@ function ActiveTimer({
   const nowMs = useFocusTimer((s) => s.nowMs);
   const tick = useFocusTimer((s) => s.tick);
   const [note, setNote] = useState(session.note ?? "");
+  const noteFieldId = useId();
   const [pending, startTransition] = useTransition();
 
   const isPaused = Boolean(session.pausedAt);
@@ -310,12 +316,12 @@ function ActiveTimer({
       />
 
       <div className="w-full max-w-xl">
-        <label htmlFor="focus-note" className="mb-1.5 flex items-center gap-1.5 text-subhead text-label-secondary">
+        <label htmlFor={noteFieldId} className="mb-1.5 flex items-center gap-1.5 text-subhead text-label-secondary">
           <Target className="size-4" aria-hidden />
           Session notes <span className="text-label-tertiary">(saved when you finish)</span>
         </label>
         <Textarea
-          id="focus-note"
+          id={noteFieldId}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Capture thoughts, blockers, or distractions to handle later..."

@@ -36,8 +36,11 @@ export function BarSeries({
         const heightPercent = (point.value / max) * 100;
         return (
           <div key={point.label + index} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+            {/* The track. Without it, a range where only one week has data drew
+                one bar against blank space and read as a stray rectangle rather
+                than a chart with eleven empty slots. */}
             <div
-              className="flex h-24 w-full items-end justify-center"
+              className="flex h-24 w-full items-end justify-center rounded-sm bg-fill-quaternary"
               title={`${point.label}: ${point.value}${unit}`}
             >
               <motion.div
@@ -88,14 +91,17 @@ export function Sparkline({
   return (
     <div className={cn("flex h-8 items-end gap-0.5", className)} aria-hidden>
       {values.map((value, index) => (
+        // Each column gets a faint full-height track, so the sparkline reads as
+        // a week-by-week shape even when only the last week has anything in it.
         <div
           key={index}
-          className={cn(
-            "min-w-0 flex-1 rounded-[1px]",
-            value === 0 ? "bg-fill-tertiary" : barClassName,
-          )}
-          style={{ height: value === 0 ? 2 : `${Math.max((value / max) * 100, 12)}%` }}
-        />
+          className="flex h-full min-w-0 flex-1 items-end rounded-[1px] bg-fill-quaternary"
+        >
+          <div
+            className={cn("w-full rounded-[1px]", value === 0 ? "bg-fill-tertiary" : barClassName)}
+            style={{ height: value === 0 ? 2 : `${Math.max((value / max) * 100, 12)}%` }}
+          />
+        </div>
       ))}
     </div>
   );

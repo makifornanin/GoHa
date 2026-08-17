@@ -15,9 +15,11 @@ export function ActiveGoalsCard({ goals }: { goals: ActiveGoalProgress[] }) {
     <Card>
       <CardHeader>
         <CardTitle>Active Goals</CardTitle>
+        {/* Padded then pulled back by the same amount: a 30px tap target on a
+            phone, with the header's height unchanged. */}
         <Link
           href="/goals"
-          className="flex items-center gap-1 text-callout font-medium text-blue hover:underline"
+          className="-my-1.5 flex items-center gap-1 rounded-sm px-1 py-1.5 text-callout font-medium text-blue hover:underline"
         >
           All
           <ArrowRight className="size-4" aria-hidden />

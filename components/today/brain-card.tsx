@@ -116,20 +116,23 @@ export function BrainCard({
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={spring.smooth}
-          className="mt-4 flex flex-col gap-1 border-t border-separator pt-3"
+          className="mt-4 flex flex-col border-t border-separator pt-3"
         >
-          <li className="mb-0.5 text-caption uppercase text-label-tertiary">
+          <li className="mb-1 text-caption uppercase text-label-tertiary">
             Plan my day would pin
           </li>
           {signal.suggestions.map(({ task, reason }, index) => (
-            <li key={task.id} className="flex items-baseline gap-2">
+            <li key={task.id} className="flex items-center gap-2">
               <span className="font-mono text-footnote tabular-nums text-label-tertiary">
                 {index + 1}
               </span>
               <button
                 type="button"
                 onClick={() => onOpenTask(task)}
-                className="min-w-0 flex-1 truncate rounded-sm text-left text-callout text-label hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+                // `py-1.5` takes the row from an 18px tap target to 32px. It
+                // replaces the list's old `gap-1`, so the card is the same
+                // height as before; the space is now inside the target.
+                className="min-w-0 flex-1 truncate rounded-sm py-1.5 text-left text-callout text-label hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
               >
                 {task.title}
               </button>

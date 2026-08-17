@@ -40,7 +40,7 @@ export function GoalCard({
   onArchive: (goal: GoalWithCounts) => void;
 }) {
   const status = goalStatusConfig[goal.status];
-  const { percent } = calculateGoalProgress({
+  const { percent, source } = calculateGoalProgress({
     status: goal.status,
     progressMode: goal.progressMode,
     manualProgress: goal.manualProgress,
@@ -130,7 +130,20 @@ export function GoalCard({
             <span className={cn("inline-flex items-center rounded-sm px-1.5 py-0.5 text-footnote", status.badge)}>
               {status.label}
             </span>
-            <span className="font-mono text-footnote tabular-nums text-label-secondary">{percent}%</span>
+            {/* Say where the number came from. A hand-set goal showing "40%"
+                next to "0/0 tasks" reads as a broken calculation, because
+                nothing on the card admitted the percentage was typed in. */}
+            <span className="flex items-center gap-1.5">
+              {source === "manual" ? (
+                <span
+                  className="rounded-sm bg-fill-tertiary px-1.5 py-0.5 text-footnote text-label-tertiary"
+                  title="Set by hand; linked tasks do not change it."
+                >
+                  Set by hand
+                </span>
+              ) : null}
+              <span className="font-mono text-footnote tabular-nums text-label-secondary">{percent}%</span>
+            </span>
           </div>
           {/* Taller than the old 1px hairline and on a fill rather than gray-5:
               at 0% the previous bar was indistinguishable from the card. */}

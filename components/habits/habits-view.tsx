@@ -244,7 +244,13 @@ export function HabitsView({
                       <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", color.tile)}>
                         <LifeAreaIcon iconKey={view.habit.icon} className="size-4" />
                       </span>
-                      <div className="min-w-0 flex-1">
+                      {/* `min-w-36` is what makes the row's `flex-wrap` actually
+                          fire. Without a floor the name shrinks to nothing before
+                          the controls ever wrap, so a numeric habit read
+                          "Drink ..." on a phone while its value input, unit and
+                          Log button kept full width. Now the controls drop to a
+                          second line instead. Desktop has room and never wraps. */}
+                      <div className="min-w-36 flex-1">
                         <p className={cn("truncate text-body text-label", view.todayState === "done" && "text-label-tertiary line-through")}>
                           {view.habit.name}
                         </p>

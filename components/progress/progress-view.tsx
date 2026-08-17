@@ -205,14 +205,19 @@ export function ProgressView({ data }: { data: ProgressData }) {
                 {data.rangeLabel}
               </p>
             </div>
+            {/* The real total, not the charted minutes summed back up. */}
             <span className="shrink-0 font-mono text-footnote tabular-nums text-label-secondary">
-              {formatDurationHm(totalFocus * 60)} total
+              {formatDurationHm(data.summary.focusSeconds)} total
             </span>
           </CardHeader>
           <CardContent>
             {totalFocus === 0 ? (
               <p className="rounded-xl bg-fill-quaternary px-4 py-8 text-center text-callout text-label-secondary">
-                No focus sessions recorded yet. Start one from Focus.
+                {/* Says what is true. A session shorter than a minute has
+                    nothing to chart, but it is not "no sessions". */}
+                {data.summary.focusSeconds === 0
+                  ? "No focus sessions recorded yet. Start one from Focus."
+                  : "No full minutes to chart yet in this range."}
               </p>
             ) : (
               <BarSeries

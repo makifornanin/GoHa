@@ -292,6 +292,18 @@ export function CommandPalette() {
                 }}
                 placeholder="Search tasks, goals, or jump to a screen..."
                 aria-label="Search commands"
+                // Combobox semantics. The keyboard already worked; a screen
+                // reader had no way to know the list existed or which row the
+                // arrow keys had landed on, because the results were plain
+                // buttons the input never pointed at.
+                role="combobox"
+                aria-expanded={results.length > 0}
+                aria-controls="command-palette-results"
+                aria-activedescendant={
+                  results.length > 0 ? `command-palette-option-${safeIndex}` : undefined
+                }
+                aria-autocomplete="list"
+                autoComplete="off"
                 className="h-12 w-full bg-transparent text-body text-label outline-none placeholder:text-label-tertiary"
               />
               <kbd className="hidden shrink-0 rounded-md bg-fill-tertiary px-1.5 py-0.5 font-mono text-footnote text-label-secondary sm:block">
@@ -299,7 +311,13 @@ export function CommandPalette() {
               </kbd>
             </div>
 
-            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div
+              ref={listRef}
+              id="command-palette-results"
+              role="listbox"
+              aria-label="Results"
+              className="min-h-0 flex-1 overflow-y-auto p-2"
+            >
               {results.length === 0 ? (
                 <p className="px-3 py-8 text-center text-callout text-label-secondary">
                   {loading ? "Loading your work..." : `Nothing matches “${query}”.`}
@@ -319,6 +337,9 @@ export function CommandPalette() {
                       ) : null}
                       <button
                         type="button"
+                        id={`command-palette-option-${index}`}
+                        role="option"
+                        aria-selected={active}
                         data-index={index}
                         onMouseMove={() => setActiveIndex(index)}
                         onClick={() => command.run()}

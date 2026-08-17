@@ -167,13 +167,21 @@ export function CalendarView({ data }: { data: CalendarData }) {
               const dayFocus = showFocus ? focusByDate.get(cell.date) : undefined;
               const habitsDone = dayHabits.filter((h) => h.done).length;
               const isSelected = selected === cell.date;
+              // A day that has not happened cannot have missed anything. Showing
+              // "0/3" on every future date painted the rest of the month as
+              // failure; a future day states what is scheduled instead.
+              const isFuture = cell.date > data.today;
 
               return (
                 <button
                   key={cell.date}
                   type="button"
                   onClick={() => setSelected(cell.date)}
-                  aria-label={`${formatIsoDateMedium(cell.date)}: ${dayTasks.length} tasks, ${habitsDone} of ${dayHabits.length} habits`}
+                  aria-label={`${formatIsoDateMedium(cell.date)}: ${dayTasks.length} tasks, ${
+                    isFuture
+                      ? `${dayHabits.length} habits scheduled`
+                      : `${habitsDone} of ${dayHabits.length} habits done`
+                  }`}
                   aria-pressed={isSelected}
                   className={cn(
                     "min-h-24 cursor-pointer border-b border-r border-separator p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0 hover:bg-surface-hover",
@@ -229,13 +237,18 @@ export function CalendarView({ data }: { data: CalendarData }) {
                         <span
                           className={cn(
                             "inline-flex items-center gap-0.5 rounded-sm px-1 font-mono text-footnote tabular-nums",
-                            habitsDone === dayHabits.length
+                            !isFuture && habitsDone === dayHabits.length
                               ? "bg-green/15 text-green"
                               : "bg-fill-tertiary text-label-secondary",
                           )}
+                          title={
+                            isFuture
+                              ? `${dayHabits.length} habits scheduled`
+                              : `${habitsDone} of ${dayHabits.length} habits done`
+                          }
                         >
                           <Repeat className="size-2.5" aria-hidden />
-                          {habitsDone}/{dayHabits.length}
+                          {isFuture ? dayHabits.length : `${habitsDone}/${dayHabits.length}`}
                         </span>
                       ) : null}
                       {dayFocus && dayFocus.seconds > 0 ? (

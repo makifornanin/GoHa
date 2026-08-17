@@ -42,9 +42,12 @@ export function MomentumCard({ data }: { data: MomentumData }) {
           <TrendingUp className="size-4 text-label-secondary" aria-hidden />
           Momentum
         </CardTitle>
+        {/* `py-1.5 -my-1.5` grows the tap area from 18px to 30px without moving
+            anything: the padding is cancelled by the negative margin, so the
+            header keeps its height and only the target gets bigger. */}
         <Link
           href="/progress"
-          className="text-callout font-medium text-blue hover:underline"
+          className="-my-1.5 rounded-sm px-1 py-1.5 text-callout font-medium text-blue hover:underline"
         >
           Details
         </Link>

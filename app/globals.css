@@ -54,6 +54,11 @@
   --separator: rgba(60, 60, 67, 0.29);
   --separator-opaque: #c6c6c8;
 
+  /* Task Map canvas grid. Deliberately fainter than a separator: this is
+     background texture behind content, not a divider between it. */
+  --grid-line: rgba(60, 60, 67, 0.11);
+  --grid-line-strong: rgba(60, 60, 67, 0.2);
+
   /* System colors, light values. */
   --blue: #007aff;
   --green: #34c759;
@@ -210,6 +215,8 @@
 
   --separator: rgba(84, 84, 88, 0.6);
   --separator-opaque: #38383a;
+  --grid-line: rgba(255, 255, 255, 0.07);
+  --grid-line-strong: rgba(255, 255, 255, 0.13);
 
   /* System colors, dark values (Apple ships different values per mode). */
   --blue: #0a84ff;

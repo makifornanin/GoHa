@@ -47,8 +47,9 @@ export default async function ProgressPage() {
 
   const completions = completionsByDay({ tasks, from: windowStart, to: today, timeZone });
   const prevCompletions = completionsByDay({ tasks, from: priorStart, to: priorEnd, timeZone });
+  // Minutes for the weekly bars only. The comparison totals use real seconds
+  // (see `focusSecondsBetween` below), so there is no prior-window minute series.
   const focusDaily = focusMinutesByDay({ sessions, from: windowStart, to: today });
-  const prevFocus = focusMinutesByDay({ sessions, from: priorStart, to: priorEnd });
 
   const heatmap = habitHeatmap({
     habits,
@@ -74,6 +75,23 @@ export default async function ProgressPage() {
 
   const sum = (points: { value: number }[]) => points.reduce((total, p) => total + p.value, 0);
 
+  /**
+   * Real seconds off the sessions, NOT rounded minutes multiplied back up.
+   * `focusMinutesByDay` rounds for the weekly chart, which is right for a bar
+   * per week and wrong for a total: a 40-second session rounded to 0 minutes
+   * made this screen report "0s" and "No focus sessions recorded yet" while
+   * Today's Momentum card, reading the same rows in seconds, said otherwise.
+   */
+  const focusSecondsBetween = (from: string, to: string) =>
+    sessions.reduce(
+      (total, session) =>
+        session.sessionDate && session.sessionDate >= from && session.sessionDate <= to
+          ? total + (session.durationSeconds ?? 0)
+          : total,
+      0,
+    );
+  const focusSeconds = focusSecondsBetween(windowStart, today);
+
   const data: ProgressData = {
     weeklyCompletions: byWeek(completions, weekStartsOn),
     weeklyFocusMinutes: byWeek(focusDaily, weekStartsOn),
@@ -86,8 +104,8 @@ export default async function ProgressPage() {
     summary: {
       tasksCompleted: sum(completions),
       tasksCompletedPrev: sum(prevCompletions),
-      focusSeconds: sum(focusDaily) * 60,
-      focusSecondsPrev: sum(prevFocus) * 60,
+      focusSeconds,
+      focusSecondsPrev: focusSecondsBetween(priorStart, priorEnd),
       habitRate: habitCompletionRate(heatmap),
       habitRatePrev: habitCompletionRate(prevHeatmap),
       bestStreak,
@@ -97,7 +115,7 @@ export default async function ProgressPage() {
     // An empty page must say "nothing yet", not draw twelve empty weeks.
     hasAnyHistory:
       sum(completions) > 0 ||
-      sum(focusDaily) > 0 ||
+      focusSeconds > 0 ||
       heatmap.some((c) => c.done > 0) ||
       sum(prevCompletions) > 0,
   };
