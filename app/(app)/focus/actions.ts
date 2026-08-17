@@ -15,6 +15,7 @@ import {
   resolvePausedSeconds,
 } from "@/lib/focus";
 import { requireUser } from "@/lib/session";
+import { getDateContext } from "@/lib/user-settings";
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -96,7 +97,11 @@ export async function startFocusSessionAction(input: {
       });
     }
 
+    // The local date this session belongs to, in the user's saved timezone.
+    // Resolved here rather than in the repository (audit R-15).
+    const { today: sessionDate } = await getDateContext(user.id, now);
     const session = await focusRepo.startFocusSession(user.id, {
+      sessionDate,
       taskId: parsed.data.taskId,
       plannedDurationSeconds: parsed.data.plannedDurationSeconds,
       now,

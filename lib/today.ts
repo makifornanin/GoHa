@@ -39,8 +39,15 @@ export function deriveTodayData(params: {
   tasks: Task[];
   goals: GoalWithCounts[];
   priorities: DailyPriority[];
+  /**
+   * The user's saved timezone. REQUIRED (audit R-15): this used to call
+   * taskEffectiveDate with no zone, so a task whose only date was a late-evening
+   * `dueAt` was bucketed against Manila and could sit in the wrong day's list
+   * for anyone else.
+   */
+  timeZone: string;
 }): TodayData {
-  const { today, tasks, goals, priorities } = params;
+  const { today, tasks, goals, priorities, timeZone } = params;
 
   const todayTasks: Task[] = [];
   const overdueTasks: Task[] = [];
@@ -48,7 +55,7 @@ export function deriveTodayData(params: {
   let totalToday = 0;
 
   for (const task of tasks) {
-    const effective = taskEffectiveDate(task);
+    const effective = taskEffectiveDate(task, timeZone);
     const isToday = effective === today;
 
     if (isToday && task.status !== "cancelled") {

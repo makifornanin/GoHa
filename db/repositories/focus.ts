@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, desc, eq, gte, isNotNull, isNull, lte, ne } from "drizzle-orm";
 
-import { manilaToday, type IsoDate } from "@/lib/date";
+import type { IsoDate } from "@/lib/date";
 import { db } from "../client";
 import { focusSessions } from "../schema";
 import type { FocusSessionStatus } from "../schema";
@@ -38,9 +38,27 @@ export async function listInProgressSessions(userId: string): Promise<FocusSessi
     .orderBy(desc(focusSessions.startedAt));
 }
 
+/**
+ * Open a focus session.
+ *
+ * `sessionDate` is REQUIRED and resolved by the caller (audit R-15). It used to
+ * be `manilaToday(now)` here, which stamped every session with a Manila
+ * calendar date no matter what timezone the user had saved. That is stored
+ * data, not a display concern: a session started at 00:30 local elsewhere
+ * landed on the wrong day permanently, and every daily focus total built on
+ * this column inherited the error.
+ *
+ * Resolving it in the repository was the mistake. A repository does not know
+ * whose day it is; the action does, from the user's date context.
+ */
 export async function startFocusSession(
   userId: string,
-  input: { taskId?: string | null; plannedDurationSeconds?: number | null; now?: Date } = {},
+  input: {
+    sessionDate: IsoDate;
+    taskId?: string | null;
+    plannedDurationSeconds?: number | null;
+    now?: Date;
+  },
 ): Promise<FocusSession> {
   const now = input.now ?? new Date();
   const [row] = await db
@@ -49,7 +67,7 @@ export async function startFocusSession(
       userId,
       taskId: input.taskId ?? null,
       plannedDurationSeconds: input.plannedDurationSeconds ?? null,
-      sessionDate: manilaToday(now),
+      sessionDate: input.sessionDate,
       startedAt: now,
       pausedSeconds: 0,
       status: "in_progress",

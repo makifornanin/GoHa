@@ -24,7 +24,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import type { Goal, LifeArea, Task } from "@/db";
 import type { TaskStatus } from "@/db/schema/enums";
-import { MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
+import { zonedToday, type Weekday } from "@/lib/date";
 import { listContainer, listItem } from "@/lib/motion";
 import {
   isTaskLate,
@@ -75,10 +75,15 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 type OptimisticAction = { type: "status"; id: string; status: TaskStatus } | { type: "remove"; id: string };
 
-function sortTasks(list: Task[], sort: SortKey): Task[] {
+/**
+ * `timeZone` is a parameter, not a module default (audit R-15). Date sorting
+ * reads a task's effective date, which for a due-only task depends entirely on
+ * the zone; falling back to Manila here reordered the list for anyone else.
+ */
+function sortTasks(list: Task[], sort: SortKey, timeZone: string): Task[] {
   const byDate = (a: Task, b: Task) => {
-    const da = taskEffectiveDate(a);
-    const db = taskEffectiveDate(b);
+    const da = taskEffectiveDate(a, timeZone);
+    const db = taskEffectiveDate(b, timeZone);
     if (da && db) return da < db ? -1 : da > db ? 1 : 0;
     if (da) return -1;
     if (db) return 1;
@@ -105,7 +110,7 @@ export function TasksView({
   subtasks = [],
   goals,
   lifeAreas,
-  timeZone = MANILA_TZ,
+  timeZone,
   weekStartsOn = 1,
   openCreateOnMount = false,
   defaultGoalId,
@@ -114,7 +119,8 @@ export function TasksView({
   subtasks?: Task[];
   goals: Goal[];
   lifeAreas: LifeArea[];
-  timeZone?: string;
+  /** The user's saved timezone. Required: see audit R-15. */
+  timeZone: string;
   weekStartsOn?: Weekday;
   openCreateOnMount?: boolean;
   defaultGoalId?: string;
@@ -213,6 +219,7 @@ export function TasksView({
             taskMatchesProgress(t, progress, now, timeZone),
         ),
         sort,
+        timeZone,
       ),
     [scoped, timeframe, progress, sort, now, weekStartsOn, timeZone],
   );

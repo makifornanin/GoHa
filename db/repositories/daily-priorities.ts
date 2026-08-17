@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq } from "drizzle-orm";
 
-import { manilaToday, type IsoDate } from "@/lib/date";
+import type { IsoDate } from "@/lib/date";
 import { db } from "../client";
 import { dailyPriorities } from "../schema";
 import type { DailyPriority } from "../types";
@@ -13,9 +13,13 @@ import type { DailyPriority } from "../types";
  * constraint); the unique (userId, priorityDate, position) keeps slots single.
  */
 
+/**
+ * The Top 3 for one local date. `date` is required: defaulting it to the Manila
+ * today made the repository decide whose day it was (audit R-15).
+ */
 export async function listDailyPriorities(
   userId: string,
-  date: IsoDate = manilaToday(),
+  date: IsoDate,
 ): Promise<DailyPriority[]> {
   return db
     .select()

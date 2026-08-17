@@ -34,7 +34,6 @@ import type { TaskStatus } from "@/db/schema/enums";
 import {
   formatIsoDateMedium,
   formatZonedDateTimeMedium,
-  MANILA_TZ,
   type Weekday,
 } from "@/lib/date";
 import { deriveTodayHabits } from "@/lib/habit-view";
@@ -73,7 +72,7 @@ export function TodayView({
   greetingPart,
   dateLabel,
   today,
-  timeZone = MANILA_TZ,
+  timeZone,
   tasks,
   goals,
   priorities,
@@ -90,7 +89,8 @@ export function TodayView({
   greetingPart: string;
   dateLabel: string;
   today: string;
-  timeZone?: string;
+  /** The user's saved timezone. Required: see audit R-15. */
+  timeZone: string;
   tasks: Task[];
   goals: GoalWithCounts[];
   priorities: DailyPriority[];
@@ -119,8 +119,8 @@ export function TodayView({
   );
 
   const data = useMemo(
-    () => deriveTodayData({ today, tasks: optimisticTasks, goals, priorities }),
-    [today, optimisticTasks, goals, priorities],
+    () => deriveTodayData({ today, tasks: optimisticTasks, goals, priorities, timeZone }),
+    [today, optimisticTasks, goals, priorities, timeZone],
   );
 
   const pinnedTaskIds = useMemo(
@@ -133,11 +133,11 @@ export function TodayView({
       optimisticTasks
         .filter((t) => (t.status === "todo" || t.status === "in_progress") && !pinnedTaskIds.has(t.id))
         .sort((a, b) => {
-          const da = taskEffectiveDate(a) ?? "9999-99-99";
-          const db = taskEffectiveDate(b) ?? "9999-99-99";
+          const da = taskEffectiveDate(a, timeZone) ?? "9999-99-99";
+          const db = taskEffectiveDate(b, timeZone) ?? "9999-99-99";
           return da < db ? -1 : da > db ? 1 : 0;
         }),
-    [optimisticTasks, pinnedTaskIds],
+    [optimisticTasks, pinnedTaskIds, timeZone],
   );
 
   const scheduledHabitCount = useMemo(
@@ -399,7 +399,7 @@ export function TodayView({
                               meta={
                                 <span className="flex items-center gap-2">
                                   <span className="font-mono text-footnote tabular-nums text-red">
-                                    {formatIsoDateMedium(taskEffectiveDate(task))}
+                                    {formatIsoDateMedium(taskEffectiveDate(task, timeZone))}
                                   </span>
                                   <PriorityChip task={task} />
                                 </span>

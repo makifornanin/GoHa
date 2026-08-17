@@ -11,8 +11,9 @@ import {
   tasksRepo,
   taskMapsRepo,
 } from "@/db";
-import { addDays, zonedToday } from "@/lib/date";
+import { addDays } from "@/lib/date";
 import { requireUser } from "@/lib/session";
+import { getDateContext } from "@/lib/user-settings";
 
 /**
  * A readable copy of the user's main records, as one JSON document.
@@ -40,7 +41,9 @@ export async function exportMyDataAction(): Promise<{
   json: string;
 }> {
   const user = await requireUser();
-  const today = zonedToday(new Date());
+  // The user's own today: this bounds the habit-entry range AND names the file,
+  // both of which were resolved in Manila regardless of settings (audit R-15).
+  const { today } = await getDateContext(user.id);
 
   const [
     lifeAreas,
