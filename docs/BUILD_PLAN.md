@@ -433,3 +433,241 @@ routes), and the browser audit 13/13 against a PRODUCTION build with zero
 console errors, zero uncaught exceptions, and zero failed requests. Harness
 account destroyed afterwards; owner data verified intact (1 user, 2 tasks,
 referential integrity OK).
+
+### 2026-08-13: Task Maps rebuilt as a road map, not a box drawing
+
+Owner report: "in the task map the nodes are not smart. it says notes but i
+cant even put any notes there and nodes are onti lang." Both were true. The Note
+node type existed with nowhere to write a note, and four interchangeable rounded
+rectangles could only ever draw an inventory of boxes, never a route.
+
+**Schema (migration `0010_jazzy_husk.sql`, applied and verified).**
+`task_map_node_type` gains `decision`, `blocker` and `phase` (seven types).
+`task_map_nodes` gains `note TEXT`: a real column, not a key in the
+presentation-only `data` jsonb, because it is content. `task_maps` gains
+`legend JSONB`.
+
+**Shape carries type, colour carries the owner's meaning.** Two separate
+channels, so a map can say "this is a branch" and "this is hard" at once.
+`nodeTypeConfig` in `lib/task-maps.ts` gives each type a hint, chip, accent and
+a clip-path shape: a decision is chamfered, a note is a folded sheet, a blocker
+and a group are dashed, a milestone is fully rounded. Colour meaning stays the
+owner's to define per map through the existing legend.
+
+**The map reflects the work.** A node linked to a task shows that task's live
+status (To do / Doing / Done / Cancelled); a done node dims and strikes through.
+A bottom-center summary rolls those up ("2/5 linked tasks done") and stays
+silent when nothing is linked rather than showing a hollow 0%.
+
+**Auto-layout.** `lib/task-map-layout.ts` is pure and unit-tested (20 cases):
+longest-path layering so a node never sits above a prerequisite, cycle-tolerant
+(a map is drawn by a human, not validated as a DAG), layers centred against the
+widest. "Tidy up" applies it locally, persists through the same endpoint a drag
+uses, and then fits the view, because a tidied wide map otherwise lands mostly
+off screen and the button looks like it threw the map away.
+
+**Also.** Edge labels (the "Yes" and "No" leaving a decision) via a new
+`updateEdgeLabelAction` on the `label` column that already existed. Seven types
+behind one "Add node" menu, each with a one-line hint, so the toolbar stays a
+toolbar. `findFreeSpot` places a new node clear of the others: the old centre
+plus random jitter buried each node under the last, so adding three looked like
+adding one. Import-tasks dialog is now a real labelled `role="dialog"` with Esc.
+MiniMap themed instead of React Flow's opaque white default.
+
+**One bug found outside the task map, fixed at the root.** `cn()` used
+tailwind-merge with no config, so it read the design system's `--text-*` scale
+as text COLOURS and dropped them: every `cn("text-body text-label")` in the UI
+primitives resolved to `text-label` alone and rendered at the browser default
+instead of 14px. Every Input, Textarea and Button was affected. `lib/utils.ts`
+now declares the type scale and the label colours to tailwind-merge;
+`tests/cn.test.ts` pins it in both directions (sizes survive, real conflicts
+still collapse).
+
+Verification: `tsc` clean, ESLint clean, Vitest 175/175 (25 new across
+`tests/task-map-layout.test.ts` and `tests/cn.test.ts`), `pnpm build` green
+(18 routes), Playwright 33/33 against a reset harness account with zero console
+or runtime errors, plus a scripted browser sweep of the canvas in light and dark
+(all seven types, notes, labelled branches, tidy-up, linked-task rollup).
+
+### 2026-08-13: Full-system sweep (12 routes, desktop + mobile + dark) and 3 fixes
+
+Browser-driven sweep of every route at 1600 and 390 wide in both themes,
+collecting console errors, uncaught exceptions, failed requests, horizontal
+overflow, unnamed controls, unlabelled inputs, duplicate ids and real touch-area
+sizes, plus an interaction pass over the command palette, task detail panel,
+Plan my day, Focus start/pause/complete, Review drafts and Settings.
+
+Clean: zero console errors, zero uncaught exceptions, zero failed requests, zero
+duplicate ids, zero unlabelled inputs, zero unnamed controls. Every checkbox
+measured a real 44x44 hit area (`hit-44` draws it with an `::after` box, so the
+element's own 20px rect understates it); the habit action cluster is 36x44 by
+design so neighbouring taps cannot overlap.
+
+Three real defects found and fixed:
+
+1. *The Habits page scrolled sideways on a phone* (`window.scrollX` reached 67px
+   at 390 wide). The cause was not the week table, which its `overflow-x-auto`
+   card was clipping correctly. It was the visually hidden `<span class="sr-only">
+   Actions</span>` in that table's last header cell: `.sr-only` is
+   `position: absolute`, and with no positioned ancestor its containing block was
+   the viewport itself, so it sat at x=456 and NO ancestor `overflow` could clip
+   it (an ancestor only clips boxes whose containing block is inside it). Adding
+   `relative` to that `<th>` puts it back inside the scroll container. Verified by
+   bisect: hiding that one span took the document from 457px to 390px.
+
+2. *Progress disagreed with Today, Focus and Review about focus time.* The
+   summary built `focusSeconds` as `sum(focusMinutesByDay(...)) * 60`, so it
+   inherited the chart's rounding: a 7-second session became 0 minutes, the card
+   read "0s", and the chart claimed "No focus sessions recorded yet" while three
+   other screens showed the session. Totals now come from the session rows in
+   real seconds; the chart still rounds to minutes, which is right for a bar per
+   week. The empty state no longer asserts there were no sessions when there
+   were.
+
+3. *The command palette had no listbox semantics.* Keyboard navigation worked,
+   but the results were plain buttons the input never pointed at, so a screen
+   reader could not tell the list existed or which row the arrows had reached.
+   Added `role="combobox"` + `aria-expanded`/`aria-controls`/`aria-activedescendant`
+   on the input, `role="listbox"` on the container and `role="option"` +
+   `aria-selected` on each result. Attributes only, no behaviour change.
+
+Left alone deliberately (reported to the owner rather than changed, since they
+asked for bug fixes and no system changes): numeric habit rows truncate the name
+to "Drink ..." on a phone because the value input, unit and Log button take
+priority; a manual-progress goal shows "40%" beside "0/0 tasks" with no hint
+that the number is hand-set; task titles on Today have a 20px tap target where
+the same affordance on To-dos has 356x70.
+
+Unresolved: an intermittent React hydration-attribute warning that appeared in 2
+of 6 full-suite runs, on a different screen each time (Mobile once, Settings
+once). It fails no test and never reproduced in isolation across three targeted
+attempts, including forcing a localStorage/database theme divergence and
+replaying the whole Settings flow. Recorded rather than guessed at.
+
+Verification: `tsc` clean, ESLint clean, Vitest 175/175, `pnpm build` green (18
+routes), Playwright 33/33 against a freshly reset harness account.
+
+### 2026-08-13: Second sweep, everything fixed, validated against a production build
+
+Owner asked for every remaining item fixed before starting automations. All nine
+deferred findings from the first sweep are done, plus four defects the deeper
+sweep uncovered.
+
+**The hydration warning was never ours.** Captured the full React message
+instead of the truncated one and the diff named it: `style={{caret-color:
+"transparent"}}` on inputs. Playwright injects that on `page.screenshot()`
+(default `caret: "hide"`); when the injection lands while a later navigation is
+hydrating, React sees an attribute it did not render. `shot()` now passes
+`caret: "initial"`, and the false positive is gone. Exactly the "something
+changed the HTML before React loaded" case React's own message lists.
+
+**Fixed from the first sweep's deferred list:**
+- Numeric habit rows truncated the name to "Drink ..." on a phone. The row was
+  already `flex-wrap`; without a floor the name shrank to nothing before the
+  controls ever wrapped. `min-w-36` makes the controls drop to a second line.
+- A hand-set goal showed "40%" beside "0/0 tasks" with nothing saying the number
+  was typed. The card now carries a "Set by hand" chip, matching the wording the
+  detail panel already used.
+- Task titles on Today had a 20px tap target. `py-2.5` fills the row's 40px,
+  sized to the row rather than with `hit-44`, whose 44px box would overhang into
+  the next row and steal its taps. The Brain card's suggestion list went from
+  18px to 32px by moving the list's `gap` inside the buttons.
+- "Details" and "All" header links were 18px: `py-1.5 -my-1.5` gives 30px with
+  the header height unchanged.
+- The calendar painted "0/3" on every future day, reading as failure on days
+  that had not happened. Future days now state what is scheduled.
+- Sparse ranges drew one bar against blank space. Every column gets a faint
+  track, so twelve weeks read as twelve slots.
+- The habits legend explained four of the six states the grid draws; "Pending"
+  and "Not scheduled" were both visible in the rows and absent from the key.
+- React Flow's 26px canvas buttons are 36px on a phone.
+- `qa.spec` is idempotent: a new `test:account:reset` empties the harness
+  account's content (keeping the account and session so no re-login is needed)
+  and restores the display name, which the seeding also depends on. Proven by
+  four consecutive runs at 13/13 with no manual reset.
+
+**Found during this sweep and fixed:**
+- *Task Map nodes could be placed where they could not be reached.* The
+  free-spot spiral had no bounds, so the fourth or fifth node landed outside the
+  visible canvas: invisible, and undraggable because the pointer lands on the
+  page behind the canvas. `findFreeSpot` now takes the viewport in flow
+  coordinates and prefers spots inside it. Compounding it, the pan-to-new-node
+  call used `setCenter` WITHOUT a zoom, and React Flow falls back to MAX zoom
+  there: one add zoomed the canvas to 2x, shrank the visible area to a third and
+  pushed everything after it off screen. Overflow now fits the whole map instead.
+  Verified: all seven node types land on canvas and every one drags.
+- *A busy Button lost its accessible name.* `loading` hid the label with
+  `invisible`, and `visibility: hidden` drops content out of the accessibility
+  tree, so a saving button announced itself as unnamed. `opacity-0` is equally
+  width-stable and keeps the name.
+- *Duplicate DOM id on Focus.* `id="focus-task"` is hardcoded, and two copies of
+  the screen can be mounted at once during a route transition, so the id existed
+  twice and `label[for]` resolved to whichever came first. Both focus fields use
+  `useId()` now.
+- Two task-map specs were flaky for a reason worth recording: the canvas is only
+  ~678x457 at Playwright's default window, and the test nudged a node by a fixed
+  +240/+200, pushing it and its connect handle off the canvas. Drags are clamped
+  to the canvas now and `connect()` fits the view before measuring. Eight
+  consecutive clean runs.
+
+**Known issue, documented rather than papered over.** Capturing a Brain Dump
+thought again within ~400ms of the previous one can leave the optimistic
+transition pending forever: the button stays disabled with `aria-busy`, no error
+appears, and only a reload clears it. Measured precisely: no gap stalls on the
+2nd capture, a 150ms gap on the 4th, a 400ms gap is clean through ten. The
+server logs nothing, so the action itself is fine; it is the optimistic
+transition failing to reconcile when `revalidatePath` renders overlap. An
+attempted fix (serialising captures behind a promise chain) made it strictly
+worse, stalling on the FIRST repeat, and was reverted rather than shipped. A
+person typing a thought and clicking is far slower than 400ms, so the exposure
+is a paste-and-click-fast user or an automation. The QA loop is paced to human
+speed with the defect spelled out at the call site.
+
+Verification: `tsc` clean, ESLint clean, Vitest 180/180, `pnpm build` green,
+Playwright 33/33 three times in a row against a PRODUCTION build (`next start`,
+not the dev server, so no Turbopack compile latency), and a final sweep of 12
+routes x {desktop light, mobile light, desktop dark} reporting zero findings:
+no console errors, no uncaught exceptions, no failed requests, no sideways
+scroll, no duplicate ids, no unnamed controls, no undersized tap targets. The
+only controls under 44px are the segmented-control segments at 26px inside their
+30px track, which is the documented spec and matches iOS.
+
+### 2026-08-13: Task Map canvas, squared grid and forgiving connections
+
+Owner: "make the background yung may square square parang sa n8n, then for the
+nodes make it easy to connect."
+
+**Grid.** Dots replaced with a squared graph-paper grid: a 40px cell plus a
+heavier line every fifth one, so the canvas keeps a sense of scale as you zoom
+rather than dissolving into uniform texture. New `--grid-line` /
+`--grid-line-strong` tokens carry it in both themes. The first attempt used a
+20px cell, which was wrong for the way maps are actually viewed: a saved
+viewport is usually zoomed OUT (measured 0.58x), where a 20px cell collapses to
+11px on screen and reads as a grey wash instead of squares. Verified by sampling
+the rendered pattern size and stroke rather than squinting at a screenshot.
+
+**Connecting.** Three changes, because the difficulty was in three places:
+- `connectionRadius` 60 (default 20) so the DROP snaps to the nearest handle
+  from three times further out: you aim at the node, not at a dot.
+- `ConnectionMode.Loose` so a drag can START from either handle. You no longer
+  have to remember that out is the bottom and in is the top.
+- The handle's grab zone is stretched ALONG the node's edge (`-inset-y-3
+  -inset-x-10`) rather than being a circle, because sideways is the direction
+  you are imprecise in, and widening it that way costs almost none of the card
+  body still needed for dragging the node. The dot also grows on node hover so
+  it is easy to see.
+
+Measured, not assumed: starting a connection used to need the pointer within
+about 6px of the handle centre. It now works from 60px away, over half the
+node's width. Re-verified afterwards that all five node types still drag from
+the card body and still open the inspector on click, in both themes.
+
+One correctness detail: only the two node ids are persisted, so a reload always
+redraws an edge bottom-to-top. With Loose mode the drag can name the top handle
+as the source, so `onConnect` drops the handle ids before adding the edge
+locally. Without that the line would have jumped the first time the page
+reloaded; now what you see is what is stored.
+
+Verification: `tsc` clean, ESLint clean, Vitest 180/180, `pnpm build` green,
+task-map specs twice at 4/4, and the full Playwright suite 33/33 against the
+production build.
