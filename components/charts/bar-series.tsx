@@ -31,7 +31,11 @@ export function BarSeries({
   const max = Math.max(1, ...points.map((p) => p.value));
 
   return (
-    <div className={cn("flex items-end gap-1.5", className)}>
+    // Hidden from assistive technology on purpose (audit R-18): bar heights
+    // carry the meaning and the axis is bare day numbers, so read aloud this is
+    // a list of numbers with no subject. Every caller pairs it with a
+    // ChartDataTable holding the same series, which is the real equivalent.
+    <div className={cn("flex items-end gap-1.5", className)} aria-hidden>
       {points.map((point, index) => {
         const heightPercent = (point.value / max) * 100;
         return (

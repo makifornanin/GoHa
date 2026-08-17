@@ -8,6 +8,8 @@ import {
   focusMinutesByDay,
   habitCompletionRate,
   habitHeatmap,
+  previousWindow,
+  windowDays,
 } from "@/lib/progress";
 import { requireUser } from "@/lib/session";
 import { getUserDatePrefs } from "@/lib/user-settings";
@@ -29,13 +31,16 @@ export default async function ProgressPage() {
   const { timeZone, weekStartsOn } = await getUserDatePrefs(user.id);
   const today = zonedToday(new Date(), timeZone);
 
-  // The visible window, plus an equal window before it to compare against.
+  // The visible window, plus the window immediately before it. `previousWindow`
+  // matches its length day for day (audit R-18): the current window ends today,
+  // mid-week, and comparing that against twelve whole weeks made every "vs
+  // previous" figure read low, worst at the start of a week.
   const windowStart = startOfWeek(addDays(today, -7 * (WEEKS_SHOWN - 1)), weekStartsOn);
-  const priorStart = addDays(windowStart, -7 * WEEKS_SHOWN);
-  const priorEnd = addDays(windowStart, -1);
+  const current = { from: windowStart, to: today };
+  const prior = previousWindow(current);
   const heatStart = startOfWeek(addDays(today, -7 * (HEATMAP_WEEKS - 1)), weekStartsOn);
   // One fetch wide enough for every window on the page.
-  const earliest = heatStart < priorStart ? heatStart : priorStart;
+  const earliest = heatStart < prior.from ? heatStart : prior.from;
 
   const [tasks, habits, entries, sessions, goals] = await Promise.all([
     tasksRepo.listTasksForUser(user.id),
@@ -45,12 +50,14 @@ export default async function ProgressPage() {
     goalsRepo.listGoalsWithTaskCounts(user.id),
   ]);
 
-  const completions = completionsByDay({ tasks, from: windowStart, to: today, timeZone });
-  const prevCompletions = completionsByDay({ tasks, from: priorStart, to: priorEnd, timeZone });
+  const completions = completionsByDay({ tasks, ...current, timeZone });
+  const prevCompletions = completionsByDay({ tasks, ...prior, timeZone });
   // Minutes for the weekly bars only. The comparison totals use real seconds
   // (see `focusSecondsBetween` below), so there is no prior-window minute series.
-  const focusDaily = focusMinutesByDay({ sessions, from: windowStart, to: today });
+  const focusDaily = focusMinutesByDay({ sessions, ...current });
 
+  // The heatmap spans further back than everything else, because a pattern
+  // needs room to be visible. Its cells are for the picture only.
   const heatmap = habitHeatmap({
     habits,
     entries,
@@ -60,11 +67,22 @@ export default async function ProgressPage() {
     weekStartsOn,
     timeZone,
   });
-  const prevHeatmap = habitHeatmap({
+  // The habit RATE is measured over the same window as every other statistic,
+  // and against the same length of history (audit R-18). It used to be the
+  // 26-week heatmap compared against a 12-week baseline, which is two different
+  // questions reported as one change.
+  const windowHeat = habitHeatmap({
     habits,
     entries,
-    from: priorStart,
-    to: priorEnd,
+    ...current,
+    today,
+    weekStartsOn,
+    timeZone,
+  });
+  const prevHeat = habitHeatmap({
+    habits,
+    entries,
+    ...prior,
     today,
     weekStartsOn,
     timeZone,
@@ -90,7 +108,7 @@ export default async function ProgressPage() {
           : total,
       0,
     );
-  const focusSeconds = focusSecondsBetween(windowStart, today);
+  const focusSeconds = focusSecondsBetween(current.from, current.to);
 
   const data: ProgressData = {
     weeklyCompletions: byWeek(completions, weekStartsOn),
@@ -99,15 +117,20 @@ export default async function ProgressPage() {
     heatmap,
     today,
     weekStartsOn,
-    rangeLabel: `${formatIsoDateMedium(windowStart)} – ${formatIsoDateMedium(today)}`,
+    rangeLabel: `${formatIsoDateMedium(current.from)} – ${formatIsoDateMedium(current.to)}`,
     heatmapRangeLabel: `${formatIsoDateMedium(heatStart)} – ${formatIsoDateMedium(today)}`,
+    // Named so the screen can say what "vs previous" actually means, rather
+    // than leaving the reader to assume it is the same length.
+    comparisonLabel: `${formatIsoDateMedium(prior.from)} – ${formatIsoDateMedium(prior.to)}`,
+    windowDayCount: windowDays(current),
+    heatmapRate: habitCompletionRate(heatmap),
     summary: {
       tasksCompleted: sum(completions),
       tasksCompletedPrev: sum(prevCompletions),
       focusSeconds,
-      focusSecondsPrev: focusSecondsBetween(priorStart, priorEnd),
-      habitRate: habitCompletionRate(heatmap),
-      habitRatePrev: habitCompletionRate(prevHeatmap),
+      focusSecondsPrev: focusSecondsBetween(prior.from, prior.to),
+      habitRate: habitCompletionRate(windowHeat),
+      habitRatePrev: habitCompletionRate(prevHeat),
       bestStreak,
       activeGoals: goals.filter((g) => g.status === "active").length,
       goalsCompleted: goals.filter((g) => g.status === "completed").length,

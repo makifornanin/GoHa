@@ -10,6 +10,9 @@ import {
   focusMinutesByDay,
   habitCompletionRate,
   habitHeatmap,
+  heatWeeks,
+  previousWindow,
+  windowDays,
 } from "@/lib/progress";
 
 const TZ = "Asia/Manila";
@@ -368,5 +371,68 @@ describe("habitHeatmap", () => {
       // Eligible every day, matching lib/habit-streaks.isDayScheduled.
       expect(cells.map((c) => c.scheduled)).toEqual([1, 1, 1, 1, 1, 1, 1]);
     });
+  });
+});
+
+describe("comparison windows (audit R-18)", () => {
+  it("gives the previous window exactly as many days as the current one", () => {
+    // A window that ends mid-week: 11 whole weeks plus a Monday and Tuesday.
+    const current = { from: "2026-05-25", to: "2026-08-11" };
+    const prior = previousWindow(current);
+
+    expect(windowDays(current)).toBe(79);
+    expect(windowDays(prior)).toBe(79);
+    // It ends the day before the current window starts, with no gap or overlap.
+    expect(prior.to).toBe("2026-05-24");
+    expect(prior.from).toBe("2026-03-07");
+  });
+
+  it("holds for a single-day window", () => {
+    const prior = previousWindow({ from: "2026-08-17", to: "2026-08-17" });
+    expect(prior).toEqual({ from: "2026-08-16", to: "2026-08-16" });
+  });
+
+  it("stops a part-week reading as a fall against a full one", () => {
+    // 2 tasks a day, every day, for an unbroken run spanning every window here.
+    const tasks: Task[] = dateRange("2026-01-01", "2026-08-11").flatMap((date) => [
+      task({ completedAt: new Date(`${date}T05:00:00.000Z`) }),
+      task({ completedAt: new Date(`${date}T06:00:00.000Z`) }),
+    ]);
+
+    const current = { from: "2026-05-25", to: "2026-08-11" };
+    const prior = previousWindow(current);
+    const sum = (points: { value: number }[]) => points.reduce((t, p) => t + p.value, 0);
+
+    const now = sum(completionsByDay({ tasks, ...current, timeZone: TZ }));
+    const before = sum(completionsByDay({ tasks, ...prior, timeZone: TZ }));
+
+    // Identical behaviour on both sides now reports as identical.
+    expect(now).toBe(before);
+    expect(deltaPercent(now, before)).toBe(0);
+
+    // The old shape: 12 whole weeks of baseline against a part-finished window.
+    const oldPrior = { from: "2026-03-02", to: "2026-05-24" };
+    const oldBefore = sum(completionsByDay({ tasks, ...oldPrior, timeZone: TZ }));
+    expect(deltaPercent(now, oldBefore)).toBeLessThan(0);
+  });
+});
+
+describe("heatWeeks (audit R-18 tabular equivalent)", () => {
+  it("rolls cells into weeks that total the same as the cells", () => {
+    const cells = [
+      { date: "2026-08-10", done: 2, scheduled: 3, level: 2 as const },
+      { date: "2026-08-11", done: 3, scheduled: 3, level: 4 as const },
+      { date: "2026-08-17", done: 1, scheduled: 2, level: 2 as const },
+    ];
+    const weeks = heatWeeks(cells, 1);
+
+    expect(weeks).toEqual([
+      { weekStart: "2026-08-10", done: 5, scheduled: 6 },
+      { weekStart: "2026-08-17", done: 1, scheduled: 2 },
+    ]);
+    // The table and the headline percentage cannot disagree.
+    const done = weeks.reduce((t, w) => t + w.done, 0);
+    const scheduled = weeks.reduce((t, w) => t + w.scheduled, 0);
+    expect(Math.round((done / scheduled) * 100)).toBe(habitCompletionRate(cells));
   });
 });

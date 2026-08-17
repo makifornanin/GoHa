@@ -4,13 +4,20 @@ import { CheckCircle2, Flame, Target, Timer } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { BarSeries, type SeriesPoint } from "@/components/charts/bar-series";
+import { ChartDataTable } from "@/components/charts/data-table";
 import { HabitHeatmap } from "@/components/charts/habit-heatmap";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Weekday } from "@/lib/date";
+import { formatIsoDateMedium, type Weekday } from "@/lib/date";
 import { formatDurationHm } from "@/lib/focus";
-import { deltaPercent, type DayPoint, type HeatCell, type WeekPoint } from "@/lib/progress";
+import {
+  deltaPercent,
+  heatWeeks,
+  type DayPoint,
+  type HeatCell,
+  type WeekPoint,
+} from "@/lib/progress";
 import { cn } from "@/lib/utils";
 
 export type ProgressData = {
@@ -24,6 +31,12 @@ export type ProgressData = {
   rangeLabel: string;
   /** Human range covered by the heatmap, which spans further back. */
   heatmapRangeLabel: string;
+  /** The equal-length window every "vs previous" figure is measured against. */
+  comparisonLabel: string;
+  /** Days in the current window, so the comparison can state its own length. */
+  windowDayCount: number;
+  /** Completion rate across the heatmap's own, longer range. */
+  heatmapRate: number;
   summary: {
     tasksCompleted: number;
     tasksCompletedPrev: number;
@@ -125,12 +138,33 @@ export function ProgressView({ data }: { data: ProgressData }) {
   const totalCompletions = data.weeklyCompletions.reduce((sum, w) => sum + w.value, 0);
   const totalFocus = data.weeklyFocusMinutes.reduce((sum, w) => sum + w.value, 0);
 
+  const weekRows = (weeks: WeekPoint[], format: (value: number) => string) =>
+    weeks.map((week, index) => ({
+      key: week.weekStart,
+      cells: [formatIsoDateMedium(week.weekStart) ?? week.weekStart, format(week.value)],
+      emphasis: index === weeks.length - 1,
+    }));
+
+  const habitWeekRows = heatWeeks(data.heatmap, data.weekStartsOn).map((week) => ({
+    key: week.weekStart,
+    cells: [
+      formatIsoDateMedium(week.weekStart) ?? week.weekStart,
+      week.scheduled === 0 ? "none scheduled" : `${week.done} of ${week.scheduled}`,
+      week.scheduled === 0 ? "—" : `${Math.round((week.done / week.scheduled) * 100)}%`,
+    ],
+  }));
+
+  // Every "vs previous" on this page means this, and only this.
+  const comparisonNote = `Tiles cover ${data.rangeLabel} (${data.windowDayCount} days), compared with the ${data.windowDayCount} days before that, ${data.comparisonLabel}.`;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Progress"
         description="How your work, focus, and habits have actually gone over time."
       />
+
+      <p className="-mt-2 text-footnote text-label-tertiary">{comparisonNote}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
@@ -194,6 +228,11 @@ export function ProgressView({ data }: { data: ProgressData }) {
             ) : (
               <BarSeries points={completionPoints} unit=" tasks" />
             )}
+            <ChartDataTable
+              caption={`Tasks completed by week, ${data.rangeLabel}`}
+              columns={["Week starting", "Tasks"]}
+              rows={weekRows(data.weeklyCompletions, (value) => String(value))}
+            />
           </CardContent>
         </Card>
 
@@ -227,6 +266,11 @@ export function ProgressView({ data }: { data: ProgressData }) {
                 emphasisClassName="bg-indigo"
               />
             )}
+            <ChartDataTable
+              caption={`Focus minutes by week, ${data.rangeLabel}`}
+              columns={["Week starting", "Minutes"]}
+              rows={weekRows(data.weeklyFocusMinutes, (value) => String(value))}
+            />
           </CardContent>
         </Card>
       </div>
@@ -239,8 +283,10 @@ export function ProgressView({ data }: { data: ProgressData }) {
               {data.heatmapRangeLabel}
             </p>
           </div>
+          {/* This card's own range, not the 12-week figure in the tile above.
+              The two used to be the same number under two different windows. */}
           <span className="shrink-0 font-mono text-footnote tabular-nums text-label-secondary">
-            {summary.habitRate}% of scheduled check-ins
+            {data.heatmapRate}% of scheduled check-ins
           </span>
         </CardHeader>
         <CardContent>
@@ -255,6 +301,11 @@ export function ProgressView({ data }: { data: ProgressData }) {
               weekStartsOn={data.weekStartsOn}
             />
           )}
+          <ChartDataTable
+            caption={`Habit check-ins by week, ${data.heatmapRangeLabel}`}
+            columns={["Week starting", "Completed", "Rate"]}
+            rows={habitWeekRows}
+          />
         </CardContent>
       </Card>
     </div>

@@ -187,16 +187,47 @@ export function habitHeatmap(params: {
   });
 }
 
-export type ProgressSummary = {
-  tasksCompleted: number;
-  tasksCompletedPrev: number;
-  focusMinutes: number;
-  focusMinutesPrev: number;
-  habitRate: number;
-  habitRatePrev: number;
-  bestStreak: number;
-  activeGoals: number;
-};
+/** Heat cells rolled into weeks, for the heatmap's tabular equivalent. */
+export function heatWeeks(
+  cells: HeatCell[],
+  weekStartsOn: Weekday = 1,
+): { weekStart: IsoDate; done: number; scheduled: number }[] {
+  const weeks = new Map<IsoDate, { done: number; scheduled: number }>();
+  for (const cell of cells) {
+    const start = startOfWeek(cell.date, weekStartsOn);
+    const week = weeks.get(start) ?? { done: 0, scheduled: 0 };
+    week.done += cell.done;
+    week.scheduled += cell.scheduled;
+    weeks.set(start, week);
+  }
+  return [...weeks.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([weekStart, week]) => ({ weekStart, ...week }));
+}
+
+export type Window = { from: IsoDate; to: IsoDate };
+
+/** Days covered by an inclusive window. */
+export function windowDays(window: Window): number {
+  let days = 0;
+  for (let d = window.from; d <= window.to; d = addDays(d, 1)) days += 1;
+  return days;
+}
+
+/**
+ * The window immediately before this one, of exactly the same length (audit
+ * R-18).
+ *
+ * The comparison used to be "twelve whole weeks" against "eleven whole weeks
+ * plus however much of this one has happened". Every "vs previous" figure on
+ * the screen was therefore biased downwards, hardest on a Monday, and the
+ * screen never said so. Same number of days on both sides, or the number is
+ * not a comparison.
+ */
+export function previousWindow(window: Window): Window {
+  const days = windowDays(window);
+  return { from: addDays(window.from, -days), to: addDays(window.from, -1) };
+}
 
 /** Percentage change vs the previous window; null when there is no baseline. */
 export function deltaPercent(current: number, previous: number): number | null {

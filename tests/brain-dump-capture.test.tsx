@@ -96,7 +96,11 @@ describe("Brain Dump rapid capture", () => {
     for (const thought of thoughts) {
       expect(screen.getAllByText(thought)).toHaveLength(1);
     }
-  });
+    // Generous timeout: this drives ~50 real keystrokes through user-event, so
+    // it runs close to the 5s default and tips over it when the suite's other
+    // jsdom files are competing for the CPU. The assertions are about state,
+    // not speed, so the wall clock must not be what decides the result.
+  }, 20_000);
 
   it("recovers the form when the action rejects", async () => {
     captureAction.mockRejectedValue(new Error("network went away"));

@@ -52,7 +52,10 @@ export function HabitHeatmap({
   );
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    // The grid is the picture; the numbers live in the data table beside it
+    // (audit R-18). Left visible to assistive technology it announced one cell
+    // per day, 182 of them, which is noise rather than an equivalent.
+    <div className={cn("flex flex-col gap-2", className)} aria-hidden>
       <div className="overflow-x-auto">
         <div className="flex gap-1">
           {/* Weekday gutter: label alternating rows only, so it stays readable. */}
