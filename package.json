@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "test:account:create": "node --experimental-strip-types scripts/test-account.mts create",
+    "test:account:reset": "node --experimental-strip-types scripts/test-account.mts reset",
     "test:account:destroy": "node --experimental-strip-types scripts/test-account.mts destroy"
   },
   "dependencies": {

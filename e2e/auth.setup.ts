@@ -20,6 +20,10 @@ const password = process.env.E2E_PASSWORD ?? "goha-e2e-harness-pw";
 const name = process.env.E2E_NAME ?? "E2E Harness";
 
 setup("authenticate (bootstrap or login)", async ({ page }) => {
+  // This step deliberately absorbs the whole cold-start cost of `next dev`
+  // (see the warm-up loop below), which is far more than one screen's worth of
+  // compiling, so it gets its own budget rather than the suite's 90s default.
+  setup.setTimeout(360_000);
   mkdirSync(path.dirname(authFile), { recursive: true });
 
   await page.goto("/register");
@@ -42,4 +46,29 @@ setup("authenticate (bootstrap or login)", async ({ page }) => {
   await expect(page).toHaveURL(/\/today/);
 
   await page.context().storageState({ path: authFile });
+
+  // Warm every route once.
+  //
+  // Under `next dev` each route and each Server Action compiles on its FIRST
+  // use, which lands entirely on whichever test happens to touch it first. That
+  // is why a suite run against a freshly started dev server failed on timings
+  // (a dialog not closing, an edge not rendering) while the identical run
+  // against a warm server passed: the assertions were racing Turbopack, not the
+  // app. Paying the compile cost here once makes the suite measure the product.
+  for (const route of [
+    "/today",
+    "/tasks",
+    "/goals",
+    "/life-areas",
+    "/habits",
+    "/focus",
+    "/brain-dump",
+    "/task-maps",
+    "/calendar",
+    "/review",
+    "/progress",
+    "/settings",
+  ]) {
+    await page.goto(route, { waitUntil: "networkidle" });
+  }
 });
