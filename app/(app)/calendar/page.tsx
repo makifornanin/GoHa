@@ -6,7 +6,10 @@ import {
 } from "@/components/calendar/calendar-view";
 import { focusRepo, habitsRepo, lifeAreasRepo, tasksRepo } from "@/db";
 import { addDays, zonedToday } from "@/lib/date";
+import { habitOutcome } from "@/lib/habit-outcome";
+import { isDayScheduled } from "@/lib/habit-streaks";
 import { buildHabitViews } from "@/lib/habit-view";
+import { toNumberOrNull } from "@/lib/habits";
 import { requireUser } from "@/lib/session";
 import { getUserDatePrefs } from "@/lib/user-settings";
 
@@ -35,30 +38,42 @@ export default async function CalendarPage() {
   ]);
 
   /**
-   * Habit occurrences per day, resolved on the server from the SAME schedule
-   * rules the Habits screen uses, so a day cannot read as scheduled here and
-   * unscheduled there. Only the current week's cells come with a resolved
-   * state, so past and future days fall back to the raw entry.
+   * Habit occurrences per day, resolved on the server through the SAME schedule
+   * rules and the SAME outcome definition the Habits screen uses, so a day
+   * cannot read as scheduled here and unscheduled there, or done here and
+   * partial there (audit R-06).
+   *
+   * Two things changed here. The outcome came from `entry.status === "done"`,
+   * which counted a numeric habit logged BELOW its target as a completion; it
+   * now goes through lib/habit-outcome, so those days read as `partial`. And
+   * schedule matching was open-coded, handling only weekly-with-days and
+   * silently treating monthly and times-per-week habits as due every day; it now
+   * calls isDayScheduled, the same predicate the streak walker uses.
    */
   const views = buildHabitViews({ habits, entries, today, weekStartsOn, timeZone });
-  const doneKey = new Set(
-    entries.filter((e) => e.status === "done").map((e) => `${e.habitId}|${e.entryDate}`),
-  );
+  const entryByKey = new Map(entries.map((e) => [`${e.habitId}|${e.entryDate}`, e]));
 
   const habitDays: HabitDay[] = [];
   for (const view of views) {
-    const schedule = view.schedule;
+    const measure = {
+      type: view.habit.type,
+      targetValue: toNumberOrNull(view.habit.targetValue),
+      higherIsBetter: view.habit.higherIsBetter,
+    };
     for (let date = from; date <= to; date = addDays(date, 1)) {
-      if (schedule.startDate && date < schedule.startDate) continue;
-      if (schedule.frequency === "weekly" && schedule.daysOfWeek?.length) {
-        const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
-        if (!schedule.daysOfWeek.includes(weekday)) continue;
-      }
+      if (!isDayScheduled(view.schedule, date)) continue;
+      const entry = entryByKey.get(`${view.habit.id}|${date}`);
       habitDays.push({
         date,
         habitId: view.habit.id,
         name: view.habit.name,
-        done: doneKey.has(`${view.habit.id}|${date}`),
+        outcome: habitOutcome({
+          habit: measure,
+          entry: entry ? { status: entry.status, value: toNumberOrNull(entry.value) } : null,
+          scheduled: true,
+          date,
+          today,
+        }),
         color: view.habit.color,
       });
     }

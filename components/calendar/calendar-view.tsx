@@ -12,13 +12,45 @@ import type { LifeArea, Task } from "@/db";
 import { addMonths, buildMonthGrid, monthLabel, weekdayHeaders } from "@/lib/calendar";
 import { formatIsoDateMedium, startOfMonth, type Weekday } from "@/lib/date";
 import { formatDurationHm } from "@/lib/focus";
+import { isCompleteOutcome, type HabitOutcome } from "@/lib/habit-outcome";
 import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { spring } from "@/lib/motion";
 import { taskEffectiveDate } from "@/lib/task-buckets";
 import { cn } from "@/lib/utils";
 
-/** One habit occurrence on a day, precomputed on the server. */
-export type HabitDay = { date: string; habitId: string; name: string; done: boolean; color: string | null };
+/**
+ * One habit occurrence on a day, precomputed on the server.
+ *
+ * Carries the resolved OUTCOME rather than a `done` boolean (audit R-06). A
+ * boolean could not tell a completion from a numeric habit logged below its
+ * target, so both rendered identically and both counted toward "3 of 3 done".
+ */
+export type HabitDay = {
+  date: string;
+  habitId: string;
+  name: string;
+  outcome: HabitOutcome;
+  color: string | null;
+};
+
+/**
+ * How each outcome reads in the day detail list.
+ *
+ * `partial` is deliberately distinguishable from `done` by more than opacity:
+ * it keeps full-strength text and gains an explicit suffix, because the whole
+ * point of the finding is that a shortfall was being presented as a success.
+ */
+const habitOutcomeDisplay: Record<
+  HabitOutcome,
+  { icon: string; text: string; strike: boolean; suffix: string | null }
+> = {
+  done: { icon: "text-green", text: "text-label-tertiary", strike: true, suffix: null },
+  partial: { icon: "text-orange", text: "text-label", strike: false, suffix: "partial" },
+  missed: { icon: "text-red", text: "text-label-secondary", strike: false, suffix: "missed" },
+  skipped: { icon: "text-label-tertiary", text: "text-label-tertiary", strike: false, suffix: "skipped" },
+  pending: { icon: "text-label-tertiary", text: "text-label", strike: false, suffix: null },
+  off_schedule: { icon: "text-label-quaternary", text: "text-label-tertiary", strike: false, suffix: null },
+};
 /** Focus minutes rolled up per day. */
 export type FocusDay = { date: string; seconds: number; sessions: number };
 
@@ -165,7 +197,9 @@ export function CalendarView({ data }: { data: CalendarData }) {
               const dayTasks = showTasks ? tasksByDate.get(cell.date) ?? [] : [];
               const dayHabits = showHabits ? habitsByDate.get(cell.date) ?? [] : [];
               const dayFocus = showFocus ? focusByDate.get(cell.date) : undefined;
-              const habitsDone = dayHabits.filter((h) => h.done).length;
+              // Only a met target counts. A numeric habit logged short of its
+              // target is `partial` and must not inflate this (audit R-06).
+              const habitsDone = dayHabits.filter((h) => isCompleteOutcome(h.outcome)).length;
               const isSelected = selected === cell.date;
               // A day that has not happened cannot have missed anything. Showing
               // "0/3" on every future date painted the rest of the month as
@@ -319,25 +353,30 @@ export function CalendarView({ data }: { data: CalendarData }) {
                 <section>
                   <h4 className="mb-2 text-caption uppercase text-label-secondary">Habits</h4>
                   <ul className="flex flex-col gap-1.5">
-                    {selectedHabits.map((habit) => (
-                      <li key={habit.habitId} className="flex items-center gap-2">
-                        <Repeat
-                          className={cn(
-                            "size-3.5 shrink-0",
-                            habit.done ? "text-green" : "text-label-tertiary",
-                          )}
-                          aria-hidden
-                        />
-                        <span
-                          className={cn(
-                            "min-w-0 flex-1 truncate text-body",
-                            habit.done ? "text-label-tertiary line-through" : "text-label",
-                          )}
-                        >
-                          {habit.name}
-                        </span>
-                      </li>
-                    ))}
+                    {selectedHabits.map((habit) => {
+                      const display = habitOutcomeDisplay[habit.outcome];
+                      return (
+                        <li key={habit.habitId} className="flex items-center gap-2">
+                          <Repeat className={cn("size-3.5 shrink-0", display.icon)} aria-hidden />
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 truncate text-body",
+                              display.text,
+                              display.strike && "line-through",
+                            )}
+                          >
+                            {habit.name}
+                          </span>
+                          {/* Named, not just tinted: a shortfall that only differs
+                              by colour is the same failure as calling it done. */}
+                          {display.suffix ? (
+                            <span className="shrink-0 text-footnote text-label-tertiary">
+                              {display.suffix}
+                            </span>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </section>
               ) : null}
