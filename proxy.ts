@@ -45,6 +45,11 @@ export const config = {
    * not a session cookie. Left in, this redirected every automation request to
    * /login with a 307, so an external caller received an HTML sign-in page
    * instead of its data and no token could ever work.
+   *
+   * `api/health` is excluded because a health check has no session and must
+   * answer with a status rather than a redirect to a sign-in page.
    */
-  matcher: ["/((?!api/auth|api/automation|_next/static|_next/image|favicon.ico|.*\\.).*)"],
+  matcher: [
+    "/((?!api/auth|api/automation|api/health|_next/static|_next/image|favicon.ico|.*\\.).*)",
+  ],
 };

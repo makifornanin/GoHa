@@ -1,0 +1,84 @@
+name: CI
+
+# Every push and every pull request. A single-owner project has no reviewer to
+# catch what a green local run missed, so the machine is the reviewer.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A newer push makes an older run irrelevant; do not pay for both.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # No DATABASE_URL and no secrets anywhere in this job, on purpose.
+    # Everything below must pass without touching a database: the build is
+    # verified not to need one (the Neon client is lazy), the unit suite is
+    # pure, and CI must never be a route to the owner's real data.
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        # Version comes from `packageManager` in package.json, so the pin lives
+        # in one place and a local run and CI cannot disagree.
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        # Frozen: the lockfile is the input, and a run that quietly resolves a
+        # different tree is testing something other than what will ship.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Migration files are consistent
+        # Drizzle's own check: the journal and the snapshots agree with each
+        # other and no two migrations collide.
+        run: pnpm db:check
+
+      - name: Known vulnerabilities in shipped dependencies
+        # Advisory, not a gate. A transitive advisory with no fix available
+        # would otherwise block every push on a project with one maintainer,
+        # and a check that must be ignored to get work done stops being read at
+        # all. It reports; the fix is a decision, not an automatic revert.
+        continue-on-error: true
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Schema has no migration missing
+        # `generate` is offline. If the schema has moved without a migration
+        # being generated, this writes a new file and the diff fails the job:
+        # the failure IS the message, and the fix is to commit the migration.
+        run: |
+          pnpm db:generate
+          if ! git diff --quiet --exit-code -- db/migrations; then
+            echo "::error::The schema has changed with no migration committed. Run 'pnpm db:generate' and commit the result."
+            git --no-pager diff --stat -- db/migrations
+            exit 1
+          fi

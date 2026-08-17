@@ -1,7 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { neon } from "@neondatabase/serverless";
+
+import { loadEnv, requireEnv } from "./lib/env.mts";
 
 /**
  * Read-only database diagnostic. Reports connection identity, applied
@@ -45,29 +44,10 @@ function textShape(value: unknown): string {
   const text = String(value ?? "");
   return `(${text.length} chars)`;
 }
-function loadEnv(file: string) {
-  const path = resolve(process.cwd(), file);
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*?)\s*$/);
-    if (!match) continue;
-    const key = match[1];
-    let value = match[2];
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (process.env[key] === undefined) process.env[key] = value;
-  }
-}
 
-loadEnv(".env.local");
-loadEnv(".env");
+loadEnv();
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is not set.");
+const url = requireEnv("DATABASE_URL");
 
 // Identity only, never the password.
 const parsed = new URL(url);

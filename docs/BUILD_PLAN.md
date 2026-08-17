@@ -706,6 +706,195 @@ the user had not touched.
 Regression cover: `tests/brain-dump-capture.test.tsx`, driving five back-to-back
 captures with no delay at all, which is harsher than the 150ms that used to fail.
 
+### 2026-08-18: R-17, the Focus session that lost your note and ended in silence
+
+Four findings, all of them a draft being lost or something happening without
+being asked for.
+
+An unreadable custom length kept the last duration the picker understood, so
+the field could read "abc" while Start quietly began a 25 minute session. It
+reports no duration now, the clock reads `--:--`, and Start is disabled.
+
+Session notes only reached the database when the session was finished. They
+autosave while it runs, scoped to `in_progress` rows so a finished session's
+note can never be rewritten. Each save is its own request, not a shared
+transition, which is the coupling that stranded rapid Brain Dump captures.
+Finishing flushes first so the two writes cannot race. `finishFocusSession` now
+leaves the column alone when no note is carried; writing `null` unconditionally
+was how the abandon sweep erased notes it never had.
+
+Discard deletes the session outright and had no confirmation. It asks now.
+
+Reaching the planned time said nothing beyond a colour change, and a session
+nobody came back to ran until the 12h abandon sweep. Time's up announces itself
+in the tab and the document title, and ten minutes of unattended overtime
+completes the session. Counted time was already capped at the plan, so this
+changes when a session closes, never what it is credited with; the countdown is
+on screen throughout and adding time resets it. In-tab only: no OS permission
+prompt, no push service (CLAUDE.md section 2).
+
+Key files: `lib/focus.ts`, `components/focus/{focus-view,duration-picker}.tsx`,
+`db/repositories/focus.ts`, `app/(app)/focus/actions.ts`,
+`tests/focus-session-safety.test.tsx`.
+
+### 2026-08-18: R-18, Progress compared unequal periods and drew pictures only
+
+"vs previous" compared the current window, which ends today and therefore stops
+mid-week, against twelve whole weeks. Every figure read low, worst at the start
+of a week, and nothing said so. `previousWindow` matches the current window day
+for day, and the page states the range it compares against.
+
+The habit rate was worse: 26 weeks of heatmap against a 12 week baseline, two
+different questions reported as one change. It is measured over the same window
+as every other tile now, and the heatmap card shows its own rate for its own
+longer range, each labelled.
+
+The charts were pictures. Bar heights and colour intensity carried everything,
+unreachable by keyboard and silent to a screen reader, while the heatmap offered
+182 individually labelled cells, which is noise rather than an equivalent. Both
+are `aria-hidden` now and each is paired with a real data table in a native
+`<details>`, holding the same numbers. Progress also had no loading or error
+boundary, the only data route without them.
+
+Key files: `lib/progress.ts`, `components/progress/progress-view.tsx`,
+`components/charts/{data-table,bar-series,habit-heatmap}.tsx`,
+`app/(app)/progress/{page,loading,error}.tsx`.
+
+### 2026-08-18: R-08, uniqueness rules became constraints instead of conventions
+
+Five rules the code kept by reading first and then writing. Two requests
+arriving together both pass a read, and the result is a duplicate the app
+believes impossible: two owners, two running focus sessions double counting
+time, two active schedules for one habit with each screen trusting whichever it
+read first, one task holding two of the day's three slots.
+
+Migration `0011_silky_hardball.sql` (NOT applied) puts them in the database:
+`user_single_owner_uq`, `focus_sessions_one_active_per_user_uq`,
+`habit_schedules_one_active_per_habit_uq`,
+`daily_priorities_user_date_task_uq`, and a check bounding
+`planned_duration_seconds` to 1s..24h, since extensions add to that column with
+no ceiling of their own.
+
+The singleton index is deliberately one index and nothing else: every table
+stays user-scoped, so multi-user later is a `DROP INDEX` with no structural
+change (CLAUDE.md section 1).
+
+Losing a race still has to read as an ordinary answer, so `lib/db-errors.ts`
+classifies violations by SQLSTATE and constraint name and the callers respond in
+the words they already used: starting focus twice returns the session that won,
+pinning an already-pinned task says so, Plan my day skips a slot taken from
+under it rather than abandoning the plan, and a raced sign-up gets the same 403
+sentence as an ordinary second attempt instead of a 500 quoting an index name.
+`upsertHabitSchedule` is a single `ON CONFLICT` statement now.
+
+Not enforced in the database, and said plainly in `docs/DATABASE.md` rather than
+left to be assumed: goal cycles deeper than self-parenting, which need a
+recursive trigger, and parent/child ownership equality (R-13).
+
+### 2026-08-18: Phase 2, the automation surface
+
+GoHa keeps no notification infrastructure, no scheduler and no third-party
+integrations (CLAUDE.md section 2), so automations live outside it. The guide's
+starting point is a read-only database role, which works for plain SQL and fails
+at the one thing that matters: Today's ranking lives in `lib/today-brain.ts`,
+and a SQL reimplementation drifts from the app the first time the ranking
+improves.
+
+So the app grows one small surface and the automations call the real engine:
+
+    GET  /api/automation             does this token work, and what can it reach
+    GET  /api/automation/brief       deriveDaySignal, the same judgement Today shows
+    GET  /api/automation/habits      what is still open today, and streaks at risk
+    POST /api/automation/deliveries  claim (kind, date) once, so a repeat run sends once
+
+Migration `0012_clammy_the_professor.sql` (NOT applied) adds three tables.
+`automation_tokens` stores a SHA-256 hash and a short prefix, never the secret.
+`automation_requests` is both the audit trail and what the rate limiter counts,
+in SQL rather than a per-process map, because a map cannot hold a limit across
+instances. `automation_deliveries` carries the unique constraint that makes a
+delivery claim a claim rather than a hope.
+
+Bearer token in the header and never a query string, prefix lookup confirmed by
+a constant-time hash compare, the user derived from the token so there is no
+caller-supplied id to forge, rate limited, logged, read-only apart from the
+delivery claim, which still cannot create or complete a single domain record.
+`quiet` is computed server-side on both read endpoints: never notifying when
+there is nothing to act on is the guide's first operating rule and should not be
+re-derived, differently, by every flow.
+
+Found by probing the running build rather than by reading it: the proxy matched
+`/api/automation` and answered every automation request with a 307 to `/login`,
+so no token could ever have worked.
+
+Deliberately not built: an export endpoint (the nightly backup is
+`pnpm db:backup`, which is better at it and does not widen this surface) and any
+write to domain records. Also not built, and worth stating because hard rule 6
+mentions it: there is no generated quote or verse content anywhere in this
+slice. The rule constrains such content if it is ever added; it is not a request
+to add it, and inventing the feature would have been speculative scope.
+
+Key files: `db/schema/automation.ts`, `db/repositories/automation.ts`,
+`lib/automation/*`, `lib/validations/automation.ts`, `app/api/automation/**`,
+`docs/AUTOMATION.md`.
+
+### 2026-08-18: Phase 3, managing tokens, and the dialog that fought back
+
+An Automations card in Settings: mint a token, see what each one can reach,
+watch what has actually been calling, revoke. The secret is shown once and the
+dialog says why, the scope selector says what each choice allows in plain words,
+and the request log answers "is my automation working", which is otherwise only
+knowable from the other side. Revoke keeps the row; it is the answer to "I
+pasted it somewhere I should not have" and must not also erase what that token
+was doing.
+
+Building it turned up a real defect in `Modal`, found by a test and traced to
+the click landing on the close button. `onClose` is nearly always an inline
+arrow, so it was a new function on every render of whatever owns the dialog, and
+it sat in the effect's dependency list. Every owner re-render tore the effect
+down and set it up again, and setting up means "focus the first focusable in the
+panel", so a dialog whose owner re-renders while you type pulled focus to the
+close button after every keystroke. The handlers live in refs now and the effect
+depends on `open` alone. Nothing else in the app hit this because every other
+modal keeps its form state inside the modal; the new create form does the same.
+
+### 2026-08-18: Phase 4, hardening, CI, and documentation that is true
+
+R-19, the environment contract. Four copies of the same `.env` reader had grown
+in `drizzle.config.ts`, `db/migrate.mts`, `scripts/backup.mts` and
+`scripts/diagnose.mts`, with subtly different regexes and no shared statement of
+precedence. One reader now (`scripts/lib/env.mts`), documented, following Next's
+order, and never printing a value. `scripts/lib/require-test-db.mts` keeps its
+own on purpose: it is the guard between a destructive command and the real
+database, and it is worth more with no dependencies. Node and pnpm are pinned
+(`.nvmrc`, `packageManager`, `engines`), which also settles the audit's warning
+about `.mts` tooling on an older runtime.
+
+R-16, production operation. Security headers and a CSP on every response,
+`poweredByHeader` off, and `/api/health`, which is deliberately dull:
+unauthenticated, so it reports only whether the process is up and whether the
+database answers, with no version, host, or counts. CI runs typecheck, lint,
+unit tests, a production build, `drizzle-kit check`, and a schema-drift check
+that fails if the schema moved without a migration. It holds no credentials and
+never touches a database; the build was verified to need neither.
+
+The CSP admits what it is rather than pretending: `'unsafe-inline'` for styles
+is required by Tailwind v4 and the motion library, and for scripts by Next's
+hydration bootstrap until a nonce is threaded through. `connect-src 'self'` is
+the line that matters here, since nothing in this app should talk to a third
+party. Verified in a real browser: `/login` renders and hydrates with an empty
+console and no failed requests.
+
+R-20, documentation drift. The README was still create-next-app boilerplate; it
+now describes what GoHa is, how to run it, the four architectural rules, and
+where every other document lives. `docs/AUTOMATION.md` is new and is the
+contract external automations depend on. `docs/DATABASE.md` gained the
+concurrency invariants and the preflight queries for 0011.
+
+Deferred with a reason rather than silently: Web Vitals reporting and bundle
+budgets (a budget with no deploy target is a number with no consequence), and
+Firefox/WebKit/axe coverage in Playwright, which belongs with a real E2E run on
+the test database.
+
 ---
 
 ## Automation Foundation: remediation plan (from the 17 Aug 2026 audit)
@@ -747,8 +936,30 @@ item, no drive-by refactors.
 - Phase 1.2 R-05 Review week state: COMPLETE.
 - Phase 1.3 R-09 open redirect: COMPLETE.
 - Phase 1.4 R-10 Brain Dump rapid capture + conversion limits: COMPLETE.
-- Phase 1.5 R-07 Calendar: IN PROGRESS.
-- Phase 1.6 R-15 timezone contract, 1.7 R-12 Task Maps, 1.8 R-17 Focus,
-  1.9 R-18 Progress, 1.10 R-08 database invariants: NOT STARTED.
-- Phase 2 (automation schema + API), Phase 3 (automation UI), Phase 4
-  (hardening, CI, docs): NOT STARTED.
+- Phase 1.5 R-07 Calendar: COMPLETE.
+- Phase 1.6 R-15 timezone contract: COMPLETE.
+- Phase 1.7 R-12 Task Maps: COMPLETE.
+- Phase 1.8 R-17 Focus draft/input safety: COMPLETE (2026-08-18).
+- Phase 1.9 R-18 Progress periods and accessibility: COMPLETE (2026-08-18).
+- Phase 1.10 R-08 database invariants: COMPLETE (2026-08-18), migration 0011
+  generated and NOT applied.
+- Phase 2 (automation schema + API): COMPLETE (2026-08-18), migration 0012
+  generated and NOT applied.
+- Phase 3 (automation UI): COMPLETE (2026-08-18).
+- Phase 4 (hardening, CI, docs): COMPLETE (2026-08-18).
+
+### Waiting on the owner
+
+Two migrations are generated, read, committed, and deliberately NOT applied
+(hard rule 2). Apply them in order with `pnpm db:migrate`:
+
+- `0011_silky_hardball.sql` — the concurrency invariants. It creates unique
+  indexes over existing rows, so it FAILS rather than corrupts if the data
+  already breaks a rule. `docs/DATABASE.md` carries five preflight queries to
+  run first; each must return no rows.
+- `0012_clammy_the_professor.sql` — the automation tables. Purely additive
+  (three new tables, one new enum), nothing existing is touched.
+
+Until 0012 is applied, the automation endpoints answer `503` and the Settings
+Automations card cannot list tokens. That is the designed answer for "the
+tables are not there yet", not a bug.

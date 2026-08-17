@@ -1,35 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { defineConfig } from "drizzle-kit";
 
-/**
- * Load `.env.local` then `.env` for the Drizzle Kit CLI. Next.js loads these at
- * runtime, but the standalone CLI does not, so `migrate` / `push` / `studio`
- * would otherwise not see `DATABASE_URL`. Lines are read raw (no shell
- * interpretation), so connection strings containing `&` are safe. Existing
- * process env always wins, and no value is ever printed.
- */
-function loadEnv(file: string) {
-  const path = resolve(process.cwd(), file);
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*?)\s*$/);
-    if (!match) continue;
-    const key = match[1];
-    let value = match[2];
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (process.env[key] === undefined) process.env[key] = value;
-  }
-}
+import { loadEnv } from "./scripts/lib/env.mts";
 
-loadEnv(".env.local");
-loadEnv(".env");
+/**
+ * Next.js loads `.env*` itself at runtime, but the standalone Drizzle Kit CLI
+ * does not, so `migrate` / `push` / `studio` would not see `DATABASE_URL`.
+ * One shared reader for every CLI entry point (audit R-19).
+ */
+loadEnv();
 
 /**
  * Drizzle Kit configuration.

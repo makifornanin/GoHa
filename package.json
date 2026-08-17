@@ -2,6 +2,11 @@
   "name": "goha",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=10"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,6 +17,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "db:migrate": "node db/migrate.mts",
     "db:diagnose": "node --experimental-strip-types scripts/diagnose.mts",
     "db:backup": "node --experimental-strip-types scripts/backup.mts",

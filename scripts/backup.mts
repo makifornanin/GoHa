@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { neon } from "@neondatabase/serverless";
 
 import { BACKUP_FORMAT, BACKUP_TABLES } from "./lib/backup-tables.mts";
+import { loadEnv, requireEnv } from "./lib/env.mts";
 
 /**
  * The real backup (audit R-04).
@@ -30,28 +31,9 @@ import { BACKUP_FORMAT, BACKUP_TABLES } from "./lib/backup-tables.mts";
  * exactly like a secret: ./backups is gitignored, and it should never be
  * pasted, attached or synced anywhere you would not put the database itself.
  */
-function loadEnv(file: string): void {
-  const path = resolve(process.cwd(), file);
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*?)\s*$/);
-    if (!match) continue;
-    let value = match[2];
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (process.env[match[1]] === undefined) process.env[match[1]] = value;
-  }
-}
+loadEnv();
 
-loadEnv(".env.local");
-loadEnv(".env");
-
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is not set; cannot back up.");
+const url = requireEnv("DATABASE_URL");
 
 /** Filesystem-safe UTC stamp: 2026-08-17T14-32-05Z. */
 function stamp(now = new Date()): string {
