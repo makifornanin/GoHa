@@ -1,7 +1,10 @@
 import type { FocusSession, HabitEntry, Task } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { addDays, startOfWeek, toZonedDate, type IsoDate, type Weekday } from "@/lib/date";
+import { habitOutcome, isCompleteOutcome } from "@/lib/habit-outcome";
+import { isDayScheduled } from "@/lib/habit-streaks";
 import { buildHabitViews } from "@/lib/habit-view";
+import { toNumberOrNull } from "@/lib/habits";
 import { MANILA_TZ } from "@/lib/date";
 
 /**
@@ -110,9 +113,22 @@ export type HeatCell = {
  * A GitHub-style habit heatmap: one cell per day, intensity = share of that
  * day's scheduled habits actually completed.
  *
- * Uses the SAME `buildHabitViews` the Habits screen uses, so a day can never
- * read as missed here and done there. Days before a habit existed are not
- * scheduled at all, so a new habit does not paint the past grey.
+ * Uses the SAME schedule predicate and the SAME outcome definition as Habits,
+ * Today and Calendar (audit R-06), so a day can never read as missed here and
+ * done there. Days before a habit existed are not scheduled at all, so a new
+ * habit does not paint the past grey.
+ *
+ * Two things this used to get wrong across the wide window it spans:
+ *
+ *  - `done` was taken from the raw entry status, so a numeric habit logged
+ *    BELOW its target counted as a completion. It resolves to `partial` now,
+ *    and partial is not a completion.
+ *  - The schedule test was open-coded and understood only weekly-with-days, so
+ *    monthly and "X times per week" habits were treated as due every single
+ *    day. That inflated the denominator on every cell.
+ *
+ * Both change the numbers the Progress and Review screens show. They are now
+ * the numbers those screens always claimed to be showing.
  */
 export function habitHeatmap(params: {
   habits: HabitWithSchedule[];
@@ -131,37 +147,37 @@ export function habitHeatmap(params: {
     timeZone: params.timeZone,
   });
 
-  // One pass over entries, keyed by habit+date, so the per-day loop is cheap.
-  const doneKeys = new Set<string>();
-  for (const view of views) {
-    for (const cell of view.weekCells) {
-      if (cell.state === "done") doneKeys.add(`${view.habit.id}|${cell.date}`);
-    }
-  }
-  // weekCells only covers the current week, so fall back to the raw entries for
-  // the wider window the heatmap spans.
-  const outcomeByKey = new Map<string, string>();
-  for (const entry of params.entries) {
-    outcomeByKey.set(`${entry.habitId}|${entry.entryDate}`, entry.status);
-  }
+  // One pass over the entries, so the per-day loop below stays a lookup.
+  const entryByKey = new Map(
+    params.entries.map((entry) => [`${entry.habitId}|${entry.entryDate}`, entry]),
+  );
 
-  const scheduleOf = new Map(views.map((v) => [v.habit.id, v.schedule]));
+  // Measurement rules per habit, hoisted out of the day loop.
+  const measures = views.map((view) => ({
+    id: view.habit.id,
+    schedule: view.schedule,
+    measure: {
+      type: view.habit.type,
+      targetValue: toNumberOrNull(view.habit.targetValue),
+      higherIsBetter: view.habit.higherIsBetter,
+    },
+  }));
 
   return dateRange(params.from, params.to).map((date) => {
     let done = 0;
     let scheduled = 0;
-    for (const view of views) {
-      const schedule = scheduleOf.get(view.habit.id);
-      if (!schedule) continue;
-      if (schedule.startDate && date < schedule.startDate) continue;
-      const weekdayScoped = schedule.frequency === "weekly" && schedule.daysOfWeek?.length;
-      if (weekdayScoped) {
-        const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
-        if (!schedule.daysOfWeek!.includes(weekday)) continue;
-      }
+    for (const { id, schedule, measure } of measures) {
+      if (!isDayScheduled(schedule, date)) continue;
       scheduled += 1;
-      const key = `${view.habit.id}|${date}`;
-      if (doneKeys.has(key) || outcomeByKey.get(key) === "done") done += 1;
+      const entry = entryByKey.get(`${id}|${date}`);
+      const outcome = habitOutcome({
+        habit: measure,
+        entry: entry ? { status: entry.status, value: toNumberOrNull(entry.value) } : null,
+        scheduled: true,
+        date,
+        today: params.today,
+      });
+      if (isCompleteOutcome(outcome)) done += 1;
     }
 
     const ratio = scheduled === 0 ? 0 : done / scheduled;

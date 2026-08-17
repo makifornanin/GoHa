@@ -235,4 +235,138 @@ describe("habitHeatmap", () => {
     // Scheduled 10th-12th (3 days), 2 done. Days before the start do not count.
     expect(habitCompletionRate(cells)).toBe(67);
   });
+
+  /*
+   * Regression cover for audit R-06. The suite above passed throughout the bug,
+   * because every fixture was a boolean habit on a daily schedule, which is the
+   * one shape the old open-coded logic got right.
+   */
+  describe("R-06 regressions", () => {
+    const numeric = {
+      ...habit,
+      id: "h2",
+      name: "Water",
+      type: "numeric",
+      targetValue: "8",
+      higherIsBetter: true,
+      schedule: { ...habit.schedule, id: "s2", habitId: "h2" },
+    } as HabitWithSchedule;
+
+    function numericEntry(entryDate: string, value: string): HabitEntry {
+      return { ...entry(entryDate), id: `n-${entryDate}`, habitId: "h2", value } as HabitEntry;
+    }
+
+    it("does not count a below-target numeric day as done", () => {
+      const cells = habitHeatmap({
+        habits: [numeric],
+        entries: [numericEntry("2026-08-11", "5")],
+        from: "2026-08-11",
+        to: "2026-08-11",
+        today: "2026-08-12",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      // Logged, so status is "done" in the row, but 5 < 8: partial, not complete.
+      expect(cells[0].scheduled).toBe(1);
+      expect(cells[0].done).toBe(0);
+      expect(habitCompletionRate(cells)).toBe(0);
+    });
+
+    it("counts a met numeric target as done", () => {
+      const cells = habitHeatmap({
+        habits: [numeric],
+        entries: [numericEntry("2026-08-11", "8")],
+        from: "2026-08-11",
+        to: "2026-08-11",
+        today: "2026-08-12",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      expect(cells[0].done).toBe(1);
+      expect(habitCompletionRate(cells)).toBe(100);
+    });
+
+    it("respects a lower-is-better target", () => {
+      const ceiling = {
+        ...numeric,
+        id: "h3",
+        targetValue: "2",
+        higherIsBetter: false,
+        schedule: { ...habit.schedule, id: "s3", habitId: "h3" },
+      } as HabitWithSchedule;
+      const under = { ...numericEntry("2026-08-11", "1"), habitId: "h3" } as HabitEntry;
+      const over = { ...numericEntry("2026-08-12", "5"), id: "n-over", habitId: "h3" } as HabitEntry;
+
+      const cells = habitHeatmap({
+        habits: [ceiling],
+        entries: [under, over],
+        from: "2026-08-11",
+        to: "2026-08-12",
+        today: "2026-08-13",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      const byDate = Object.fromEntries(cells.map((c) => [c.date, c]));
+      expect(byDate["2026-08-11"].done).toBe(1); // 1 <= 2, met
+      expect(byDate["2026-08-12"].done).toBe(0); // 5 > 2, partial
+    });
+
+    it("does not schedule a weekly habit on days outside its weekdays", () => {
+      // 2026-08-11 is a Tuesday, 2026-08-12 a Wednesday.
+      const mondaysOnly = {
+        ...habit,
+        id: "h4",
+        schedule: {
+          ...habit.schedule,
+          id: "s4",
+          habitId: "h4",
+          frequency: "weekly",
+          daysOfWeek: [1],
+        },
+      } as HabitWithSchedule;
+
+      const cells = habitHeatmap({
+        habits: [mondaysOnly],
+        entries: [],
+        from: "2026-08-11",
+        to: "2026-08-12",
+        today: "2026-08-13",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      expect(cells.every((c) => c.scheduled === 0)).toBe(true);
+    });
+
+    it("does not treat a times-per-week habit as due every day", () => {
+      // The old open-coded test only handled weekly+daysOfWeek, so a
+      // "3 times per week" habit was counted as scheduled on all 7 days and the
+      // denominator was more than double what it should be. isDayScheduled
+      // treats every day as ELIGIBLE for this shape, which is the documented
+      // rule; the point of this test is that the two now agree.
+      const timesPerWeek = {
+        ...habit,
+        id: "h5",
+        schedule: {
+          ...habit.schedule,
+          id: "s5",
+          habitId: "h5",
+          frequency: "weekly",
+          daysOfWeek: null,
+          timesPerPeriod: 3,
+        },
+      } as HabitWithSchedule;
+
+      const cells = habitHeatmap({
+        habits: [timesPerWeek],
+        entries: [],
+        from: "2026-08-10",
+        to: "2026-08-16",
+        today: "2026-08-17",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      // Eligible every day, matching lib/habit-streaks.isDayScheduled.
+      expect(cells.map((c) => c.scheduled)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    });
+  });
 });
