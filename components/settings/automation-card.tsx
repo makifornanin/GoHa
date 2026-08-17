@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   createAutomationTokenAction,
   deleteAutomationTokenAction,
-  listAutomationAction,
   revokeAutomationTokenAction,
   type AutomationOverview,
   type TokenSummary,
@@ -180,28 +179,21 @@ function NewTokenModal({
   );
 }
 
-export function AutomationCard({ className }: { className?: string }) {
-  const [data, setData] = useState<AutomationOverview | null>(null);
-  const [open, setOpen] = useState(false);
+export function AutomationCard({
+  initial,
+  className,
+}: {
+  /** Loaded with the page, so the tokens are simply there. */
+  initial: AutomationOverview;
+  className?: string;
+}) {
+  const [data, setData] = useState<AutomationOverview>(initial);
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<{ value: string; name: string; qrSvg: string | null } | null>(
     null,
   );
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  function load() {
-    setOpen(true);
-    startTransition(async () => {
-      try {
-        setData(await listAutomationAction());
-      } catch (error) {
-        console.error("listAutomationAction failed", error);
-        toast.error("Could not load your automation tokens.");
-        setData({ tokens: [], requests: [], sent: [], baseUrl: "" });
-      }
-    });
-  }
 
   function created(token: TokenSummary, value: string, qrSvg: string | null) {
     setData((current) => (current ? { ...current, tokens: [token, ...current.tokens] } : current));
@@ -284,20 +276,7 @@ export function AutomationCard({ className }: { className?: string }) {
         </div>
       </div>
 
-      {!open ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-xl text-callout text-label-secondary">
-            GoHa sends nothing itself. It hands out read tokens, and a tool you run (n8n, Make,
-            Shortcuts) does the delivering.
-          </p>
-          <Button variant="secondary" onClick={load} loading={pending}>
-            Show tokens
-          </Button>
-        </div>
-      ) : data === null ? (
-        <p className="py-4 text-center text-callout text-label-secondary">Loading...</p>
-      ) : (
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-callout text-label-secondary">
               {data.tokens.filter((t) => t.active).length} active{" "}
@@ -441,8 +420,7 @@ export function AutomationCard({ className }: { className?: string }) {
               </ul>
             </div>
           ) : null}
-        </div>
-      )}
+      </div>
 
       <NewTokenModal
         open={creating}

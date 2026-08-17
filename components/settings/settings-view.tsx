@@ -19,6 +19,8 @@ import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { AutomationCard } from "@/components/settings/automation-card";
+import type { AutomationOverview } from "@/app/(app)/settings/automation-actions";
+import type { PeopleOverview } from "@/app/(app)/settings/invite-actions";
 import { InvitesCard } from "@/components/settings/invites-card";
 import {
   AutomationPrefsCard,
@@ -71,9 +73,13 @@ const WEEK_START_OPTIONS = [
 export function SettingsView({
   profile,
   settings,
+  automationOverview,
+  people,
 }: {
   profile: { name: string; email: string };
   settings: SettingsData;
+  automationOverview: AutomationOverview;
+  people: PeopleOverview;
 }) {
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -86,8 +92,8 @@ export function SettingsView({
       />
       <SecurityCard />
       <AutomationPrefsCard prefs={settings.automation} />
-      <InvitesCard className="lg:col-span-2" />
-      <AutomationCard className="lg:col-span-2" />
+      <InvitesCard initial={people} className="lg:col-span-2" />
+      <AutomationCard initial={automationOverview} className="lg:col-span-2" />
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />
     </div>
