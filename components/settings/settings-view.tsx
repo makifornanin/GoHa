@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { AutomationCard } from "@/components/settings/automation-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -78,6 +79,7 @@ export function SettingsView({
         eveningReflectionTime={settings.eveningReflectionTime}
       />
       <SecurityCard />
+      <AutomationCard className="lg:col-span-2" />
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />
     </div>

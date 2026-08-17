@@ -49,6 +49,25 @@ export function Modal({
   const titleId = useId();
   const descriptionId = useId();
 
+  /**
+   * The handlers are held in refs so the effect below can depend on `open`
+   * ALONE.
+   *
+   * `onClose` is almost always an inline arrow, so its identity changes on
+   * every render of whatever owns the dialog. With it in the dependency list
+   * the whole effect tore down and set up again on each of those renders, and
+   * setting up means "focus the first focusable in the panel". A dialog whose
+   * owner re-renders while you type therefore snatched focus back to the close
+   * button after every keystroke, and a click meant for a control inside the
+   * dialog could land on that button instead and dismiss it.
+   */
+  const onCloseRef = useRef(onClose);
+  const initialFocusRef = useRef(initialFocus);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    initialFocusRef.current = initialFocus;
+  }, [onClose, initialFocus]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -64,12 +83,12 @@ export function Modal({
           )
         : [];
 
-    (initialFocus?.() ?? focusables()[0] ?? panel)?.focus();
+    (initialFocusRef.current?.() ?? focusables()[0] ?? panel)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key === "Tab") {
@@ -97,7 +116,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose, initialFocus]);
+  }, [open]);
 
   const morphProps = layoutId
     ? { layoutId, transition: spring.snappy }
