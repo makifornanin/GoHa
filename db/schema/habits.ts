@@ -1,4 +1,4 @@
-import { boolean, check, date, index, integer, numeric, pgTable, smallint, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, numeric, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
@@ -75,6 +75,16 @@ export const habitSchedules = pgTable(
   (t) => [
     index("habit_schedules_habit_id_idx").on(t.habitId),
     index("habit_schedules_user_id_idx").on(t.userId),
+    /**
+     * One ACTIVE schedule per habit, enforced by the database (audit R-08).
+     * "One per habit by convention" was exactly the problem: the upsert read
+     * for an existing schedule and then inserted, so two saves arriving
+     * together left a habit with two active cadences and every screen picking
+     * whichever it read first. Inactive history rows are unaffected.
+     */
+    uniqueIndex("habit_schedules_one_active_per_habit_uq")
+      .on(t.habitId)
+      .where(sql`${t.isActive}`),
   ],
 );
 

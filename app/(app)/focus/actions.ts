@@ -14,6 +14,7 @@ import {
   focusElapsedSeconds,
   resolvePausedSeconds,
 } from "@/lib/focus";
+import { CONSTRAINTS, isUniqueViolation } from "@/lib/db-errors";
 import { requireUser } from "@/lib/session";
 import { getDateContext } from "@/lib/user-settings";
 
@@ -109,6 +110,17 @@ export async function startFocusSessionAction(input: {
     revalidatePath("/focus");
     return { ok: true, data: session };
   } catch (error) {
+    // Two starts landing together: the database now refuses the second (audit
+    // R-08), which is the point. The person asked for a running session and
+    // there is exactly one, so hand back the one that won rather than an error
+    // about a race they did not know they were in.
+    if (isUniqueViolation(error, CONSTRAINTS.oneActiveFocusSession)) {
+      const active = await focusRepo.getActiveFocusSession(user.id);
+      if (active) {
+        revalidatePath("/focus");
+        return { ok: true, data: active };
+      }
+    }
     console.error("startFocusSessionAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }

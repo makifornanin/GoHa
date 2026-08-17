@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { dailyPrioritiesRepo, goalsRepo, tasksRepo, type DailyPriority } from "@/db";
 import { zonedToday } from "@/lib/date";
+import { CONSTRAINTS, isUniqueViolation } from "@/lib/db-errors";
 import { requireUser } from "@/lib/session";
 import { scoreTasks } from "@/lib/today-brain";
 import { getUserDatePrefs } from "@/lib/user-settings";
@@ -50,6 +51,15 @@ export async function addDailyPriorityAction(taskId: string): Promise<ActionResu
     revalidatePath("/today");
     return { ok: true, data: priority };
   } catch (error) {
+    // The count-then-insert above can be passed twice at once. The database
+    // settles it (audit R-08); say which rule stopped it, in the same words the
+    // check above would have used.
+    if (isUniqueViolation(error, CONSTRAINTS.onePriorityPerTaskPerDay)) {
+      return { ok: false, error: "That task is already one of today's priorities." };
+    }
+    if (isUniqueViolation(error, CONSTRAINTS.onePriorityPerSlot)) {
+      return { ok: false, error: `You can pin at most ${MAX_PRIORITIES} priorities for today.` };
+    }
     console.error("addDailyPriorityAction failed", error);
     return { ok: false, error: "Could not pin that priority. Please try again." };
   }
@@ -99,14 +109,25 @@ export async function planMyDayAction(): Promise<
 
     const pinned: { id: string; title: string; reason: string }[] = [];
     for (const [index, candidate] of ranked.entries()) {
-      await dailyPrioritiesRepo.setDailyPriority(user.id, today, free[index], {
-        taskId: candidate.task.id,
-      });
+      try {
+        await dailyPrioritiesRepo.setDailyPriority(user.id, today, free[index], {
+          taskId: candidate.task.id,
+        });
+      } catch (error) {
+        // A slot taken, or that task pinned, while this was choosing. Skip it
+        // and keep planning: losing one pick must not cost the whole plan.
+        if (isUniqueViolation(error)) continue;
+        throw error;
+      }
       pinned.push({
         id: candidate.task.id,
         title: candidate.task.title,
         reason: candidate.reason,
       });
+    }
+
+    if (pinned.length === 0) {
+      return { ok: false, error: "Today's priorities just changed. Please try again." };
     }
 
     revalidatePath("/today");

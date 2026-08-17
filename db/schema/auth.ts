@@ -1,4 +1,5 @@
-import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
 
@@ -12,14 +13,32 @@ import { auditTimestamps, primaryId } from "./_shared";
  * `advanced.database.generateId` to emit UUIDs so app-generated and
  * database-default IDs never diverge.
  */
-export const user = pgTable("user", {
-  id: primaryId(),
-  name: text().notNull(),
-  email: text().notNull().unique(),
-  emailVerified: boolean().notNull().default(false),
-  image: text(),
-  ...auditTimestamps,
-});
+export const user = pgTable(
+  "user",
+  {
+    id: primaryId(),
+    name: text().notNull(),
+    email: text().notNull().unique(),
+    emailVerified: boolean().notNull().default(false),
+    image: text(),
+    ...auditTimestamps,
+  },
+  () => [
+    /**
+     * Single owner, enforced by the database (audit R-08).
+     *
+     * `lib/auth.ts` refuses a second account by reading the table and then
+     * creating, which two simultaneous sign-ups can both pass. A unique index
+     * on a constant expression permits exactly one row in the table, so the
+     * second insert loses no matter how the endpoint is reached.
+     *
+     * This is deliberately one index and nothing else, because GoHa keeps every
+     * table user-scoped so multi-user is possible later (CLAUDE.md section 1).
+     * Opening that up is one `DROP INDEX`, with no other structural change.
+     */
+    uniqueIndex("user_single_owner_uq").on(sql`((true))`),
+  ],
+);
 
 export const session = pgTable(
   "session",

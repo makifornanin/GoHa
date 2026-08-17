@@ -139,14 +139,33 @@ export async function getHabitSchedule(userId: string, habitId: string): Promise
   return row ?? null;
 }
 
-/** Update the habit's active schedule in place, or create it if none exists. */
+/**
+ * Update the habit's active schedule in place, or create it if none exists.
+ *
+ * ONE statement, resolved by the database against
+ * `habit_schedules_one_active_per_habit_uq` (audit R-08). It used to read for
+ * an existing schedule and then insert, so two saves arriving together both
+ * found nothing and both inserted, leaving the habit with two active cadences
+ * and every screen believing whichever it read first.
+ *
+ * A schedule being deactivated cannot use the conflict path, because the
+ * partial index only covers active rows; that case updates the current active
+ * row by id instead.
+ */
 export async function upsertHabitSchedule(
   userId: string,
   habitId: string,
   input: HabitScheduleInput,
 ): Promise<HabitSchedule> {
-  const existing = await getHabitSchedule(userId, habitId);
-  if (existing) {
+  if (input.isActive === false) {
+    const existing = await getHabitSchedule(userId, habitId);
+    if (!existing) {
+      const [inserted] = await db
+        .insert(habitSchedules)
+        .values({ ...input, userId, habitId })
+        .returning();
+      return inserted;
+    }
     const [row] = await db
       .update(habitSchedules)
       .set({ ...input, updatedAt: new Date() })
@@ -154,9 +173,18 @@ export async function upsertHabitSchedule(
       .returning();
     return row;
   }
+
   const [row] = await db
     .insert(habitSchedules)
-    .values({ ...input, userId, habitId })
+    .values({ ...input, userId, habitId, isActive: true })
+    .onConflictDoUpdate({
+      target: habitSchedules.habitId,
+      targetWhere: eq(habitSchedules.isActive, true),
+      set: { ...input, isActive: true, updatedAt: new Date() },
+      // Ownership stays a condition of the write itself, not only of the
+      // caller's earlier check.
+      setWhere: eq(habitSchedules.userId, userId),
+    })
     .returning();
   return row;
 }

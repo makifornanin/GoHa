@@ -1,4 +1,14 @@
-import { check, date, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  check,
+  date,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
@@ -38,10 +48,29 @@ export const focusSessions = pgTable(
     index("focus_sessions_user_session_date_idx").on(t.userId, t.sessionDate),
     index("focus_sessions_user_status_idx").on(t.userId, t.status),
     index("focus_sessions_task_id_idx").on(t.taskId),
+    /**
+     * At most one running session per user, enforced by the database (audit
+     * R-08). Starting a session closes any lingering one and then inserts,
+     * which two clicks landing together can both pass, and the totals are then
+     * double counted for as long as both stay open.
+     */
+    uniqueIndex("focus_sessions_one_active_per_user_uq")
+      .on(t.userId)
+      .where(sql`${t.status} = 'in_progress'`),
     check(
       "focus_sessions_duration_non_negative",
       sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`,
     ),
     check("focus_sessions_paused_seconds_non_negative", sql`${t.pausedSeconds} >= 0`),
+    /**
+     * A plan is a real length. Extensions add to this column with no ceiling of
+     * their own, so the bound lives here: positive, and never longer than a
+     * day, which is already far past the point the abandon sweep gives up on a
+     * session.
+     */
+    check(
+      "focus_sessions_planned_duration_range",
+      sql`${t.plannedDurationSeconds} is null or (${t.plannedDurationSeconds} > 0 and ${t.plannedDurationSeconds} <= 86400)`,
+    ),
   ],
 );

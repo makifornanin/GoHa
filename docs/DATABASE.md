@@ -142,6 +142,37 @@ their loss is intended.
   - `task_map_edges.source_node_id <> target_node_id` (no self-loops)
   - `brain_dump_items`: `converted_type` and `converted_entity_id` are both null or both set
   - `user_settings.week_starts_on` between 0 and 6
+  - `focus_sessions.planned_duration_seconds` null or 1..86400 (extensions add to
+    this column and had no ceiling of their own)
+
+## Concurrency invariants (migration 0011, audit R-08)
+
+Rules the application already tried to keep by reading first and then writing,
+which two requests arriving together can both pass. They are now enforced by the
+database, so the loser of a race gets a constraint violation instead of a
+duplicate. `lib/db-errors.ts` classifies those violations and the callers turn
+them into ordinary answers rather than errors.
+
+- `user_single_owner_uq`: a unique index on a constant expression, so `"user"`
+  can hold exactly one row. Backs the single-owner hook in `lib/auth.ts`.
+  Multi-user later is a `DROP INDEX` and nothing else, since every table is
+  already user-scoped.
+- `focus_sessions_one_active_per_user_uq`: partial unique on `(user_id) WHERE
+  status = 'in_progress'`. At most one running session, so a double start cannot
+  leave two open and double count. `startFocusSessionAction` answers a conflict
+  with the session that won.
+- `habit_schedules_one_active_per_habit_uq`: partial unique on `(habit_id) WHERE
+  is_active`. "One active schedule per habit" was previously only a convention;
+  `upsertHabitSchedule` is now a single `ON CONFLICT` statement against it.
+- `daily_priorities_user_date_task_uq`: partial unique on `(user_id,
+  priority_date, task_id) WHERE task_id is not null`. One task cannot occupy two
+  of the day's three slots.
+
+Deliberately NOT enforced in the database: goal hierarchy cycles beyond
+self-parenting. `goals_no_self_parent` covers the one-step case; a deeper cycle
+needs a recursive trigger, and the ancestor walk in the Goals action remains the
+guard. Ownership equality between parent and child rows (audit R-13) is also
+still application-enforced.
 
 ## Indexes (from real query patterns)
 
@@ -207,5 +238,23 @@ excluded, zero countable = 0%); in `manual` mode it is `manual_progress`; a
 - Scripts: `pnpm db:generate` (diff schema to SQL, offline), `pnpm db:migrate`
   (apply, needs `DATABASE_URL`), `pnpm db:push` (dev sync), `pnpm db:studio`.
 - Never edit generated SQL by hand or reset destructively as a normal workflow
-  (CLAUDE.md section 8). This migration has **not** been applied to any database
-  yet; it is committed for review.
+  (CLAUDE.md section 8).
+- `0011_silky_hardball.sql` (the concurrency invariants above) is generated and
+  committed but **not applied**. It creates unique indexes over existing rows,
+  so it fails rather than corrupts if the data already breaks a rule. Check
+  first, then apply with `pnpm db:migrate`:
+
+  ```sql
+  -- Each of these must return no rows before the migration will succeed.
+  SELECT count(*) FROM "user" HAVING count(*) > 1;
+  SELECT user_id FROM focus_sessions WHERE status = 'in_progress'
+    GROUP BY user_id HAVING count(*) > 1;
+  SELECT habit_id FROM habit_schedules WHERE is_active
+    GROUP BY habit_id HAVING count(*) > 1;
+  SELECT user_id, priority_date, task_id FROM daily_priorities
+    WHERE task_id IS NOT NULL
+    GROUP BY user_id, priority_date, task_id HAVING count(*) > 1;
+  SELECT id FROM focus_sessions
+    WHERE planned_duration_seconds IS NOT NULL
+      AND (planned_duration_seconds <= 0 OR planned_duration_seconds > 86400);
+  ```

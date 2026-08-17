@@ -1,0 +1,5 @@
+CREATE UNIQUE INDEX "user_single_owner_uq" ON "user" USING btree (((true)));--> statement-breakpoint
+CREATE UNIQUE INDEX "habit_schedules_one_active_per_habit_uq" ON "habit_schedules" USING btree ("habit_id") WHERE "habit_schedules"."is_active";--> statement-breakpoint
+CREATE UNIQUE INDEX "focus_sessions_one_active_per_user_uq" ON "focus_sessions" USING btree ("user_id") WHERE "focus_sessions"."status" = 'in_progress';--> statement-breakpoint
+CREATE UNIQUE INDEX "daily_priorities_user_date_task_uq" ON "daily_priorities" USING btree ("user_id","priority_date","task_id") WHERE "daily_priorities"."task_id" is not null;--> statement-breakpoint
+ALTER TABLE "focus_sessions" ADD CONSTRAINT "focus_sessions_planned_duration_range" CHECK ("focus_sessions"."planned_duration_seconds" is null or ("focus_sessions"."planned_duration_seconds" > 0 and "focus_sessions"."planned_duration_seconds" <= 86400));

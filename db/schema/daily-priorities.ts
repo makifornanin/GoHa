@@ -1,4 +1,4 @@
-import { boolean, check, date, index, pgTable, smallint, text, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, pgTable, smallint, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
@@ -36,6 +36,15 @@ export const dailyPriorities = pgTable(
       t.position,
     ),
     index("daily_priorities_user_date_idx").on(t.userId, t.priorityDate),
+    /**
+     * A task can hold at most one of the day's three slots (audit R-08). The
+     * action counts the existing pins and then inserts, so two pins of the same
+     * task landing together both passed and Today showed the same task twice,
+     * spending two of the three slots on one piece of work.
+     */
+    uniqueIndex("daily_priorities_user_date_task_uq")
+      .on(t.userId, t.priorityDate, t.taskId)
+      .where(sql`${t.taskId} is not null`),
     check("daily_priorities_position_range", sql`${t.position} between 1 and 3`),
     check(
       "daily_priorities_task_or_label",
