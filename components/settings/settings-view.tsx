@@ -19,6 +19,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { AutomationCard } from "@/components/settings/automation-card";
+import { InvitesCard } from "@/components/settings/invites-card";
 import {
   AutomationPrefsCard,
   type AutomationPrefs,
@@ -85,6 +86,7 @@ export function SettingsView({
       />
       <SecurityCard />
       <AutomationPrefsCard prefs={settings.automation} />
+      <InvitesCard className="lg:col-span-2" />
       <AutomationCard className="lg:col-span-2" />
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />

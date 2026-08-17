@@ -12,6 +12,7 @@ import { authClient } from "@/lib/auth-client";
 import { spring } from "@/lib/motion";
 import { safeRedirectPath } from "@/lib/redirect";
 import { useMounted } from "@/lib/use-mounted";
+import { cn } from "@/lib/utils";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -43,20 +44,34 @@ export function AuthForm({
   mode,
   redirectTo,
   canBootstrap = true,
+  inviteCode,
+  inviteRequired = false,
+  inviteError,
+  lockedEmail,
 }: {
   mode: "login" | "register";
   redirectTo?: string;
   /**
-   * Whether the owner account can still be created. False once one exists, so
-   * the login screen stops offering a route that always fails.
+   * Whether an account can still be created without an invitation. False once
+   * the first account exists, so the sign-in screen stops offering a route that
+   * always fails.
    */
   canBootstrap?: boolean;
+  /** A validated invitation, carried to the server with the sign-up. */
+  inviteCode?: string;
+  /** True when this GoHa already has accounts and no usable invitation came. */
+  inviteRequired?: boolean;
+  /** Why the invitation was refused, in words meant for the person reading. */
+  inviteError?: string;
+  /** Set when the invitation names one address; the field is filled and held. */
+  lockedEmail?: string | null;
 }) {
   const isLogin = mode === "login";
   const router = useRouter();
   const mounted = useMounted();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
 
   // Shared with the server component. A startsWith("/") test accepted
   // //attacker.example, which the browser resolves off-site (audit R-09).
@@ -80,11 +95,17 @@ export function AuthForm({
             email: parsed.data.email,
             password: parsed.data.password,
           })
-        : await authClient.signUp.email({
-            name: (parsed.data as z.infer<typeof registerSchema>).name,
-            email: parsed.data.email,
-            password: parsed.data.password,
-          });
+        : await authClient.signUp.email(
+            {
+              name: (parsed.data as z.infer<typeof registerSchema>).name,
+              email: parsed.data.email,
+              password: parsed.data.password,
+            },
+            // The invitation travels in a header, not the body: Better Auth
+            // validates the body against its own shape, and the gate that reads
+            // this sits in front of it.
+            inviteCode ? { headers: { "x-goha-invite": inviteCode } } : undefined,
+          );
 
       if (result.error) {
         setPending(false);
@@ -124,12 +145,16 @@ export function AuthForm({
         </p>
         <div>
           <h1 className="text-large-title text-label">
-            {isLogin ? "Welcome back" : "Set up GoHa"}
+            {isLogin ? "Welcome back" : inviteRequired ? "Invitation needed" : "Create your account"}
           </h1>
           <p className="mt-2 text-body text-label-secondary">
             {isLogin
               ? "Sign in to your execution system."
-              : "This one-time setup creates the single owner of this GoHa."}
+              : inviteRequired
+                ? "This GoHa is invite only."
+                : canBootstrap
+                  ? "This first account becomes the owner of this GoHa."
+                  : "You have been invited. Your goals, habits and history are yours alone."}
           </p>
         </div>
       </div>
@@ -144,6 +169,19 @@ export function AuthForm({
         the button below stays disabled until hydration so it should not happen
         at all.
       */}
+      {inviteRequired ? (
+        <div className="space-y-4">
+          <p role="alert" className="rounded-lg bg-fill-quaternary px-4 py-3 text-callout text-label-secondary">
+            {inviteError ?? "An invitation is needed to create an account here."}
+          </p>
+          <Link
+            href="/login"
+            className="block text-center text-callout font-medium text-blue hover:underline"
+          >
+            Back to sign in
+          </Link>
+        </div>
+      ) : (
       <form className="space-y-4" method="post" onSubmit={onSubmit} noValidate>
         {isLogin ? null : (
           <Field label="Name">
@@ -157,18 +195,29 @@ export function AuthForm({
             autoComplete="email"
             placeholder="you@example.com"
             required
-            disabled={pending}
+            disabled={pending || Boolean(lockedEmail)}
+            defaultValue={lockedEmail ?? undefined}
+            // A locked address is part of the invitation, so it is submitted
+            // even though the field cannot be edited.
+            readOnly={Boolean(lockedEmail)}
           />
+          {lockedEmail ? (
+            <p className="mt-1 text-footnote text-label-tertiary">
+              This invitation is for {lockedEmail}.
+            </p>
+          ) : null}
         </Field>
         <Field label="Password">
           <Input
             type="password"
             name="password"
             autoComplete={isLogin ? "current-password" : "new-password"}
-            placeholder="Your password"
+            placeholder={isLogin ? "Your password" : "At least 8 characters"}
             required
             disabled={pending}
+            onChange={isLogin ? undefined : (event) => setPassword(event.target.value)}
           />
+          {isLogin ? null : <PasswordMeter value={password} />}
         </Field>
 
         {error ? (
@@ -188,14 +237,15 @@ export function AuthForm({
           // wrong thing rather than nothing.
           loading={pending || !mounted}
         >
-          {isLogin ? "Sign in" : "Create owner account"}
+          {isLogin ? "Sign in" : canBootstrap ? "Create owner account" : "Create my account"}
         </Button>
       </form>
+      )}
 
       {/* Nothing at all once the owner exists and we are on the sign-in
           screen: there is no second account to create, so the only honest
           footer is no footer. */}
-      {isLogin && !canBootstrap ? null : (
+      {(isLogin && !canBootstrap) || inviteRequired ? null : (
         <p className="mt-8 text-center text-callout text-label-secondary">
           {isLogin ? (
             <>
@@ -215,5 +265,82 @@ export function AuthForm({
         </p>
       )}
     </motion.div>
+  );
+}
+
+/**
+ * How strong the password is, said plainly.
+ *
+ * The server enforces 8 characters and nothing else, which is a floor rather
+ * than advice. This is the advice: it reacts as you type, names what would
+ * improve it, and never blocks submission. A meter that refuses a password the
+ * server would accept teaches people to distrust the form.
+ *
+ * Length is weighted heaviest because it is what actually matters, and the
+ * common-password check catches the handful that a strength formula rates well
+ * and an attacker tries first.
+ */
+const COMMON = new Set([
+  "password",
+  "password1",
+  "12345678",
+  "123456789",
+  "qwertyui",
+  "iloveyou",
+  "letmein1",
+  "admin123",
+]);
+
+function scorePassword(value: string): { score: 0 | 1 | 2 | 3; label: string; hint: string } {
+  if (value.length === 0) return { score: 0, label: "", hint: "" };
+  if (COMMON.has(value.toLowerCase())) {
+    return { score: 0, label: "Too common", hint: "This is one of the first passwords anyone tries." };
+  }
+  if (value.length < 8) {
+    return { score: 0, label: "Too short", hint: `${8 - value.length} more character(s) needed.` };
+  }
+
+  let score = 0;
+  if (value.length >= 12) score += 1;
+  if (value.length >= 16) score += 1;
+  const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(value)).length;
+  if (variety >= 3) score += 1;
+
+  const capped = Math.min(3, score) as 0 | 1 | 2 | 3;
+  return {
+    score: capped,
+    label: ["Weak", "Fair", "Good", "Strong"][capped],
+    hint:
+      capped >= 3
+        ? ""
+        : value.length < 12
+          ? "Longer beats more complicated: a few words together works well."
+          : "Mixing in a number or symbol would help.",
+  };
+}
+
+function PasswordMeter({ value }: { value: string }) {
+  const { score, label, hint } = scorePassword(value);
+  if (value.length === 0) return null;
+
+  const colors = ["bg-red", "bg-orange", "bg-yellow", "bg-green"];
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex gap-1" aria-hidden>
+        {[0, 1, 2, 3].map((step) => (
+          <span
+            key={step}
+            className={cn(
+              "h-1 flex-1 rounded-full transition-colors",
+              step <= score ? colors[score] : "bg-fill-tertiary",
+            )}
+          />
+        ))}
+      </div>
+      <p className="text-footnote text-label-tertiary" aria-live="polite">
+        <span className="text-label-secondary">{label}</span>
+        {hint ? ` — ${hint}` : ""}
+      </p>
+    </div>
   );
 }
