@@ -14,6 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node db/migrate.mts",
     "db:diagnose": "node --experimental-strip-types scripts/diagnose.mts",
+    "db:backup": "node --experimental-strip-types scripts/backup.mts",
+    "db:restore-check": "node --experimental-strip-types scripts/restore-check.mts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "test:account:create": "node --experimental-strip-types scripts/test-account.mts create",

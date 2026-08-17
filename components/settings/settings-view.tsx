@@ -331,12 +331,18 @@ function ArchiveCard({ className }: { className?: string }) {
 }
 
 /**
- * Your data, in your hands.
+ * A readable copy of your main records. NOT the backup.
  *
- * A single-owner life system whose only copy lives in one hosted database
- * needs a user-accessible way out. The download is built in the browser from
- * the JSON the server returns, so nothing is written to disk on the server and
- * no file ever has to be cleaned up.
+ * This used to describe itself as "everything you have created", which was not
+ * true and was the more dangerous half of audit finding R-04: it reads like a
+ * backup, so it discourages having one. What it actually omits is task map
+ * nodes and edges, daily priorities, goal progress history, the focus session
+ * currently running, inactive habit schedules, and anything outside its caps
+ * and date ranges. There is also no path that puts any of it back.
+ *
+ * The real backup is `pnpm db:backup` (scripts/backup.mts): all 19 tables, no
+ * caps, validated by `pnpm db:restore-check`. The copy is still worth having,
+ * so the wording now says what it is instead of overselling it.
  */
 function DataCard({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition();
@@ -363,13 +369,18 @@ function DataCard({ className }: { className?: string }) {
     <SettingsCard
       icon={<Download className="size-4" />}
       title="Your data"
-      description="Everything you have created, as one JSON file."
+      description="A readable copy of your main records, as one JSON file."
       className={className}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-callout text-label-secondary">
           Life areas, goals, tasks, habits and their history, focus sessions, brain dump, task maps,
-          and weekly reviews. Sign-in details are never included.
+          and weekly reviews. Sign-in details are never included.{" "}
+          <span className="text-label-tertiary">
+            This is a convenience copy to read or move elsewhere, not a backup: it leaves out map
+            nodes, daily priorities and goal history, and nothing here restores it. The full backup
+            is the <code className="font-mono">db:backup</code> script.
+          </span>
         </p>
         <Button onClick={exportData} loading={pending}>
           <Download className="size-4" aria-hidden />

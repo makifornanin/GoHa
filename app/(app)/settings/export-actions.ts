@@ -15,12 +15,18 @@ import { addDays, zonedToday } from "@/lib/date";
 import { requireUser } from "@/lib/session";
 
 /**
- * Export everything this user owns as one JSON document.
+ * A readable copy of the user's main records, as one JSON document.
  *
- * A single-owner life system with no way to get the data back out is a real
- * risk, not a missing nicety: without this the only copy of years of goals,
- * habits and reflections lives in one Neon database with no user-accessible
- * escape hatch.
+ * NOT a backup, and deliberately no longer described as one (audit R-04). It
+ * omits task map nodes and edges, daily priorities, goal progress history, any
+ * focus session still in progress, inactive habit schedules, and anything
+ * beyond the caps below. Nothing in the app restores it.
+ *
+ * The backup is `pnpm db:backup` (scripts/backup.mts), which captures all 19
+ * tables unfiltered and is validated by `pnpm db:restore-check`.
+ *
+ * This still earns its place: it is the copy the owner can open, read, grep and
+ * move somewhere else without a Postgres client.
  *
  * Deliberately plain JSON of the CANONICAL rows rather than a derived report.
  * Derived values (goal progress, streaks, buckets) are recomputed on read
