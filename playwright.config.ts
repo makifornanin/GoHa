@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { resolveDestructiveDatabaseUrl } from "./scripts/lib/require-test-db.mts";
+
 /**
  * Playwright config for GoHa end-to-end flows.
  *
@@ -16,6 +18,16 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
+
+/**
+ * The database the app under test will use.
+ *
+ * Resolved here, at config load, and handed to the dev server explicitly.
+ * globalSetup validating one URL while the server quietly read another from
+ * .env.local would make the guard decorative, and that divergence is invisible
+ * until the moment it destroys something.
+ */
+const { url: testDatabaseUrl } = resolveDestructiveDatabaseUrl();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -52,6 +64,14 @@ export default defineConfig({
         // server on E2E_PORT (:3100), so without this override every auth request
         // is rejected as INVALID_ORIGIN. A real process env var takes precedence
         // over .env.local in Next, so this points Better Auth at the test origin.
-        env: { BETTER_AUTH_URL: baseURL },
+        //
+        // DATABASE_URL is overridden for the same reason: the suite is
+        // destructive, so the server it drives must read and write the test
+        // database that globalSetup just validated, not whatever .env.local
+        // holds. Same precedence rule applies.
+        env: {
+          BETTER_AUTH_URL: baseURL,
+          ...(testDatabaseUrl ? { DATABASE_URL: testDatabaseUrl } : {}),
+        },
       },
 });

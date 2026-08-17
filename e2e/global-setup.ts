@@ -14,5 +14,6 @@ import { requireTestDatabase } from "../scripts/lib/require-test-db.mts";
  * is the second layer, for when those commands are run directly.
  */
 export default function globalSetup(): void {
-  requireTestDatabase("The Playwright suite");
+  const { source } = requireTestDatabase("The Playwright suite");
+  console.log(`[e2e] target database: ${source} (test database confirmed)`);
 }

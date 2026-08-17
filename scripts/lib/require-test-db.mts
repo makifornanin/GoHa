@@ -58,25 +58,54 @@ function loadEnvFile(file: string): void {
 export type TestDbVerdict = {
   /** Why the run was permitted. */
   allowedBy: "marker" | "override";
+  /** The connection string the caller should actually use. */
+  url: string;
+  /** Which variable it came from, for the caller to report without the value. */
+  source: DestructiveUrlSource;
 };
 
+export type DestructiveUrlSource = "E2E_DATABASE_URL" | "DATABASE_URL";
+
 /**
- * Throws unless the configured database is safe to write destructively.
+ * Which connection string destructive tooling targets.
+ *
+ * E2E_DATABASE_URL wins when present. That indirection is the whole point:
+ * without it, running the suite safely means hand-editing DATABASE_URL before
+ * every run and remembering to put it back, which is exactly the mistake the
+ * guard exists to catch. With it, `pnpm test:e2e` targets the test database by
+ * construction and the owner database is never named in the command.
+ *
+ * Falls back to DATABASE_URL so a machine that genuinely has only a test
+ * database (CI, a disposable container) needs no extra configuration.
+ */
+export function resolveDestructiveDatabaseUrl(): {
+  url: string | undefined;
+  source: DestructiveUrlSource;
+} {
+  if (process.env.E2E_DATABASE_URL === undefined && process.env.DATABASE_URL === undefined) {
+    loadEnvFile(".env.local");
+    loadEnvFile(".env");
+  }
+  const e2e = process.env.E2E_DATABASE_URL;
+  if (e2e) return { url: e2e, source: "E2E_DATABASE_URL" };
+  return { url: process.env.DATABASE_URL, source: "DATABASE_URL" };
+}
+
+/**
+ * Throws unless the database destructive tooling would target is safe to write
+ * to. Returns the connection string to use, so callers cannot accidentally
+ * connect to a different one than the one that was checked.
  *
  * @param context Short description of the caller, used in the error message
  *                so the operator knows which command was blocked.
  */
 export function requireTestDatabase(context = "This command"): TestDbVerdict {
-  if (process.env.DATABASE_URL === undefined) {
-    loadEnvFile(".env.local");
-    loadEnvFile(".env");
-  }
+  const { url: raw, source } = resolveDestructiveDatabaseUrl();
 
-  const raw = process.env.DATABASE_URL;
   if (!raw) {
     throw new Error(
-      `${context} needs DATABASE_URL, and it is not set.\n` +
-        "Set it to a TEST database before running anything destructive.",
+      `${context} needs a database URL, and neither E2E_DATABASE_URL nor DATABASE_URL is set.\n` +
+        "Set E2E_DATABASE_URL to a TEST database before running anything destructive.",
     );
   }
 
@@ -85,10 +114,10 @@ export function requireTestDatabase(context = "This command"): TestDbVerdict {
     // like a decision rather than a default.
     console.warn(
       `!! ${OVERRIDE_KEY}=${OVERRIDE_VALUE} is set.\n` +
-        `!! ${context} will run against the CONFIGURED database, whatever it is.\n` +
+        `!! ${context} will run against ${source}, whatever it points at.\n` +
         "!! If that is the owner database, this can delete real data.",
     );
-    return { allowedBy: "override" };
+    return { allowedBy: "override", url: raw, source };
   }
 
   // Parse for identity only. Nothing derived from this is ever printed.
@@ -102,7 +131,7 @@ export function requireTestDatabase(context = "This command"): TestDbVerdict {
     database = parsed.pathname.replace(/^\//, "");
   } catch {
     throw new Error(
-      `${context} could not parse DATABASE_URL as a URL, so it cannot confirm ` +
+      `${context} could not parse ${source} as a URL, so it cannot confirm ` +
         "the target is a test database. Refusing to continue.",
     );
   }
@@ -112,19 +141,27 @@ export function requireTestDatabase(context = "This command"): TestDbVerdict {
 
   if (!marked) {
     throw new Error(
-      `${context} refuses to run: the configured database is not marked as a test database.\n` +
+      `${context} refuses to run: ${source} is not marked as a test database.\n` +
         "\n" +
-        `Expected "${TEST_DB_MARKER}" in the DATABASE_URL hostname or database name.\n` +
+        `Expected "${TEST_DB_MARKER}" in its hostname or database name.\n` +
         "(The actual value is not shown here on purpose.)\n" +
         "\n" +
-        "Fix it one of these ways:\n" +
-        `  1. Point DATABASE_URL at a database whose name contains ${TEST_DB_MARKER}\n` +
-        "     (a Neon branch named goha_test is the cheapest way to get one).\n" +
-        `  2. If you genuinely mean to target the current database, re-run with:\n` +
-        `       ${OVERRIDE_KEY}=${OVERRIDE_VALUE}\n` +
-        "     Only do this if you accept that real data may be deleted.",
+        "Set one up once, in the Neon project you already have:\n" +
+        "\n" +
+        "  1. In the Neon SQL editor, on your existing project:\n" +
+        `       CREATE DATABASE ${TEST_DB_MARKER};\n` +
+        "  2. Copy that database's connection string into .env.local as:\n" +
+        `       E2E_DATABASE_URL=...\n` +
+        "  3. Apply the schema to it once:\n" +
+        `       DATABASE_URL=$E2E_DATABASE_URL pnpm db:migrate\n` +
+        "\n" +
+        "No second project, no second bill, and DATABASE_URL never changes.\n" +
+        "\n" +
+        `If you genuinely mean to target ${source} as it is, re-run with:\n` +
+        `  ${OVERRIDE_KEY}=${OVERRIDE_VALUE}\n` +
+        "Only do this if you accept that real data may be deleted.",
     );
   }
 
-  return { allowedBy: "marker" };
+  return { allowedBy: "marker", url: raw, source };
 }

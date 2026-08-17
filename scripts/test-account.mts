@@ -45,10 +45,15 @@ loadEnv(".env.local");
 /**
  * Refuse to touch anything unless the target is a test database. Runs before
  * the client is constructed, so a blocked invocation never opens a connection.
+ *
+ * The URL comes back from the guard rather than being read again from the
+ * environment: checking one variable and then connecting with another is how
+ * a guard becomes decorative.
  */
-requireTestDatabase("pnpm test:account:*");
+const { url: testDbUrl, source } = requireTestDatabase("pnpm test:account:*");
+console.log(`Target: ${source} (test database confirmed)`);
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql = neon(testDbUrl);
 
 /**
  * Harness identity. The defaults are local, non-secret test constants shared
