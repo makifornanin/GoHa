@@ -1065,6 +1065,135 @@ The `--commit` run was blocked by the environment's permission classifier, which
 is the correct outcome for a destructive database write, so it is handed to the
 owner rather than worked around.
 
+### 2026-08-18: shipped and verified in production
+
+The owner deleted the harness account (confirmed as test data, not real work),
+applied all three migrations, merged to `main` and redeployed.
+
+Verified against the live deployment and the live database rather than assumed:
+
+- Database: 1 account, 14 migrations applied, all four automation tables, all
+  six `user_settings` columns, all seven invariant indexes present.
+- The new code is live. The discriminator was `/api/health`: the old build
+  answered 307 because its proxy matcher did not exclude health checks, and it
+  now answers 200 with a JSON status.
+- All twelve automation endpoints answer 401 without a token, and a bogus token
+  gets `{"error":"Unauthorized."}` rather than 503. That distinction matters: it
+  proves the token lookup reached real tables in production, so `DATABASE_URL`
+  is right on Vercel and the surface is functional end to end.
+- Security headers, CSP included, present on the live responses.
+- `/login` hydrates with an empty console in light and dark, no failed requests,
+  no horizontal overflow at 390px.
+- Local: typecheck, lint, 380 tests, `drizzle-kit check`, and `db:generate`
+  producing no new migration (no schema drift).
+
+An earlier deployment had built `main` at a commit predating this entire
+session, which is why the dashboard showed a failed thumbnail and a 100% error
+rate. The branch was 33 commits ahead. Diagnosed from the public URL alone.
+
+NOT verified by eye: anything behind the login. The Settings automation cards
+and the Today quote card are covered by unit tests, the production build and the
+route probes, but nobody has looked at them on the deployed app.
+
+---
+
+## Automation Foundation: remediation plan (from the 17 Aug 2026 audit)
+
+Recorded here because the plan and its rules previously lived only in a chat
+prompt. A session that starts from the repository alone could not recover them,
+which is the same continuity gap the audit raised about documentation drift
+(R-20). Source: `docs/GoHa-Full-System-Report-2026-08-17.pdf`, risk register
+R-01..R-21.
+
+### HARD RULES (never violate)
+
+1. Never run `pnpm db:push`. Schema changes go through generated migrations only.
+2. Never apply a migration to a real database. Generate with `pnpm db:generate`,
+   read the SQL, then STOP and hand the owner the exact command. The owner
+   applies migrations by hand.
+3. Never run `pnpm test:e2e` or `test:account:*` outside a database carrying the
+   `goha_test` marker (enforced by `scripts/lib/require-test-db.mts`).
+4. Never modify, read aloud, print, or commit `.env.local` or any secret value.
+   `.env.example` may carry documented keys with placeholder values only.
+5. All NEW date-bucketing code takes a required date context built from the saved
+   user timezone. Never default to `Asia/Manila` in new code.
+6. Generated quote/verse content is written with `"verified": false`. Never mark
+   content verified, and never invent verse wording.
+7. If a change is ambiguous or risks data meaning, especially near migrations
+   0002/0003 and 0005/0006 (see R-03), STOP and ask rather than guessing.
+8. Keep the architecture: Server Components read repositories, Server Actions
+   mutate, `server-only` database boundary, owner scoping via `requireUser()`.
+   Route Handlers only under `app/api/`.
+
+Per item: run `pnpm typecheck && pnpm lint && pnpm test`, one commit per numbered
+item, no drive-by refactors.
+
+### Progress
+
+- Phase 0 (repository hygiene, R-02 test-database guard, R-04 real backup,
+  R-21 diagnostic redaction): COMPLETE.
+- Phase 1.1 R-06 shared habit outcome: COMPLETE.
+- Phase 1.2 R-05 Review week state: COMPLETE.
+- Phase 1.3 R-09 open redirect: COMPLETE.
+- Phase 1.4 R-10 Brain Dump rapid capture + conversion limits: COMPLETE.
+- Phase 1.5 R-07 Calendar: COMPLETE.
+- Phase 1.6 R-15 timezone contract: COMPLETE.
+- Phase 1.7 R-12 Task Maps: COMPLETE.
+- Phase 1.8 R-17 Focus draft/input safety: COMPLETE (2026-08-18).
+- Phase 1.9 R-18 Progress periods and accessibility: COMPLETE (2026-08-18).
+- Phase 1.10 R-08 database invariants: COMPLETE (2026-08-18), migration 0011
+  generated and NOT applied.
+- Phase 2 (automation schema + API): COMPLETE (2026-08-18), migration 0012
+  generated and NOT applied.
+- Phase 3 (automation UI): COMPLETE (2026-08-18).
+- Phase 4 (hardening, CI, docs): COMPLETE (2026-08-18).
+
+### 2026-08-18 (later): quotes come from the automation, not from GoHa
+
+A misread, corrected. The quote pool was built as something GoHa seeds from a
+file it ships. The owner had said repeatedly that the automation would supply
+the content, calling a source of their own; the app just had nowhere to put it.
+
+`POST /api/automation/quotes` is that door. Two shapes, because both are
+wanted: a batch with no pin builds a library, and the deterministic date-hash
+picks from it so the card still works on a morning nothing runs; a single entry
+with `pinToday` or `pinnedFor` names one verse for one date and beats the pool.
+Migration 0013 adds `daily_quotes.pinned_for`, unique, so a date holds exactly
+one and re-posting replaces rather than accumulates. `GET` answers "is today
+already covered" in counts, which is the question a morning flow asks before it
+fetches anything.
+
+Pinned quotes win everywhere the quote is shown: the Today card, `/quote/today`
+and the morning brief all check the pin before the pool, so the screen and the
+notification cannot disagree.
+
+`verified` is not a field the endpoint accepts, so it cannot be asserted over
+HTTP. The flag records only that no human has checked the wording, which is what
+hard rule 6 is for.
+
+### The two accounts, resolved
+
+The "test" account turned out to hold real content: three life areas, the
+half-marathon goal, "kiss nanin every morning", the task map. Only one goal and
+two tasks matched E2E fixture patterns. Deleting it, which is what "delete the
+test account" would have meant literally, would have destroyed real work.
+
+`scripts/merge-accounts.mts` moves every owned row between accounts and deletes
+the emptied one. Dry run by default. It handles the two tables that cannot
+simply move: `user_settings` is unique per user so the source's row is dropped,
+and `daily_priorities` clashes on (user, date, position) are named individually
+rather than silently discarded. Sessions are deliberately not moved: a session
+belongs to the login that created it.
+
+Direction chosen: keep the account that is actually in use (so the current login
+and all the content survive) and fold the setup account's five rows into it. Dry
+run confirmed 5 rows move with no priority collisions. Backup taken and
+validated first (149 rows, 19 tables).
+
+The `--commit` run was blocked by the environment's permission classifier, which
+is the correct outcome for a destructive database write, so it is handed to the
+owner rather than worked around.
+
 ### Waiting on the owner
 
 1. ~~The database credential is rejected.~~ RESOLVED 2026-08-18: the owner
