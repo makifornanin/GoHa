@@ -1,6 +1,6 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
-import { invitesRepo, usersRepo } from "@/db";
+import { appSettingsRepo, invitesRepo, usersRepo } from "@/db";
 import { auth } from "@/lib/auth";
 import {
   hashInviteCode,
@@ -50,7 +50,27 @@ async function guardSignUp(request: Request): Promise<Response | null> {
 
   if (!(await usersRepo.hasAnyUser())) return null;
 
+  /*
+   * Open sign-up, if the owner has chosen it.
+   *
+   * Read fresh on every attempt rather than cached, because closing sign-up is
+   * something you do the moment you decide to, and a cached "open" would keep
+   * the door ajar for as long as the cache lived.
+   *
+   * A failure here refuses rather than assumes: an unreadable policy is not
+   * permission.
+   */
+  // Never throws; an unreadable policy resolves to invite only, so a database
+  // problem cannot accidentally open sign-up. See the repository for why.
+  const mode = await appSettingsRepo.getSignupMode();
+
   const presented = normalizeInviteCode(request.headers.get(INVITE_HEADER) ?? "");
+
+  // Open: anyone may create an account. An invitation is still honoured when
+  // one is presented, so an addressed link keeps its meaning and gets marked
+  // used rather than sitting there looking unspent forever.
+  if (mode === "open" && !presented) return null;
+
   if (!presented) {
     return json(
       { message: "GoHa is invite only. Ask the owner for an invitation link." },

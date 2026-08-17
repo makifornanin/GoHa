@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { z } from "zod";
 
-import { invitesRepo } from "@/db";
+import { appSettingsRepo, invitesRepo } from "@/db";
 import { createInviteCode, formatInviteCode, inviteState } from "@/lib/invite";
 import { requireUser } from "@/lib/session";
 
@@ -86,10 +86,51 @@ async function baseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-export async function listInvitesAction(): Promise<InviteSummary[]> {
+export type PeopleOverview = {
+  invites: InviteSummary[];
+  signupMode: "open" | "invite_only";
+  /** Only the owner may change the policy; everyone else sees it read-only. */
+  isOwner: boolean;
+};
+
+export async function listInvitesAction(): Promise<PeopleOverview> {
   const user = await requireUser();
-  const rows = await invitesRepo.listInvites(user.id);
-  return rows.map(toSummary);
+  const [rows, signupMode, owner] = await Promise.all([
+    invitesRepo.listInvites(user.id),
+    appSettingsRepo.getSignupMode(),
+    appSettingsRepo.isOwner(user.id),
+  ]);
+  return { invites: rows.map(toSummary), signupMode, isOwner: owner };
+}
+
+/**
+ * Open or close sign-up for the whole install.
+ *
+ * Owner only, checked server-side. This is the one setting in GoHa that is not
+ * personal: it decides who can create an account at all, so it cannot be
+ * something any account can change about everyone else.
+ */
+export async function setSignupModeAction(
+  mode: "open" | "invite_only",
+): Promise<ActionResult<{ signupMode: "open" | "invite_only" }>> {
+  const user = await requireUser();
+
+  if (!(await appSettingsRepo.isOwner(user.id))) {
+    return { ok: false, error: "Only the owner of this GoHa can change who may sign up." };
+  }
+  if (mode !== "open" && mode !== "invite_only") {
+    return { ok: false, error: "That is not a sign-up mode." };
+  }
+
+  try {
+    const saved = await appSettingsRepo.setSignupMode(mode);
+    revalidatePath("/settings");
+    revalidatePath("/login");
+    return { ok: true, data: { signupMode: saved } };
+  } catch (error) {
+    console.error("setSignupModeAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
 }
 
 /**

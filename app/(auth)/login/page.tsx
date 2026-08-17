@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/auth/auth-form";
-import { usersRepo } from "@/db";
+import { appSettingsRepo, usersRepo } from "@/db";
 import { safeRedirectPath } from "@/lib/redirect";
 import { getCurrentUser } from "@/lib/session";
 
@@ -29,7 +29,13 @@ export default async function LoginPage({
    * protected regardless; this only stops the screen promising something it
    * cannot deliver.
    */
-  const canBootstrap = !(await usersRepo.hasAnyUser());
+  // The footer offers account creation when it would actually work: either
+  // nobody has signed up yet, or the owner has opened sign-up to anyone.
+  const [hasUsers, mode] = await Promise.all([
+    usersRepo.hasAnyUser(),
+    appSettingsRepo.getSignupMode(),
+  ]);
+  const canBootstrap = !hasUsers || mode === "open";
 
   return <AuthForm mode="login" redirectTo={redirectTo} canBootstrap={canBootstrap} />;
 }

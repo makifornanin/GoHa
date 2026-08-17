@@ -30,19 +30,19 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const { settings, context } = auth;
     const pool = context.isSabbath
-      ? await quotesRepo.listRestQuotes()
-      : await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref));
+      ? await quotesRepo.listRestQuotes(auth.userId)
+      : await quotesRepo.listActiveQuotes(auth.userId, sourcesFor(settings.quoteSourcePref));
 
     // A rest day with no rest-themed content falls back to the ordinary pool
     // rather than saying nothing at all.
     const effective =
       context.isSabbath && pool.length === 0
-        ? await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref))
+        ? await quotesRepo.listActiveQuotes(auth.userId, sourcesFor(settings.quoteSourcePref))
         : pool;
 
     // A pin beats the pool: an automation that fetched a verse of the day has
     // named this exact row for this exact date.
-    const pinned = await quotesRepo.getPinnedQuote(context.localDate);
+    const pinned = await quotesRepo.getPinnedQuote(auth.userId, context.localDate);
     const quote = pinned ?? pickDailyQuote(effective, context.localDate);
 
     return await finishAutomation(

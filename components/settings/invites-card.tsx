@@ -9,7 +9,9 @@ import {
   deleteInviteAction,
   listInvitesAction,
   revokeInviteAction,
+  setSignupModeAction,
   type InviteSummary,
+  type PeopleOverview,
 } from "@/app/(app)/settings/invite-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,7 +131,7 @@ function NewInviteModal({
  * how the data already works rather than a promise about how it will.
  */
 export function InvitesCard({ className }: { className?: string }) {
-  const [invites, setInvites] = useState<InviteSummary[] | null>(null);
+  const [data, setData] = useState<PeopleOverview | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [issued, setIssued] = useState<{
@@ -144,11 +146,11 @@ export function InvitesCard({ className }: { className?: string }) {
     setOpen(true);
     startTransition(async () => {
       try {
-        setInvites(await listInvitesAction());
+        setData(await listInvitesAction());
       } catch (error) {
         console.error("listInvitesAction failed", error);
         toast.error("Could not load your invitations.");
-        setInvites([]);
+        setData({ invites: [], signupMode: "invite_only", isOwner: false });
       }
     });
   }
@@ -159,7 +161,7 @@ export function InvitesCard({ className }: { className?: string }) {
     code: string,
     qrSvg: string | null,
   ) {
-    setInvites((current) => (current ? [invite, ...current] : [invite]));
+    setData((current) => (current ? { ...current, invites: [invite, ...current.invites] } : current));
     setCreating(false);
     setCopied(false);
     setIssued({ link, code, qrSvg });
@@ -177,7 +179,7 @@ export function InvitesCard({ className }: { className?: string }) {
         toast.error(result.error ?? "That did not work.");
         return;
       }
-      setInvites((current) => (current ? after(current) : current));
+      setData((current) => (current ? { ...current, invites: after(current.invites) } : current));
       toast.success(message);
     });
   }
@@ -225,26 +227,80 @@ export function InvitesCard({ className }: { className?: string }) {
             Show invitations
           </Button>
         </div>
-      ) : invites === null ? (
+      ) : data === null ? (
         <p className="py-4 text-center text-callout text-label-secondary">Loading...</p>
       ) : (
         <div className="flex flex-col gap-5">
+          {/*
+            Who may sign up at all. Owner only, and enforced server-side: this
+            is the one setting in GoHa that is about everyone rather than about
+            the person changing it.
+          */}
+          <div className="rounded-xl bg-fill-quaternary px-4 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-body text-label">Who can create an account</p>
+                <p className="mt-0.5 text-footnote text-label-tertiary">
+                  {data.signupMode === "open"
+                    ? "Anyone who reaches the sign-in page can sign up. Their data is entirely their own."
+                    : "Only people you invite. A public address does not become a public sign-up page."}
+                </p>
+              </div>
+              {data.isOwner ? (
+                <Select
+                  aria-label="Who can create an account"
+                  className="w-44 shrink-0"
+                  value={data.signupMode}
+                  disabled={pending}
+                  options={[
+                    { value: "open", label: "Anyone" },
+                    { value: "invite_only", label: "Invitation only" },
+                  ]}
+                  onChange={(next) => {
+                    const mode = next === "open" ? "open" : "invite_only";
+                    const previous = data.signupMode;
+                    setData({ ...data, signupMode: mode });
+                    startTransition(async () => {
+                      const result = await setSignupModeAction(mode);
+                      if (!result.ok) {
+                        // Roll back rather than leave the screen claiming a
+                        // policy that is not in force.
+                        setData((current) =>
+                          current ? { ...current, signupMode: previous } : current,
+                        );
+                        toast.error(result.error);
+                        return;
+                      }
+                      toast.success(
+                        mode === "open" ? "Anyone can sign up now." : "Sign-up is invitation only.",
+                      );
+                    });
+                  }}
+                />
+              ) : (
+                <span className="shrink-0 text-footnote text-label-tertiary">
+                  {data.signupMode === "open" ? "Anyone" : "Invitation only"}
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-callout text-label-secondary">
-              {invites.filter((i) => i.state === "usable").length} waiting to be used
+              {data.invites.filter((i) => i.state === "usable").length} waiting to be used
             </p>
             <Button onClick={() => setCreating(true)} disabled={pending}>
               Invite someone
             </Button>
           </div>
 
-          {invites.length === 0 ? (
+          {data.invites.length === 0 ? (
             <p className="rounded-xl bg-fill-quaternary px-4 py-6 text-center text-callout text-label-secondary">
               No invitations yet.
             </p>
           ) : (
             <ul className="flex flex-col">
-              {invites.map((invite) => (
+              {data.invites.map((invite) => (
                 <li
                   key={invite.id}
                   className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 border-b border-separator py-2 last:border-0"

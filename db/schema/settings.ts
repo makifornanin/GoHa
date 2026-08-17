@@ -1,9 +1,9 @@
-import { boolean, check, jsonb, pgTable, smallint, text, time, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, jsonb, pgTable, smallint, text, time, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
 import { user } from "./auth";
-import { quoteSourcePref, themePreference } from "./enums";
+import { quoteSourcePref, signupMode, themePreference } from "./enums";
 
 /**
  * Per-user settings. One row per user (unique `userId`). Notifications here are
@@ -67,4 +67,29 @@ export const userSettings = pgTable(
       sql`${t.deadlineLeadMinutes} between 5 and 1440`,
     ),
   ],
+);
+
+/**
+ * Settings for the whole install, not for one person.
+ *
+ * Exactly one row, held there by a unique index on a constant expression. Who
+ * may create an account is a property of this GoHa rather than of any account
+ * in it, so it cannot live in `user_settings`: whichever user's row you put it
+ * in becomes silently special, and nobody can tell which.
+ *
+ * The owner is the account that was created first, and only the owner can
+ * change what is here.
+ */
+export const appSettings = pgTable(
+  "app_settings",
+  {
+    id: primaryId(),
+    /**
+     * `open`: anyone who reaches the sign-in page can create an account.
+     * `invite_only`: an invitation from the owner is required.
+     */
+    signupMode: signupMode().notNull().default("invite_only"),
+    ...auditTimestamps,
+  },
+  () => [uniqueIndex("app_settings_singleton_uq").on(sql`((true))`)],
 );

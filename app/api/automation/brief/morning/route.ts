@@ -50,8 +50,8 @@ export async function GET(request: Request): Promise<Response> {
     // The message is deliberately not AI-written; a rest reminder should be the
     // same calm sentence every week, not a model's variation on it.
     if (context.isSabbath) {
-      const rest = await quotesRepo.listRestQuotes();
-      const fallback = rest.length > 0 ? rest : await quotesRepo.listActiveQuotes(["verse"]);
+      const rest = await quotesRepo.listRestQuotes(auth.userId);
+      const fallback = rest.length > 0 ? rest : await quotesRepo.listActiveQuotes(auth.userId, ["verse"]);
       const quote = pickDailyQuote(fallback, today);
       return await finishAutomation(
         auth,
@@ -75,8 +75,8 @@ export async function GET(request: Request): Promise<Response> {
         // The same wide window Today uses: streaks need history, and today's
         // check-ins come from these rows rather than a second fetch.
         habitsRepo.listEntriesInRange(auth.userId, { from: addDays(today, -400), to: today }),
-        quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref)),
-        quotesRepo.getPinnedQuote(today),
+        quotesRepo.listActiveQuotes(auth.userId, sourcesFor(settings.quoteSourcePref)),
+        quotesRepo.getPinnedQuote(auth.userId, today),
         automationRepo.getNotification(auth.userId, `brief:morning:${today}`),
       ]);
 

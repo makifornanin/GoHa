@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { invitesRepo, usersRepo } from "@/db";
+import { appSettingsRepo, invitesRepo, usersRepo } from "@/db";
 import { AuthForm } from "@/components/auth/auth-form";
 import {
   hashInviteCode,
@@ -43,6 +43,12 @@ export default async function RegisterPage({
 
   const { invite: presented } = await searchParams;
   const code = normalizeInviteCode(presented ?? "");
+  const mode = await appSettingsRepo.getSignupMode();
+
+  // Open sign-up: the form is the whole story, no invitation needed.
+  if (mode === "open" && !code) {
+    return <AuthForm mode="register" redirectTo="/today" />;
+  }
 
   if (!code) {
     // No invitation, and the app already has accounts: say what the situation

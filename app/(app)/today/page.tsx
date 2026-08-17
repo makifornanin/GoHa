@@ -66,15 +66,15 @@ export default async function TodayPage() {
    */
   const isSabbath = isSabbathDate(settings.sabbathDay, today);
   const quotePool = isSabbath
-    ? await quotesRepo.listRestQuotes()
-    : await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref));
+    ? await quotesRepo.listRestQuotes(user.id)
+    : await quotesRepo.listActiveQuotes(user.id, sourcesFor(settings.quoteSourcePref));
   const pool =
     isSabbath && quotePool.length === 0
-      ? await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref))
+      ? await quotesRepo.listActiveQuotes(user.id, sourcesFor(settings.quoteSourcePref))
       : quotePool;
   // A pinned quote wins over the pool pick, so a verse an automation chose for
   // today is the one the card shows.
-  const pinnedQuote = await quotesRepo.getPinnedQuote(today);
+  const pinnedQuote = await quotesRepo.getPinnedQuote(user.id, today);
   const picked = pinnedQuote ?? pickDailyQuote(pool, today);
   const quote = picked
     ? { text: picked.text, attribution: picked.attribution, translation: picked.translation }

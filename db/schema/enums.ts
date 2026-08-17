@@ -113,6 +113,14 @@ export const quoteSource = pgEnum("quote_source", ["quote", "verse"]);
 /** Which of those the owner wants to see on a given day. */
 export const quoteSourcePref = pgEnum("quote_source_pref", ["quote", "verse", "both"]);
 
+/**
+ * Who may create an account on this install.
+ *
+ * Defaults to invite_only in the schema, because a default that opens a public
+ * sign-up page is not a default anyone should get by forgetting to choose.
+ */
+export const signupMode = pgEnum("signup_mode", ["open", "invite_only"]);
+
 /** User appearance preference. Mirrors next-themes. */
 export const themePreference = pgEnum("theme_preference", [
   "light",
@@ -156,3 +164,4 @@ export type AutomationScope = (typeof automationScope.enumValues)[number];
 export type NotificationKind = (typeof notificationKind.enumValues)[number];
 export type QuoteSource = (typeof quoteSource.enumValues)[number];
 export type QuoteSourcePref = (typeof quoteSourcePref.enumValues)[number];
+export type SignupMode = (typeof signupMode.enumValues)[number];
