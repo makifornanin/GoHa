@@ -10,7 +10,41 @@ import { neon } from "@neondatabase/serverless";
  * Never prints the connection secret.
  *
  * Run: pnpm db:diagnose
+ *
+ * STRUCTURAL OUTPUT ONLY (audit R-21). This used to print the owner's email
+ * and display name, every recent task title, and the first 60 characters of
+ * brain dump entries. A diagnostic exists to be pasted into a chat, an issue
+ * or a screenshot, which made it the single most likely route for private
+ * content to leave the machine. None of that content was ever load-bearing:
+ * the question this script answers is "is the row there, on the right date,
+ * pointing at the right parent", and shapes answer that as well as text does.
+ *
+ * The redaction helpers below keep just enough to recognise a record (its id
+ * prefix, its length, its dates) without reproducing what it says.
  */
+
+/** `mark@example.com` -> `m***@e***.com`. Enough to tell two accounts apart. */
+function maskEmail(value: unknown): string {
+  const email = String(value ?? "");
+  const at = email.indexOf("@");
+  if (at < 1) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf(".");
+  const tld = dot > 0 ? domain.slice(dot) : "";
+  return `${local[0]}***@${domain[0]}***${tld}`;
+}
+
+/** First 8 characters of a UUID: enough to correlate rows across sections. */
+function shortId(value: unknown): string {
+  return `${String(value ?? "").slice(0, 8)}...`;
+}
+
+/** Replaces free text with its shape. */
+function textShape(value: unknown): string {
+  const text = String(value ?? "");
+  return `(${text.length} chars)`;
+}
 function loadEnv(file: string) {
   const path = resolve(process.cwd(), file);
   if (!existsSync(path)) return;
@@ -82,7 +116,9 @@ for (const t of tables) {
 console.log("\n=== SAMPLE DATA ===");
 const users = await sql`select id, email, name, created_at from "user" order by created_at limit 5`;
 console.log("users:", users.length === 0 ? "(NONE - no owner account!)" : "");
-for (const u of users) console.log(`  ${u.email} (${u.name}) id=${u.id}`);
+for (const u of users) {
+  console.log(`  ${maskEmail(u.email)}  name=${textShape(u.name)}  id=${shortId(u.id)}`);
+}
 
 const settings = await sql`select user_id, theme, timezone, week_starts_on from user_settings`;
 console.log("\nuser_settings:");
@@ -96,20 +132,24 @@ const tasks = await sql`
 `;
 console.log(`\ntasks (${tasks.length}):`);
 for (const t of tasks) {
+  // Title deliberately reduced to its length: the diagnostic value here is the
+  // dates and the parent links, never the wording.
   console.log(
-    `  [${t.status}/${t.priority}] "${t.title}"\n` +
+    `  [${t.status}/${t.priority}] id=${shortId(t.id)} title=${textShape(t.title)}\n` +
       `      scheduled_for=${t.scheduled_for ?? "NULL"}  due_at=${t.due_at ?? "NULL"}\n` +
-      `      goal=${t.goal_id ?? "-"} area=${t.life_area_id ?? "-"}  created=${t.created_at}`,
+      `      goal=${t.goal_id ? shortId(t.goal_id) : "-"} area=${t.life_area_id ? shortId(t.life_area_id) : "-"}  created=${t.created_at}`,
   );
 }
 
 const prios = await sql`select id, task_id, priority_date, created_at from daily_priorities`;
 console.log(`\ndaily_priorities (${prios.length}):`);
-for (const p of prios) console.log(`  date=${p.priority_date} task=${p.task_id}`);
+for (const p of prios) {
+  console.log(`  date=${p.priority_date} task=${p.task_id ? shortId(p.task_id) : "(label)"}`);
+}
 
 const dumps = await sql`select id, content, status from brain_dump_items limit 5`;
 console.log(`\nbrain_dump_items (${dumps.length}):`);
-for (const d of dumps) console.log(`  [${d.status}] ${String(d.content).slice(0, 60)}`);
+for (const d of dumps) console.log(`  [${d.status}] id=${shortId(d.id)} content=${textShape(d.content)}`);
 
 const focus = await sql`select id, status, started_at, ended_at, duration_seconds from focus_sessions limit 5`;
 console.log(`\nfocus_sessions (${focus.length}):`);
