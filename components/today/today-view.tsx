@@ -50,6 +50,7 @@ import type { TaskFormInput } from "@/lib/validations/task";
 
 import { ActiveGoalsCard } from "./active-goals-card";
 import { BrainCard } from "./brain-card";
+import { DailyQuoteCard } from "./daily-quote-card";
 import { MomentumCard, type MomentumData } from "./momentum-card";
 import { QuickAddTask } from "./quick-add-task";
 import { TaskChecklistItem } from "./task-checklist-item";
@@ -434,6 +435,11 @@ export function TodayView({
               </Card>
 
               <MomentumCard data={momentum} />
+
+              {/* Under Momentum, per automation Guide 01 phase 1.5. Empty until
+                  the quote pool exists; the slot is settled now so filling it
+                  later moves nothing else on this page. */}
+              <DailyQuoteCard />
 
               <ActiveGoalsCard goals={data.activeGoals} />
 

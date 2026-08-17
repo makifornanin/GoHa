@@ -110,9 +110,18 @@ export function AuthForm({
       transition={{ ...spring.smooth, duration: 0.5 }}
     >
       <div className="mb-10 flex flex-col items-center gap-5 text-center">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-blue text-white">
-          <span className="text-title-3">G</span>
-        </div>
+        {/* The same wordmark as the shell, at display size. The blue tile that
+            used to sit here was the second copy of a mark the app no longer
+            has; the sign-in screen is where the name should be at its most
+            deliberate, not where a placeholder glyph lives. */}
+        <p className="flex items-baseline text-[34px] leading-[40px] tracking-[-0.04em]">
+          <span className="font-semibold text-label">Go</span>
+          <span className="font-normal text-label-secondary">Ha</span>
+          <span
+            aria-hidden
+            className="ml-1.5 size-2 shrink-0 self-center rounded-full bg-blue"
+          />
+        </p>
         <div>
           <h1 className="text-large-title text-label">
             {isLogin ? "Welcome back" : "Set up GoHa"}
