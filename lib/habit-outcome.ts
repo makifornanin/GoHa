@@ -72,6 +72,39 @@ export type HabitOutcome =
   | "off_schedule";
 
 /**
+ * The outcomes reachable when an entry EXISTS. Never pending, never
+ * off_schedule, because both of those describe the absence of a log.
+ */
+export type LoggedOutcome = Extract<
+  HabitOutcome,
+  "done" | "partial" | "missed" | "skipped"
+>;
+
+/**
+ * Resolve a logged entry on its own, with no date context.
+ *
+ * Split out because a caller holding an entry has nothing to decide about
+ * schedules or day boundaries, and making it invent a `today` just to satisfy a
+ * signature is how wrong values get passed. The narrower return type also lets
+ * the legacy wrappers map without a cast.
+ */
+export function loggedEntryOutcome(habit: HabitMeasure, entry: LoggedEntry): LoggedOutcome {
+  if (entry.status === "skipped") return "skipped";
+  if (entry.status === "missed") return "missed";
+  // status === "done": for a numeric habit the value decides whether the
+  // logged day actually met the target.
+  if (habit.type === "numeric" && habit.targetValue !== null && entry.value !== null) {
+    const met = habit.higherIsBetter
+      ? entry.value >= habit.targetValue
+      : entry.value <= habit.targetValue;
+    return met ? "done" : "partial";
+  }
+  // A boolean habit, or a numeric habit with no target or no recorded value:
+  // there is nothing to compare against, so the log stands as a completion.
+  return "done";
+}
+
+/**
  * Resolve one habit-day.
  *
  * Precedence, which matters and is preserved exactly from the original
@@ -83,21 +116,7 @@ export type HabitOutcome =
 export function habitOutcome(input: HabitOutcomeInput): HabitOutcome {
   const { habit, entry, scheduled, date, today } = input;
 
-  if (entry) {
-    if (entry.status === "skipped") return "skipped";
-    if (entry.status === "missed") return "missed";
-    // status === "done": for a numeric habit the value decides whether the
-    // logged day actually met the target.
-    if (habit.type === "numeric" && habit.targetValue !== null && entry.value !== null) {
-      const met = habit.higherIsBetter
-        ? entry.value >= habit.targetValue
-        : entry.value <= habit.targetValue;
-      return met ? "done" : "partial";
-    }
-    // A boolean habit, or a numeric habit with no target or no recorded value:
-    // there is nothing to compare against, so the log stands as a completion.
-    return "done";
-  }
+  if (entry) return loggedEntryOutcome(habit, entry);
 
   if (!scheduled) return "off_schedule";
   // Today is still in play, and the future has not happened yet.

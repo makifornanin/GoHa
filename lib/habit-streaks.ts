@@ -1,4 +1,11 @@
 import { addDays, startOfWeek, weekdayOf, type IsoDate, type Weekday } from "@/lib/date";
+import {
+  habitOutcome,
+  loggedEntryOutcome,
+  type HabitMeasure,
+  type LoggedEntry,
+  type LoggedOutcome,
+} from "@/lib/habit-outcome";
 
 /**
  * Habit streak logic. Pure and framework-free so it is exhaustively unit-tested
@@ -6,22 +13,23 @@ import { addDays, startOfWeek, weekdayOf, type IsoDate, type Weekday } from "@/l
  *
  *  - Schedule-aware: only SCHEDULED days can break a streak. Unscheduled days
  *    (e.g. Tuesday for a Mon/Wed/Fri habit) are ignored, not counted as misses.
- *  - Asia/Manila local dates: callers pass `today` as the Manila calendar date
- *    (manilaToday), and entry dates are Manila dates. No UTC truncation here.
+ *  - Local dates throughout: callers pass `today` as the calendar date in the
+ *    user's saved timezone, and entry dates are the same. No UTC truncation.
  *  - A scheduled day only becomes a miss once it is in the PAST (`date < today`).
  *    Today, if unlogged, is "pending" and never breaks the streak before it ends.
  *  - `skipped` days are neutral: they neither extend nor break a streak.
  *  - Numeric habits: a value that meets the target is `done`; a logged value
  *    below target is `partial` (not a completion; breaks a streak like a miss).
+ *
+ * What a day RESOLVES TO is no longer decided here. That definition moved to
+ * lib/habit-outcome.ts so Calendar, Progress and Review could stop disagreeing
+ * with this file (audit R-06); everything below consumes it.
  */
 
 export type StreakOutcome = "done" | "partial" | "miss" | "skip";
 
-export type HabitLike = {
-  type: "boolean" | "numeric";
-  targetValue: number | null;
-  higherIsBetter: boolean;
-};
+/** Structurally the shared measure; the local name is kept for its callers. */
+export type HabitLike = HabitMeasure;
 
 export type ScheduleLike = {
   frequency: "daily" | "weekly" | "monthly";
@@ -30,28 +38,33 @@ export type ScheduleLike = {
   startDate: IsoDate | null;
 };
 
-export type EntryLike = {
-  entryDate: IsoDate;
-  status: "done" | "missed" | "skipped";
-  value: number | null;
-};
+export type EntryLike = LoggedEntry & { entryDate: IsoDate };
 
 export type Streaks = { current: number; longest: number };
 
 const HORIZON_DAYS = 730;
 
-/** The display/streak outcome of a single entry, given its habit's target. */
+/** The shared outcome vocabulary, in the shorter names this module's callers use. */
+const LOGGED_TO_STREAK: Record<LoggedOutcome, StreakOutcome> = {
+  done: "done",
+  partial: "partial",
+  missed: "miss",
+  skipped: "skip",
+};
+
+/**
+ * The display/streak outcome of a single entry, given its habit's target.
+ *
+ * Now a thin wrapper over lib/habit-outcome. It stays because the streak walker
+ * and the history grid speak this four-value vocabulary, and renaming that
+ * across every cell renderer would be a large diff for no behavioural gain.
+ * The mapping is a total Record, so adding an outcome upstream fails the build
+ * here rather than silently falling through.
+ */
 export function entryOutcome(habit: HabitLike, entry: EntryLike): StreakOutcome {
-  if (entry.status === "skipped") return "skip";
-  if (entry.status === "missed") return "miss";
-  // status === "done"
-  if (habit.type === "numeric" && habit.targetValue != null && entry.value != null) {
-    const met = habit.higherIsBetter
-      ? entry.value >= habit.targetValue
-      : entry.value <= habit.targetValue;
-    return met ? "done" : "partial";
-  }
-  return "done";
+  return LOGGED_TO_STREAK[
+    loggedEntryOutcome(habit, { status: entry.status, value: entry.value })
+  ];
 }
 
 /** The weekdays a schedule targets, or null when it is not weekday-based. */
@@ -92,8 +105,8 @@ function dayBasedStreaks(
 ): Streaks {
   const { habit, schedule, entries, today } = params;
 
-  const outcomes = new Map<IsoDate, StreakOutcome>();
-  for (const entry of entries) outcomes.set(entry.entryDate, entryOutcome(habit, entry));
+  const entryByDate = new Map<IsoDate, EntryLike>();
+  for (const entry of entries) entryByDate.set(entry.entryDate, entry);
 
   const entryDates = entries.map((e) => e.entryDate).sort();
   const floor = addDays(today, -HORIZON_DAYS);
@@ -106,10 +119,28 @@ function dayBasedStreaks(
     if (weekdays.has(weekdayOf(d))) scheduledDates.push(d);
   }
 
-  // Resolve a scheduled date to its outcome: a past day with no entry is a miss;
-  // today with no entry is pending (neutral).
-  const resolve = (date: IsoDate): StreakOutcome | "pending" =>
-    outcomes.get(date) ?? (date < today ? "miss" : "pending");
+  /*
+   * Resolve a scheduled date through the SHARED definition rather than
+   * re-deriving it. The "past day with no entry is a miss, today is pending"
+   * rule used to be written out here as well as in habit-view, which is exactly
+   * how the three copies drifted (audit R-06).
+   *
+   * `scheduled: true` is correct: this is only ever called with dates already
+   * filtered to the habit's schedule, so off_schedule is unreachable. It maps
+   * to pending anyway, because neutral is the safe reading of a day the habit
+   * was never due on.
+   */
+  const resolve = (date: IsoDate): StreakOutcome | "pending" => {
+    const outcome = habitOutcome({
+      habit,
+      entry: entryByDate.get(date) ?? null,
+      scheduled: true,
+      date,
+      today,
+    });
+    if (outcome === "pending" || outcome === "off_schedule") return "pending";
+    return LOGGED_TO_STREAK[outcome];
+  };
 
   let longest = 0;
   let run = 0;

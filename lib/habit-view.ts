@@ -9,9 +9,9 @@ import {
   type IsoDate,
   type Weekday,
 } from "@/lib/date";
+import { habitOutcome, toDayCellState } from "@/lib/habit-outcome";
 import {
   computeHabitStreaks,
-  entryOutcome,
   isDayScheduled,
   type EntryLike,
   type HabitLike,
@@ -76,17 +76,29 @@ function toEntryLike(entry: HabitEntry): EntryLike {
   return { entryDate: entry.entryDate, status: entry.status, value: toNumberOrNull(entry.value) };
 }
 
-/** Resolve a single day to a display state for the given habit. */
+/**
+ * Resolve a single day to a display state for the given habit.
+ *
+ * Delegates to the shared definition (audit R-06). This function used to carry
+ * its own copy of the entry-wins / off-schedule / past-is-a-miss precedence,
+ * which is one of the three copies that disagreed.
+ */
 function resolveDayState(
+  habit: HabitLike,
   schedule: ScheduleLike,
-  outcomes: Map<IsoDate, DayCellState>,
+  entryByDate: Map<IsoDate, EntryLike>,
   date: IsoDate,
   today: IsoDate,
 ): DayCellState {
-  const logged = outcomes.get(date);
-  if (logged) return logged;
-  if (!isDayScheduled(schedule, date)) return "off";
-  return date < today ? "miss" : "pending"; // today/future scheduled but unlogged = pending
+  return toDayCellState(
+    habitOutcome({
+      habit,
+      entry: entryByDate.get(date) ?? null,
+      scheduled: isDayScheduled(schedule, date),
+      date,
+      today,
+    }),
+  );
 }
 
 export function buildHabitViews(params: {
@@ -114,10 +126,8 @@ export function buildHabitViews(params: {
     const habitLike = toHabitLike(habit);
     const habitEntries = entriesByHabit.get(habit.id) ?? [];
 
-    const outcomes = new Map<IsoDate, DayCellState>();
-    for (const entry of habitEntries) {
-      outcomes.set(entry.entryDate, entryOutcome(habitLike, toEntryLike(entry)));
-    }
+    const entryByDate = new Map<IsoDate, EntryLike>();
+    for (const entry of habitEntries) entryByDate.set(entry.entryDate, toEntryLike(entry));
 
     const streaks = computeHabitStreaks({
       habit: habitLike,
@@ -135,11 +145,11 @@ export function buildHabitViews(params: {
       streaks,
       scheduledToday: isDayScheduled(schedule, today),
       todayEntry,
-      todayState: resolveDayState(schedule, outcomes, today, today),
+      todayState: resolveDayState(habitLike, schedule, entryByDate, today, today),
       weekCells: weekDates.map((date) => ({
         date,
         weekday: weekdayOf(date),
-        state: resolveDayState(schedule, outcomes, date, today),
+        state: resolveDayState(habitLike, schedule, entryByDate, date, today),
         isToday: date === today,
       })),
     };
@@ -173,7 +183,17 @@ export function deriveTodayHabits(
     const schedule = toScheduleLike(habit, timeZone);
     if (!isDayScheduled(schedule, today)) continue;
     const entry = todaysEntries.find((e) => e.habitId === habit.id && e.entryDate === today) ?? null;
-    const state: DayCellState = entry ? entryOutcome(toHabitLike(habit), toEntryLike(entry)) : "pending";
+    // `scheduled: true` because the loop above already skipped anything not due
+    // today. Same shared definition as the grid, so Today and Habits agree.
+    const state: DayCellState = toDayCellState(
+      habitOutcome({
+        habit: toHabitLike(habit),
+        entry: entry ? toEntryLike(entry) : null,
+        scheduled: true,
+        date: today,
+        today,
+      }),
+    );
     result.push({ habit, todayEntry: entry, todayState: state });
   }
   return result;
