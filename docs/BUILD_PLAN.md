@@ -671,3 +671,37 @@ reloaded; now what you see is what is stored.
 Verification: `tsc` clean, ESLint clean, Vitest 180/180, `pnpm build` green,
 task-map specs twice at 4/4, and the full Playwright suite 33/33 against the
 production build.
+
+### 2026-08-17: R-10 resolved, the Brain Dump rapid-capture dead state
+
+The known issue recorded on 2026-08-13 (capturing again within ~400ms could
+leave the button disabled with `aria-busy` forever) is fixed, and the 500ms
+pacing in `e2e/qa.spec.ts` that stepped around it has been removed.
+
+The cause was not the action, which is why the server logs were always clean.
+The optimistic insert ran inside a shared `useTransition`. That transition's
+pending flag clears when the action promise resolves, but the revalidated props
+commit a moment later, so a capture started in that gap joined a transition
+whose optimistic base was mid-change and never settled.
+
+The earlier attempt failed because it treated this as a sequencing problem and
+serialised captures behind a promise chain, which made every capture wait on the
+one before and stalled on the FIRST repeat. The fix is to remove the coupling
+instead: each capture is now an independent promise with its own placeholder
+row held outside `useOptimistic`, so there is no shared transition to get stuck
+in and no reason to disable the field between captures.
+
+Placeholders are retired by matching content COUNT against the server rows, not
+by deleting on settle. Deleting on settle was tried first and put the note's
+visibility back at the mercy of revalidation timing, which is the same class of
+coupling; a slow, failed or absent refresh made the note vanish. Counting rather
+than set membership also keeps deliberately capturing the same thought twice
+working. On failure the placeholder is withdrawn, because nothing was written.
+
+Also fixed alongside it: conversion now truncates to the target's own edit limit
+(task 160, goal 120, habit 80) inside the atomic CTE. A long thought previously
+produced a record that failed validation the next time it was saved, on a field
+the user had not touched.
+
+Regression cover: `tests/brain-dump-capture.test.tsx`, driving five back-to-back
+captures with no delay at all, which is harsher than the 150ms that used to fail.

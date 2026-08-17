@@ -63,8 +63,26 @@ export function BrainDumpView({
   const [draftColor, setDraftColor] = useState<NoteColorKey>(DEFAULT_NOTE_COLOR);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<BrainDumpItemRow | null>(null);
-  const [capturePending, startCapture] = useTransition();
   const [, startAction] = useTransition();
+
+  /*
+   * Captures in flight, held OUTSIDE useOptimistic (audit R-10).
+   *
+   * The old capture path put its optimistic insert inside a shared
+   * useTransition. That transition's pending flag clears when the action
+   * promise resolves, but the revalidated props commit a moment later, so a
+   * second capture started in that gap joined a transition whose optimistic
+   * base was mid-change. The result was a transition that never settled: the
+   * button stayed disabled with aria-busy, no error appeared, and only a
+   * reload cleared it. Anything faster than about 400ms hit it, which meant a
+   * paste-and-click user or an automation.
+   *
+   * Each capture is now an independent promise with its own row in this list,
+   * so there is no shared transition to get stuck in and no reason to block
+   * the field between captures. The other actions keep useOptimistic: they
+   * mutate rows the server already has, and were never part of the fault.
+   */
+  const [inFlight, setInFlight] = useState<BrainDumpItemRow[]>([]);
 
   const [optimisticItems, apply] = useOptimistic(items, (state, action: OptimisticAction) => {
     switch (action.type) {
@@ -85,44 +103,121 @@ export function BrainDumpView({
     }
   });
 
+  /**
+   * Placeholders whose real row has not arrived yet.
+   *
+   * Reconciled by CONTENT COUNT rather than by id (the server picks a different
+   * id) or by a set membership test (capturing the same thought twice on
+   * purpose is legitimate, and a set would hide the second one). For each
+   * distinct content, as many placeholders are retired as there are server rows
+   * holding it; the rest stay on screen.
+   *
+   * Deriving this rather than deleting on settle is deliberate. An earlier
+   * version removed the placeholder when the action resolved, which put the
+   * note's visibility back in the hands of revalidation timing: exactly the
+   * coupling R-10 came from. Now a slow, failed or entirely absent refresh
+   * leaves the note where the user put it.
+   */
+  const unsettled = useMemo(() => {
+    if (inFlight.length === 0) return inFlight;
+    const available = new Map<string, number>();
+    for (const item of optimisticItems) {
+      if (item.status !== "inbox") continue;
+      available.set(item.content, (available.get(item.content) ?? 0) + 1);
+    }
+    // Oldest first, so the earliest placeholder is the one a new row retires.
+    const keep: BrainDumpItemRow[] = [];
+    for (let i = inFlight.length - 1; i >= 0; i -= 1) {
+      const item = inFlight[i];
+      const covered = available.get(item.content) ?? 0;
+      if (covered > 0) available.set(item.content, covered - 1);
+      else keep.push(item);
+    }
+    return keep.reverse();
+  }, [inFlight, optimisticItems]);
+
   const counts = useMemo(() => {
     const map = new Map<Tab, number>();
-    for (const t of TABS) map.set(t.key, optimisticItems.filter((i) => i.status === t.key).length);
+    for (const t of TABS) {
+      const settled = optimisticItems.filter((i) => i.status === t.key).length;
+      map.set(t.key, t.key === "inbox" ? settled + unsettled.length : settled);
+    }
     return map;
-  }, [optimisticItems]);
+  }, [optimisticItems, unsettled]);
 
-  const visible = optimisticItems.filter((i) => i.status === tab);
+  const visible =
+    tab === "inbox"
+      ? [...unsettled, ...optimisticItems.filter((i) => i.status === "inbox")]
+      : optimisticItems.filter((i) => i.status === tab);
 
   function capture() {
     const content = draft.trim();
-    if (!content || capturePending) return;
+    if (!content) return;
+
     const now = new Date();
+    // Unique per capture, not per millisecond: two captures inside the same
+    // millisecond used to collide on `optimistic-${now.getTime()}` and React
+    // then reconciled two list rows onto one key.
+    const key = `pending-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`;
+    const color = draftColor;
     const optimistic: BrainDumpItemRow = {
-      id: `optimistic-${now.getTime()}`,
+      id: key,
       userId: "",
       content,
       status: "inbox",
-      color: draftColor,
+      color,
       convertedType: null,
       convertedEntityId: null,
       sortOrder: 0,
       createdAt: now,
       updatedAt: now,
     };
-    startCapture(async () => {
-      apply({ type: "add", item: optimistic });
-      setDraft("");
-      const result = await captureBrainDumpItemAction(content);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+
+    /*
+     * Add the new placeholder and, in the same update, drop any earlier ones
+     * the server has since confirmed. Pruning here rather than on a timer or an
+     * effect keeps the list bounded without introducing another moving part.
+     */
+    setInFlight((current) => {
+      const available = new Map<string, number>();
+      for (const item of items) {
+        if (item.status !== "inbox") continue;
+        available.set(item.content, (available.get(item.content) ?? 0) + 1);
       }
-      // Capture stays a single fast field; the chosen colour is applied to the
-      // note the server just created.
-      if (draftColor !== DEFAULT_NOTE_COLOR) {
-        await setBrainDumpColorAction(result.data.id, draftColor);
+      const kept: BrainDumpItemRow[] = [];
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        const item = current[i];
+        const covered = available.get(item.content) ?? 0;
+        if (covered > 0) available.set(item.content, covered - 1);
+        else kept.push(item);
       }
+      return [optimistic, ...kept.reverse()];
     });
+    setDraft("");
+
+    void (async () => {
+      try {
+        const result = await captureBrainDumpItemAction(content);
+        if (!result.ok) {
+          toast.error(result.error);
+          // Nothing was written, so the placeholder is a lie. Take it back.
+          startAction(() => setInFlight((c) => c.filter((item) => item.id !== key)));
+          return;
+        }
+        // Capture stays a single fast field; the chosen colour is applied to
+        // the note the server just created.
+        if (color !== DEFAULT_NOTE_COLOR) {
+          await setBrainDumpColorAction(result.data.id, color);
+        }
+        // On success the placeholder is left in place. `unsettled` retires it
+        // the moment the real row appears, so there is no window where the
+        // note is missing and no dependence on when the refresh lands.
+      } catch (error) {
+        console.error("captureBrainDumpItemAction failed", error);
+        toast.error("Could not save that thought. Please try again.");
+        startAction(() => setInFlight((c) => c.filter((item) => item.id !== key)));
+      }
+    })();
   }
 
   function act(
@@ -209,7 +304,10 @@ export function BrainDumpView({
             <span className="font-mono text-footnote tabular-nums text-label-tertiary">
               {draft.length}/{BRAIN_DUMP_CONTENT_MAX} · ⌘/Ctrl + Enter
             </span>
-            <Button onClick={capture} disabled={draft.trim().length === 0} loading={capturePending}>
+            {/* Never disabled by an in-flight capture. Each one is independent,
+                so blocking the field between them bought nothing and was the
+                surface the stuck-pending state appeared on (audit R-10). */}
+            <Button onClick={capture} disabled={draft.trim().length === 0}>
               <CornerDownLeft />
               Pin it
             </Button>

@@ -404,14 +404,10 @@ test("Brain Dump: capture, edit, convert, archive", async ({ page }) => {
     await page.getByLabel("Capture a thought").fill(text);
     await page.getByRole("button", { name: "Pin it" }).click();
     await expect(page.getByText(text).first()).toBeVisible({ timeout: 15_000 });
-    // KNOWN ISSUE, deliberately paced rather than papered over: capturing again
-    // within ~400ms of the previous capture can leave the optimistic transition
-    // pending forever (button stuck disabled with aria-busy, no error, cleared
-    // only by a reload). Measured: no gap stalls on the 2nd capture, 150ms on
-    // the 4th, 400ms is clean through ten. A person typing a thought and
-    // clicking is far slower than that, so this paces the loop to human speed
-    // instead of hiding the defect. See the report for the full write-up.
-    await page.waitForTimeout(500);
+    // The 500ms pacing that used to be here is gone: it existed only to step
+    // around audit R-10, where capturing again within ~400ms left the form
+    // permanently pending. Captures no longer share a transition, so the loop
+    // runs at full speed. Unit cover: tests/brain-dump-capture.test.tsx.
   }
   record("Brain Dump", "NOTE", "Capture is fast and items appear immediately (optimistic).");
 

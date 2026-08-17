@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 
 import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
+import { GOAL_TITLE_MAX } from "@/lib/goals";
+import { HABIT_NAME_MAX } from "@/lib/habits";
+import { TASK_TITLE_MAX } from "@/lib/tasks";
 import { db } from "../client";
 import { brainDumpItems } from "../schema";
 import type { BrainDumpStatus } from "../schema";
@@ -123,6 +126,22 @@ export async function convertBrainDumpItem(
 ): Promise<{ entityId: string } | null> {
   const entityId = randomUUID();
 
+  /*
+   * Truncate to the TARGET's own edit limit (audit R-10).
+   *
+   * A brain dump item allows 2000 characters; a task title allows 160, a goal
+   * 120, a habit 80. Converting a long thought produced a record the user could
+   * never save again: opening it and pressing save failed Zod validation on a
+   * field they had not touched, with a message about a limit the note itself
+   * never had. Cutting at conversion keeps every converted record editable.
+   *
+   * Done in SQL rather than in the action because the whole conversion is one
+   * atomic writable CTE, and reading the content out first to trim it in JS
+   * would reintroduce the read-then-write race the CTE exists to close.
+   */
+  const titleLimit =
+    target === "task" ? TASK_TITLE_MAX : target === "goal" ? GOAL_TITLE_MAX : HABIT_NAME_MAX;
+
   const statement =
     target === "task"
       ? sql`
@@ -133,7 +152,7 @@ export async function convertBrainDumpItem(
           ),
           created as (
             insert into tasks (id, user_id, title)
-            select ${entityId}, ${userId}, content from src
+            select ${entityId}, ${userId}, left(content, ${titleLimit}) from src
             returning id
           )
           update brain_dump_items b
@@ -150,7 +169,7 @@ export async function convertBrainDumpItem(
             ),
             created as (
               insert into goals (id, user_id, title, timeframe)
-              select ${entityId}, ${userId}, content, 'monthly' from src
+              select ${entityId}, ${userId}, left(content, ${titleLimit}), 'monthly' from src
               returning id
             )
             update brain_dump_items b
@@ -166,7 +185,7 @@ export async function convertBrainDumpItem(
             ),
             created as (
               insert into habits (id, user_id, name, type)
-              select ${entityId}, ${userId}, content, 'boolean' from src
+              select ${entityId}, ${userId}, left(content, ${titleLimit}), 'boolean' from src
               returning id
             ),
             scheduled as (
