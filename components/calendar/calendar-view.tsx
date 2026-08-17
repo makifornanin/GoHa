@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { CalendarDays, ChevronLeft, ChevronRight, Repeat, Timer } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
@@ -61,6 +62,13 @@ export type CalendarData = {
   lifeAreas: LifeArea[];
   today: string;
   weekStartsOn: Weekday;
+  /** The month being rendered ("YYYY-MM-01"), resolved on the server. */
+  anchor: string;
+  /** First and last day the grid draws; also the exact range that was fetched. */
+  gridStart: string;
+  gridEnd: string;
+  /** The user's saved timezone. Required: dates here must not assume Manila. */
+  timeZone: string;
 };
 
 type Layer = "all" | "tasks" | "habits" | "focus";
@@ -74,9 +82,22 @@ type Layer = "all" | "tasks" | "habits" | "focus";
  * read-and-navigate rather than an editing surface.
  */
 export function CalendarView({ data }: { data: CalendarData }) {
-  const [anchor, setAnchor] = useState(() => startOfMonth(data.today));
+  const router = useRouter();
+  /*
+   * The month is a URL parameter, not local state (audit R-07). Local state
+   * could navigate past the data the server had fetched; deriving it from the
+   * prop means the grid and the query can never disagree about which month is
+   * on screen. `layer` and `selected` stay local: they are view preferences,
+   * and putting them in the URL would make every filter click a navigation.
+   */
+  const anchor = data.anchor;
   const [layer, setLayer] = useState<Layer>("all");
   const [selected, setSelected] = useState<string | null>(data.today);
+
+  /** Navigate to another month, keeping the layer choice. */
+  function goToMonth(target: string) {
+    router.push(`/calendar?month=${target.slice(0, 7)}`);
+  }
 
   const weeks = useMemo(
     () => buildMonthGrid(anchor, data.today, data.weekStartsOn),
@@ -91,14 +112,17 @@ export function CalendarView({ data }: { data: CalendarData }) {
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const task of data.tasks) {
-      const date = taskEffectiveDate(task);
+      // The saved timezone, not the Manila default this used to fall back to
+      // (audit R-07/R-15). A due-at instant near midnight landed on the wrong
+      // calendar day for any user not in Manila.
+      const date = taskEffectiveDate(task, data.timeZone);
       if (!date) continue;
       const bucket = map.get(date) ?? [];
       bucket.push(task);
       map.set(date, bucket);
     }
     return map;
-  }, [data.tasks]);
+  }, [data.tasks, data.timeZone]);
 
   const habitsByDate = useMemo(() => {
     const map = new Map<string, HabitDay[]>();
@@ -119,9 +143,24 @@ export function CalendarView({ data }: { data: CalendarData }) {
   const showHabits = layer === "all" || layer === "habits";
   const showFocus = layer === "all" || layer === "focus";
 
-  const selectedTasks = selected ? tasksByDate.get(selected) ?? [] : [];
-  const selectedHabits = selected ? habitsByDate.get(selected) ?? [] : [];
-  const selectedFocus = selected ? focusByDate.get(selected) : undefined;
+  /*
+   * The detail panel must obey the layer filter and the fetched window.
+   *
+   * It previously read straight from the maps, so switching to "Focus" left the
+   * selected day still listing tasks and habits the grid had just hidden. And a
+   * day selected before navigating stayed in the panel while its data belonged
+   * to a month no longer fetched, which is how the truncation in R-07 surfaced
+   * as stale detail rather than as an obviously empty screen.
+   */
+  const selectedInView =
+    selected !== null && selected >= data.gridStart && selected <= data.gridEnd ? selected : null;
+
+  const selectedTasks =
+    selectedInView && showTasks ? tasksByDate.get(selectedInView) ?? [] : [];
+  const selectedHabits =
+    selectedInView && showHabits ? habitsByDate.get(selectedInView) ?? [] : [];
+  const selectedFocus =
+    selectedInView && showFocus ? focusByDate.get(selectedInView) : undefined;
 
   function dotColor(task: Task): string {
     const area = task.lifeAreaId ? areaById.get(task.lifeAreaId) : null;
@@ -141,18 +180,27 @@ export function CalendarView({ data }: { data: CalendarData }) {
             variant="outline"
             size="icon"
             aria-label="Previous month"
-            onClick={() => setAnchor((a) => addMonths(a, -1))}
+            onClick={() => goToMonth(addMonths(anchor, -1))}
           >
             <ChevronLeft />
           </Button>
-          <Button variant="secondary" onClick={() => setAnchor(startOfMonth(data.today))}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              // Today means today, not "the month containing today". Leaving the
+              // old selection behind sent you to this month with a day from
+              // another one still open in the panel.
+              setSelected(data.today);
+              goToMonth(startOfMonth(data.today));
+            }}
+          >
             Today
           </Button>
           <Button
             variant="outline"
             size="icon"
             aria-label="Next month"
-            onClick={() => setAnchor((a) => addMonths(a, 1))}
+            onClick={() => goToMonth(addMonths(anchor, 1))}
           >
             <ChevronRight />
           </Button>

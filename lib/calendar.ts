@@ -1,5 +1,8 @@
 import { addDays, startOfMonth, startOfWeek, type IsoDate, type Weekday } from "@/lib/date";
 
+/** How many cells `buildMonthGrid` renders: six whole weeks. */
+export const MONTH_GRID_DAYS = 42;
+
 /**
  * Pure month-grid construction for the Tasks calendar view. Everything is local
  * date-string arithmetic (no Date/timezone maths), so a grid can never drift by
@@ -35,6 +38,41 @@ export function addMonths(anchor: IsoDate, months: number): IsoDate {
   const newYear = year + Math.floor(zeroBased / 12);
   const newMonth = ((zeroBased % 12) + 12) % 12;
   return `${newYear}-${String(newMonth + 1).padStart(2, "0")}-01`;
+}
+
+/**
+ * Narrow a `?month=` parameter to a month anchor ("YYYY-MM-01").
+ *
+ * Accepts "YYYY-MM" and "YYYY-MM-DD"; anything else falls back to the month
+ * containing `today`. Deliberately permissive about the day part, because the
+ * anchor is a month and a link carrying a full date should still resolve.
+ */
+export function parseMonthAnchor(value: string | undefined | null, today: IsoDate): IsoDate {
+  if (typeof value === "string") {
+    const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(value);
+    if (match) {
+      const month = Number(match[2]);
+      if (month >= 1 && month <= 12) return `${match[1]}-${match[2]}-01`;
+    }
+  }
+  return startOfMonth(today);
+}
+
+/**
+ * The exact inclusive local-date range `buildMonthGrid` will render.
+ *
+ * The calendar used to fetch a fixed window around TODAY while month
+ * navigation was unlimited, so paging far enough away silently produced a
+ * month with no habits and no focus time and no indication anything was
+ * missing (audit R-07). Deriving the range from the anchor is what lets the
+ * server fetch precisely what the grid is about to show.
+ */
+export function monthGridRange(
+  anchor: IsoDate,
+  weekStartsOn: Weekday = 1,
+): { start: IsoDate; end: IsoDate } {
+  const start = startOfWeek(startOfMonth(anchor), weekStartsOn);
+  return { start, end: addDays(start, MONTH_GRID_DAYS - 1) };
 }
 
 /**

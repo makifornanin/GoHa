@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { addMonths, buildMonthGrid, groupByDate, monthLabel, weekdayHeaders } from "@/lib/calendar";
+import {
+  addMonths,
+  buildMonthGrid,
+  groupByDate,
+  monthGridRange,
+  monthLabel,
+  parseMonthAnchor,
+  weekdayHeaders,
+} from "@/lib/calendar";
 import { isTaskLate, taskMatchesProgress, taskMatchesTimeframe } from "@/lib/task-buckets";
 import { parseDurationMinutes } from "@/lib/focus";
 
@@ -95,5 +103,67 @@ describe("focus duration parsing", () => {
     expect(parseDurationMinutes("0")).toBeNull();
     expect(parseDurationMinutes("999")).toBeNull();
     expect(parseDurationMinutes("10", 15, 60)).toBeNull();
+  });
+});
+
+/**
+ * The viewed month drives the query (audit R-07).
+ *
+ * The calendar used to fetch a fixed window around TODAY while navigation was
+ * unlimited, so a month far enough away rendered with no habits and no focus
+ * time and nothing to say why. These pin the two pure pieces that make the
+ * fetched range and the drawn grid the same thing.
+ */
+describe("parseMonthAnchor", () => {
+  const TODAY = "2026-08-17";
+
+  it("accepts YYYY-MM", () => {
+    expect(parseMonthAnchor("2026-03", TODAY)).toBe("2026-03-01");
+  });
+
+  it("accepts a full date and snaps it to the month", () => {
+    expect(parseMonthAnchor("2026-03-19", TODAY)).toBe("2026-03-01");
+  });
+
+  it("falls back to the month containing today", () => {
+    for (const bad of [undefined, null, "", "nonsense", "2026", "2026-13", "2026-00", "26-03"]) {
+      expect(parseMonthAnchor(bad, TODAY)).toBe("2026-08-01");
+    }
+  });
+
+  it("allows navigating years away from today", () => {
+    expect(parseMonthAnchor("2019-11", TODAY)).toBe("2019-11-01");
+    expect(parseMonthAnchor("2031-01", TODAY)).toBe("2031-01-01");
+  });
+});
+
+describe("monthGridRange", () => {
+  it("covers exactly the 42 cells the grid draws", () => {
+    const anchor = "2026-08-01";
+    const range = monthGridRange(anchor, 1);
+    const cells = buildMonthGrid(anchor, "2026-08-17", 1).flat();
+
+    expect(cells).toHaveLength(42);
+    expect(range.start).toBe(cells[0].date);
+    expect(range.end).toBe(cells[41].date);
+  });
+
+  it("honours the week-start preference", () => {
+    // 2026-08-01 is a Saturday, so the two week starts pull in different days.
+    expect(monthGridRange("2026-08-01", 1).start).toBe("2026-07-27"); // Monday
+    expect(monthGridRange("2026-08-01", 0).start).toBe("2026-07-26"); // Sunday
+  });
+
+  it("agrees with the grid for every month of a year, both week starts", () => {
+    // The real guarantee: whatever the server fetched is what the grid shows.
+    for (const weekStart of [0, 1] as const) {
+      for (let month = 1; month <= 12; month += 1) {
+        const anchor = `2026-${String(month).padStart(2, "0")}-01`;
+        const range = monthGridRange(anchor, weekStart);
+        const cells = buildMonthGrid(anchor, "2026-08-17", weekStart).flat();
+        expect(range.start).toBe(cells[0].date);
+        expect(range.end).toBe(cells[cells.length - 1].date);
+      }
+    }
   });
 });
