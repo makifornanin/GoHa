@@ -705,3 +705,50 @@ the user had not touched.
 
 Regression cover: `tests/brain-dump-capture.test.tsx`, driving five back-to-back
 captures with no delay at all, which is harsher than the 150ms that used to fail.
+
+---
+
+## Automation Foundation: remediation plan (from the 17 Aug 2026 audit)
+
+Recorded here because the plan and its rules previously lived only in a chat
+prompt. A session that starts from the repository alone could not recover them,
+which is the same continuity gap the audit raised about documentation drift
+(R-20). Source: `docs/GoHa-Full-System-Report-2026-08-17.pdf`, risk register
+R-01..R-21.
+
+### HARD RULES (never violate)
+
+1. Never run `pnpm db:push`. Schema changes go through generated migrations only.
+2. Never apply a migration to a real database. Generate with `pnpm db:generate`,
+   read the SQL, then STOP and hand the owner the exact command. The owner
+   applies migrations by hand.
+3. Never run `pnpm test:e2e` or `test:account:*` outside a database carrying the
+   `goha_test` marker (enforced by `scripts/lib/require-test-db.mts`).
+4. Never modify, read aloud, print, or commit `.env.local` or any secret value.
+   `.env.example` may carry documented keys with placeholder values only.
+5. All NEW date-bucketing code takes a required date context built from the saved
+   user timezone. Never default to `Asia/Manila` in new code.
+6. Generated quote/verse content is written with `"verified": false`. Never mark
+   content verified, and never invent verse wording.
+7. If a change is ambiguous or risks data meaning, especially near migrations
+   0002/0003 and 0005/0006 (see R-03), STOP and ask rather than guessing.
+8. Keep the architecture: Server Components read repositories, Server Actions
+   mutate, `server-only` database boundary, owner scoping via `requireUser()`.
+   Route Handlers only under `app/api/`.
+
+Per item: run `pnpm typecheck && pnpm lint && pnpm test`, one commit per numbered
+item, no drive-by refactors.
+
+### Progress
+
+- Phase 0 (repository hygiene, R-02 test-database guard, R-04 real backup,
+  R-21 diagnostic redaction): COMPLETE.
+- Phase 1.1 R-06 shared habit outcome: COMPLETE.
+- Phase 1.2 R-05 Review week state: COMPLETE.
+- Phase 1.3 R-09 open redirect: COMPLETE.
+- Phase 1.4 R-10 Brain Dump rapid capture + conversion limits: COMPLETE.
+- Phase 1.5 R-07 Calendar: IN PROGRESS.
+- Phase 1.6 R-15 timezone contract, 1.7 R-12 Task Maps, 1.8 R-17 Focus,
+  1.9 R-18 Progress, 1.10 R-08 database invariants: NOT STARTED.
+- Phase 2 (automation schema + API), Phase 3 (automation UI), Phase 4
+  (hardening, CI, docs): NOT STARTED.
