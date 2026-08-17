@@ -1,0 +1,27 @@
+# Normalize line endings.
+#
+# The repository stores LF. Without this, a Windows checkout with
+# core.autocrlf=true rewrites every file to CRLF in the working tree, and git
+# then reports "LF will be replaced by CRLF" on each one. That is noise on
+# every status, and it becomes a real diff the moment a file is touched by a
+# tool that writes what it reads.
+#
+# `eol=lf` makes the working tree match the repository on every platform, so
+# the churn stops at the source rather than being filtered out per command.
+* text=auto eol=lf
+
+# Binary assets: never diffed, never line-ending converted. `text=auto` detects
+# most of these on its own, but being explicit means a corrupted PDF can never
+# be blamed on a filter.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+
+# Generated and vendored files: keep them out of diff noise and language stats.
+pnpm-lock.yaml        -diff linguist-generated
+db/migrations/meta/** -diff linguist-generated
