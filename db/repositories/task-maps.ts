@@ -1,6 +1,7 @@
 import "server-only";
 
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, exists, inArray, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "../client";
 import { taskMapEdges, taskMapNodes, taskMaps } from "../schema";
@@ -123,6 +124,24 @@ export type TaskMapNodeInput = {
   data?: unknown;
 };
 
+/**
+ * A live (non-archived) map owned by this user contains the given node/edge.
+ *
+ * Expressed in SQL rather than as a check in the action layer (audit R-12).
+ * Archiving is meant to freeze a map, but every node and edge mutation was
+ * scoped to the OWNER only, so an archived map stayed fully editable through a
+ * stale tab, a deep link, or any future call site that forgot to ask. A
+ * condition attached to the statement itself cannot be forgotten.
+ */
+function inLiveMap(mapIdColumn: AnyPgColumn) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(taskMaps)
+      .where(and(eq(taskMaps.id, mapIdColumn), eq(taskMaps.isArchived, false))),
+  );
+}
+
 export async function createTaskMapNode(
   userId: string,
   taskMapId: string,
@@ -143,7 +162,13 @@ export async function updateTaskMapNode(
   const [row] = await db
     .update(taskMapNodes)
     .set(input)
-    .where(and(eq(taskMapNodes.id, id), eq(taskMapNodes.userId, userId)))
+    .where(
+      and(
+        eq(taskMapNodes.id, id),
+        eq(taskMapNodes.userId, userId),
+        inLiveMap(taskMapNodes.taskMapId),
+      ),
+    )
     .returning();
   return row ?? null;
 }
@@ -151,7 +176,13 @@ export async function updateTaskMapNode(
 export async function deleteTaskMapNode(userId: string, id: string): Promise<boolean> {
   const rows = await db
     .delete(taskMapNodes)
-    .where(and(eq(taskMapNodes.id, id), eq(taskMapNodes.userId, userId)))
+    .where(
+      and(
+        eq(taskMapNodes.id, id),
+        eq(taskMapNodes.userId, userId),
+        inLiveMap(taskMapNodes.taskMapId),
+      ),
+    )
     .returning({ id: taskMapNodes.id });
   return rows.length > 0;
 }
@@ -177,6 +208,7 @@ export async function updateNodePositions(
             eq(taskMapNodes.id, p.id),
             eq(taskMapNodes.userId, userId),
             eq(taskMapNodes.taskMapId, taskMapId),
+            inLiveMap(taskMapNodes.taskMapId),
           ),
         )
         .returning({ id: taskMapNodes.id }),
@@ -203,6 +235,9 @@ export async function countNodesInMap(
         eq(taskMapNodes.userId, userId),
         eq(taskMapNodes.taskMapId, taskMapId),
         inArray(taskMapNodes.id, nodeIds),
+        // Also blocks creating an edge inside an archived map, since the
+        // action validates both endpoints through this count.
+        inLiveMap(taskMapNodes.taskMapId),
       ),
     );
   return row?.n ?? 0;
@@ -222,7 +257,13 @@ export async function updateTaskMapEdge(
   const [row] = await db
     .update(taskMapEdges)
     .set({ ...input, updatedAt: new Date() })
-    .where(and(eq(taskMapEdges.id, id), eq(taskMapEdges.userId, userId)))
+    .where(
+      and(
+        eq(taskMapEdges.id, id),
+        eq(taskMapEdges.userId, userId),
+        inLiveMap(taskMapEdges.taskMapId),
+      ),
+    )
     .returning();
   return row ?? null;
 }
@@ -264,7 +305,13 @@ export async function createTaskMapEdge(
 export async function deleteTaskMapEdge(userId: string, id: string): Promise<boolean> {
   const rows = await db
     .delete(taskMapEdges)
-    .where(and(eq(taskMapEdges.id, id), eq(taskMapEdges.userId, userId)))
+    .where(
+      and(
+        eq(taskMapEdges.id, id),
+        eq(taskMapEdges.userId, userId),
+        inLiveMap(taskMapEdges.taskMapId),
+      ),
+    )
     .returning({ id: taskMapEdges.id });
   return rows.length > 0;
 }

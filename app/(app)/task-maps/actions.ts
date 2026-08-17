@@ -35,10 +35,21 @@ function fail(message: string | undefined): ActionResult<never> {
   return { ok: false, error: message ?? GENERIC_ERROR };
 }
 
-/** Confirm the map exists and belongs to the caller before mutating its graph. */
-async function assertMapOwner(userId: string, taskMapId: string): Promise<boolean> {
+const ARCHIVED = "That map is archived. Restore it before making changes.";
+
+/**
+ * The map exists, belongs to the caller, and is still editable.
+ *
+ * Archiving is meant to freeze a map, but nothing enforced it: every graph
+ * mutation checked ownership alone, so an archived map stayed fully editable
+ * (audit R-12). The repository now carries the same condition in SQL; this
+ * exists so the user gets an explanation instead of a bare "not found".
+ */
+async function assertMapEditable(userId: string, taskMapId: string): Promise<string | null> {
   const map = await taskMapsRepo.getTaskMap(userId, taskMapId);
-  return Boolean(map);
+  if (!map) return NOT_FOUND;
+  if (map.isArchived) return ARCHIVED;
+  return null;
 }
 
 // --- Maps ---
@@ -69,6 +80,9 @@ export async function updateTaskMapAction(
   if (!parsed.success) return fail(parsed.error.issues[0]?.message);
 
   try {
+    // Renaming an archived map is an edit like any other.
+    const gate = await assertMapEditable(user.id, idResult.data);
+    if (gate) return fail(gate);
     const map = await taskMapsRepo.updateTaskMap(user.id, idResult.data, parsed.data);
     if (!map) return fail(NOT_FOUND);
     revalidatePath("/task-maps");
@@ -156,7 +170,8 @@ export async function addNodeAction(input: CreateNodeInput): Promise<ActionResul
   const { taskMapId, taskId, color, ...node } = parsed.data;
 
   try {
-    if (!(await assertMapOwner(user.id, taskMapId))) return fail(NOT_FOUND);
+    const gate = await assertMapEditable(user.id, taskMapId);
+    if (gate) return fail(gate);
     if (taskId && !(await tasksRepo.getTask(user.id, taskId))) {
       return fail("That task could not be found.");
     }
@@ -207,7 +222,8 @@ export async function moveNodesAction(input: MoveNodesInput): Promise<ActionResu
   if (!parsed.success) return fail(parsed.error.issues[0]?.message);
 
   try {
-    if (!(await assertMapOwner(user.id, parsed.data.taskMapId))) return fail(NOT_FOUND);
+    const gate = await assertMapEditable(user.id, parsed.data.taskMapId);
+    if (gate) return fail(gate);
     const updated = await taskMapsRepo.updateNodePositions(
       user.id,
       parsed.data.taskMapId,
@@ -279,7 +295,8 @@ export async function importTasksAction(
   const { taskMapId, taskIds, originX, originY } = parsed.data;
 
   try {
-    if (!(await assertMapOwner(user.id, taskMapId))) return fail(NOT_FOUND);
+    const gate = await assertMapEditable(user.id, taskMapId);
+    if (gate) return fail(gate);
 
     const owned = await Promise.all(taskIds.map((id) => tasksRepo.getTask(user.id, id)));
     const tasks = owned.filter((t): t is NonNullable<typeof t> => t !== null);
@@ -368,7 +385,8 @@ export async function addEdgeAction(input: CreateEdgeInput): Promise<ActionResul
   const { taskMapId, sourceNodeId, targetNodeId } = parsed.data;
 
   try {
-    if (!(await assertMapOwner(user.id, taskMapId))) return fail(NOT_FOUND);
+    const gate = await assertMapEditable(user.id, taskMapId);
+    if (gate) return fail(gate);
     // Both endpoints must be nodes of this owned map.
     const found = await taskMapsRepo.countNodesInMap(user.id, taskMapId, [sourceNodeId, targetNodeId]);
     if (found !== 2) return fail("Those nodes could not be connected.");

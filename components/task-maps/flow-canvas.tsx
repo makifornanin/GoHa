@@ -46,6 +46,7 @@ import {
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -305,6 +306,7 @@ function FlowCanvasInner({
   initialViewport,
   initialLegend,
   tasks,
+  readOnly = false,
 }: {
   taskMapId: string;
   initialNodes: TaskMapNode[];
@@ -312,10 +314,27 @@ function FlowCanvasInner({
   initialViewport: { x: number; y: number; zoom: number } | null;
   initialLegend: Record<string, string> | null;
   tasks: TaskOption[];
+  /**
+   * Archived maps are frozen (audit R-12). The repository refuses graph writes
+   * for them in SQL, so this is purely so the canvas stops OFFERING edits it
+   * knows will be rejected.
+   */
+  readOnly?: boolean;
 }) {
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
 
   const [legend, setLegend] = useState<Record<string, string>>(initialLegend ?? {});
+  /*
+   * A failed delete is resolved by refetching, not by rebuilding the graph by
+   * hand (audit R-12). Removal was optimistic with no rollback at all, so a
+   * rejected delete (now the normal outcome on an archived map) left the node
+   * gone from the canvas and present in the database until a reload. Restoring
+   * a node also means restoring the edges that cascaded with it, and
+   * reconstructing that from client state is exactly the kind of guesswork that
+   * drifts; the server already knows the answer.
+   */
+  const router = useRouter();
+
   const [nodes, setNodes, onNodesChange] = useNodesState<GohaNode>(
     initialNodes.map((n) => dbNodeToFlow(n, initialLegend ?? {}, taskById)),
   );
@@ -427,11 +446,40 @@ function FlowCanvasInner({
     [taskMapId, setEdges],
   );
 
+  /**
+   * Confirm before a keyboard/selection delete, which React Flow performs
+   * BEFORE it calls onNodesDelete, so this is the only place a prompt can
+   * actually prevent it.
+   */
+  const onBeforeDelete = useCallback(
+    async ({ nodes: doomedNodes, edges: doomedEdges }: { nodes: Node[]; edges: Edge[] }) => {
+      const parts: string[] = [];
+      if (doomedNodes.length > 0) {
+        parts.push(`${doomedNodes.length} node${doomedNodes.length === 1 ? "" : "s"}`);
+      }
+      if (doomedEdges.length > 0) {
+        parts.push(`${doomedEdges.length} connection${doomedEdges.length === 1 ? "" : "s"}`);
+      }
+      if (parts.length === 0) return true;
+      // Deleting a node takes its connections with it, which is not obvious
+      // from a selection outline.
+      const cascade =
+        doomedNodes.length > 0 ? " Connections attached to a deleted node go with it." : "";
+      return window.confirm(`Delete ${parts.join(" and ")}?${cascade}`);
+    },
+    [],
+  );
+
   const onEdgesDelete = useCallback(async (deleted: Edge[]) => {
     // Edges removed by node-cascade are also reported here; a missing edge is a
     // harmless no-op on the server.
-    await Promise.all(deleted.map((e) => deleteEdgeAction(e.id)));
-  }, []);
+    const results = await Promise.all(deleted.map((e) => deleteEdgeAction(e.id)));
+    const failure = results.find((r) => !r.ok);
+    if (failure && !failure.ok) {
+      toast.error(failure.error);
+      router.refresh();
+    }
+  }, [router]);
 
   // --- Delete nodes ---
   const onNodesDelete = useCallback(async (deleted: Node[]) => {
@@ -439,8 +487,11 @@ function FlowCanvasInner({
     setSelectedId((cur) => (cur && deleted.some((n) => n.id === cur) ? null : cur));
     const results = await Promise.all(deleted.map((n) => deleteNodeAction(n.id)));
     const failure = results.find((r) => !r.ok);
-    if (failure && !failure.ok) toast.error(failure.error);
-  }, []);
+    if (failure && !failure.ok) {
+      toast.error(failure.error);
+      router.refresh();
+    }
+  }, [router]);
 
   // --- Add node ---
   const addNode = useCallback(
@@ -601,13 +652,17 @@ function FlowCanvasInner({
 
   const deleteEdge = useCallback(
     (id: string) => {
+      if (!window.confirm("Delete this connection?")) return;
       setEdges((eds) => eds.filter((e) => e.id !== id));
       setSelectedEdgeId((cur) => (cur === id ? null : cur));
       void deleteEdgeAction(id).then((res) => {
-        if (!res.ok) toast.error(res.error);
+        if (!res.ok) {
+          toast.error(res.error);
+          router.refresh();
+        }
       });
     },
-    [setEdges],
+    [setEdges, router],
   );
 
   /** Persist the colour legend and re-label every node that uses those colours. */
@@ -660,15 +715,21 @@ function FlowCanvasInner({
 
   const deleteNode = useCallback(
     (id: string) => {
+      if (!window.confirm("Delete this node? Connections attached to it go with it.")) {
+        return;
+      }
       pending.current.delete(id);
       setNodes((nds) => nds.filter((n) => n.id !== id));
       setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
       setSelectedId((cur) => (cur === id ? null : cur));
       void deleteNodeAction(id).then((res) => {
-        if (!res.ok) toast.error(res.error);
+        if (!res.ok) {
+          toast.error(res.error);
+          router.refresh();
+        }
       });
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges, router],
   );
 
   const selectedNode = useMemo(
@@ -687,11 +748,35 @@ function FlowCanvasInner({
    * stays silent instead of showing a hollow 0%.
    */
   const progress = useMemo(() => {
-    const linked = nodes.filter((n) => n.data.taskId && n.data.taskStatus);
-    if (linked.length === 0) return null;
-    const done = linked.filter((n) => n.data.taskStatus === "completed").length;
-    const doing = linked.filter((n) => n.data.taskStatus === "in_progress").length;
-    return { done, doing, total: linked.length, percent: Math.round((done / linked.length) * 100) };
+    /*
+     * Count each linked TASK once, and ignore cancelled work (audit R-12).
+     *
+     * Nodes were counted, not tasks, so linking the same task from two nodes
+     * (a legitimate way to show one job feeding two branches) counted it twice
+     * and could put the map at 50% when its only task was done. Cancelled tasks
+     * were also counted in the denominator, so dropping work made the map look
+     * less complete, which is the opposite of what happened. This mirrors
+     * lib/goal-progress, where cancelled tasks are excluded from both sides.
+     */
+    const statusByTaskId = new Map<string, TaskStatusLike>();
+    for (const node of nodes) {
+      const taskId = node.data.taskId;
+      const status = node.data.taskStatus;
+      if (!taskId || !status) continue;
+      statusByTaskId.set(taskId, status);
+    }
+
+    const statuses = [...statusByTaskId.values()].filter((s) => s !== "cancelled");
+    if (statuses.length === 0) return null;
+
+    const done = statuses.filter((s) => s === "completed").length;
+    const doing = statuses.filter((s) => s === "in_progress").length;
+    return {
+      done,
+      doing,
+      total: statuses.length,
+      percent: Math.round((done / statuses.length) * 100),
+    };
   }, [nodes]);
 
   const toolbarButton =
@@ -708,6 +793,7 @@ function FlowCanvasInner({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onBeforeDelete={onBeforeDelete}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
         onMoveEnd={onMoveEnd}
@@ -725,7 +811,10 @@ function FlowCanvasInner({
           setAddOpen(false);
         }}
         defaultEdgeOptions={EDGE_OPTIONS}
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        edgesReconnectable={!readOnly}
         // Connecting made forgiving, which was the whole complaint:
         // - `connectionRadius` 60 (default 20) snaps the drop to the nearest
         //   handle from three times further away, so you aim at the NODE rather
@@ -1446,6 +1535,12 @@ export default function FlowCanvas(props: {
   initialViewport: { x: number; y: number; zoom: number } | null;
   initialLegend: Record<string, string> | null;
   tasks: TaskOption[];
+  /**
+   * Archived maps are frozen (audit R-12). The repository refuses graph writes
+   * for them in SQL, so this is purely so the canvas stops OFFERING edits it
+   * knows will be rejected.
+   */
+  readOnly?: boolean;
 }) {
   return (
     <ReactFlowProvider>

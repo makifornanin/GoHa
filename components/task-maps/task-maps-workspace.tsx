@@ -189,7 +189,14 @@ export function TaskMapsWorkspace({
                   ) : null}
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setEditMap(graph.map)}>
+                  {/* An archived map is frozen; renaming it is an edit like any
+                      other and the action now refuses it (audit R-12). */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={graph.map.isArchived}
+                    onClick={() => setEditMap(graph.map)}
+                  >
                     <Pencil className="size-4" aria-hidden /> Rename
                   </Button>
                   {graph.map.isArchived ? (
@@ -215,6 +222,7 @@ export function TaskMapsWorkspace({
                 <FlowCanvas
                   key={graph.map.id}
                   taskMapId={graph.map.id}
+                  readOnly={graph.map.isArchived}
                   initialNodes={graph.nodes}
                   initialEdges={graph.edges}
                   initialViewport={graph.map.viewport ?? null}
