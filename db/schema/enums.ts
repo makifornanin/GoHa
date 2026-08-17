@@ -82,6 +82,14 @@ export const brainDumpConvertedType = pgEnum("brain_dump_converted_type", [
   "habit",
 ]);
 
+/**
+ * What an automation token may do. `read` covers every read endpoint;
+ * `read_write` additionally allows claiming a delivery, which is the only write
+ * the automation surface offers. Nothing here can create or complete domain
+ * records: those stay behind the app's own Server Actions.
+ */
+export const automationScope = pgEnum("automation_scope", ["read", "read_write"]);
+
 /** User appearance preference. Mirrors next-themes. */
 export const themePreference = pgEnum("theme_preference", [
   "light",
@@ -121,3 +129,4 @@ export type BrainDumpStatus = (typeof brainDumpStatus.enumValues)[number];
 export type BrainDumpConvertedType = (typeof brainDumpConvertedType.enumValues)[number];
 export type ThemePreference = (typeof themePreference.enumValues)[number];
 export type TaskMapNodeType = (typeof taskMapNodeType.enumValues)[number];
+export type AutomationScope = (typeof automationScope.enumValues)[number];

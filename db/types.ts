@@ -5,6 +5,9 @@
  */
 import type {
   account,
+  automationDeliveries,
+  automationRequests,
+  automationTokens,
   brainDumpItems,
   dailyPriorities,
   focusSessions,
@@ -69,3 +72,10 @@ export type NewWeeklyReview = typeof weeklyReviews.$inferInsert;
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;
+
+export type AutomationToken = typeof automationTokens.$inferSelect;
+export type NewAutomationToken = typeof automationTokens.$inferInsert;
+export type AutomationRequest = typeof automationRequests.$inferSelect;
+export type NewAutomationRequest = typeof automationRequests.$inferInsert;
+export type AutomationDelivery = typeof automationDeliveries.$inferSelect;
+export type NewAutomationDelivery = typeof automationDeliveries.$inferInsert;

@@ -15,3 +15,4 @@ export * as dailyPrioritiesRepo from "./daily-priorities";
 export * as taskMapsRepo from "./task-maps";
 export * as reviewsRepo from "./reviews";
 export * as settingsRepo from "./settings";
+export * as automationRepo from "./automation";

@@ -37,6 +37,14 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except the auth API, Next internals, and static files.
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.).*)"],
+  /**
+   * Run on everything except the auth API, the automation API, Next internals,
+   * and static files.
+   *
+   * `api/automation` is excluded because it authenticates with a bearer token,
+   * not a session cookie. Left in, this redirected every automation request to
+   * /login with a 307, so an external caller received an HTML sign-in page
+   * instead of its data and no token could ever work.
+   */
+  matcher: ["/((?!api/auth|api/automation|_next/static|_next/image|favicon.ico|.*\\.).*)"],
 };

@@ -15,3 +15,4 @@ export * from "./daily-priorities";
 export * from "./task-maps";
 export * from "./reviews";
 export * from "./settings";
+export * from "./automation";
