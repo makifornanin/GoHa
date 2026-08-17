@@ -1,5 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { boolean, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 import { auditTimestamps, primaryId } from "./_shared";
 
@@ -24,19 +23,24 @@ export const user = pgTable(
     ...auditTimestamps,
   },
   () => [
-    /**
-     * Single owner, enforced by the database (audit R-08).
+    /*
+     * The single-owner index is GONE, on purpose (migration 0014).
      *
-     * `lib/auth.ts` refuses a second account by reading the table and then
-     * creating, which two simultaneous sign-ups can both pass. A unique index
-     * on a constant expression permits exactly one row in the table, so the
-     * second insert loses no matter how the endpoint is reached.
+     * `user_single_owner_uq` permitted exactly one row here, which was right
+     * while GoHa was one person's private system. The owner now shares it, so
+     * the constraint that made that impossible had to go.
      *
-     * This is deliberately one index and nothing else, because GoHa keeps every
-     * table user-scoped so multi-user is possible later (CLAUDE.md section 1).
-     * Opening that up is one `DROP INDEX`, with no other structural change.
+     * What replaces it is not nothing: sign-up requires an invitation the owner
+     * issues (see `invites` below and the auth route handler). The difference is
+     * that the limit is now a policy the owner controls rather than a wall in
+     * the schema.
+     *
+     * Everything downstream was already built for this. Every domain table is
+     * user-scoped with a cascading FK, and every repository filters by the
+     * session user id, so a second account sees its own data and nothing else.
+     * That was the point of keeping the scoping even when there was one user
+     * (CLAUDE.md section 1).
      */
-    uniqueIndex("user_single_owner_uq").on(sql`((true))`),
   ],
 );
 
@@ -88,4 +92,55 @@ export const verification = pgTable(
     ...auditTimestamps,
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+/**
+ * Invitations to create an account.
+ *
+ * GoHa is deployed on the public internet, so "anyone may register" would mean
+ * anyone at all: strangers creating accounts in the owner's database, on the
+ * owner's Neon bill. An invitation is barely more friction for the person being
+ * invited and closes the door to everyone else.
+ *
+ * The code is stored as a SHA-256 hash, exactly like an automation token: the
+ * link is shown once, on creation, and a leaked database dump does not hand
+ * anyone a working invitation.
+ *
+ * Single use by construction. `claimedAt` is set by an atomic conditional
+ * update BEFORE the account is created, so two people opening the same link at
+ * the same moment cannot both get in; the loser is told the invitation is
+ * already used. If the sign-up then fails, the claim is released.
+ */
+export const invites = pgTable(
+  "invites",
+  {
+    id: primaryId(),
+    /** Who issued it. Their invitations disappear with them. */
+    invitedBy: uuid()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    codeHash: text().notNull(),
+    /** Leading characters, so the owner can recognise one in the list. */
+    codePrefix: text().notNull(),
+    /**
+     * Optional lock to one address. When set, the sign-up email must match, so
+     * a forwarded link cannot be used by someone the owner did not mean.
+     */
+    email: text(),
+    /** A note to the owner: "for Nanin". Never shown to the invitee. */
+    label: text(),
+    expiresAt: timestamp({ withTimezone: true }),
+    /** Held while a sign-up is in flight, and permanently once it succeeds. */
+    claimedAt: timestamp({ withTimezone: true }),
+    /** The account it produced, once there is one. */
+    acceptedBy: uuid().references(() => user.id, { onDelete: "set null" }),
+    acceptedAt: timestamp({ withTimezone: true }),
+    revokedAt: timestamp({ withTimezone: true }),
+    ...auditTimestamps,
+  },
+  (t) => [
+    unique("invites_code_hash_uq").on(t.codeHash),
+    index("invites_code_prefix_idx").on(t.codePrefix),
+    index("invites_invited_by_idx").on(t.invitedBy),
+  ],
 );

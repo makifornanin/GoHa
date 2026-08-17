@@ -15,6 +15,7 @@ import type {
   goalProgressUpdates,
   goals,
   habitEntries,
+  invites,
   habitSchedules,
   habits,
   lifeAreas,
@@ -82,3 +83,6 @@ export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type NewNotificationLogEntry = typeof notificationLog.$inferInsert;
 export type DailyQuote = typeof dailyQuotes.$inferSelect;
 export type NewDailyQuote = typeof dailyQuotes.$inferInsert;
+
+export type Invite = typeof invites.$inferSelect;
+export type NewInvite = typeof invites.$inferInsert;

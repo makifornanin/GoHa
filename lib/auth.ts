@@ -2,28 +2,64 @@ import "server-only";
 
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 
-import { db, schema, usersRepo } from "@/db";
+import { db, schema } from "@/db";
+
+/**
+ * Where this app answers from.
+ *
+ * Better Auth checks the request Origin against its base URL and refuses
+ * anything else with "Invalid origin". Deriving that from a single hand-set
+ * environment variable is fragile: on Vercel the production host, every preview
+ * host and localhost are all legitimate, and one stale value locks the owner out
+ * of their own sign-in page with an error that names nothing useful.
+ *
+ * So the list is assembled from what the platform already knows.
+ * `VERCEL_PROJECT_PRODUCTION_URL` is the stable production host and
+ * `VERCEL_URL` is this particular deployment, both injected by Vercel; neither
+ * exists locally, where localhost applies instead.
+ */
+function vercelUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  return value.startsWith("http") ? value : `https://${value}`;
+}
+
+const PRODUCTION_URL = vercelUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+const DEPLOYMENT_URL = vercelUrl(process.env.VERCEL_URL);
+
+/** The canonical base. An explicit setting still wins if one is given. */
+const BASE_URL = process.env.BETTER_AUTH_URL || PRODUCTION_URL || undefined;
+
+function trustedOrigins(): string[] {
+  const origins = new Set<string>();
+  for (const origin of [process.env.BETTER_AUTH_URL, PRODUCTION_URL, DEPLOYMENT_URL]) {
+    if (origin) origins.add(origin.replace(/\/$/, ""));
+  }
+  // Development, where none of the platform variables exist.
+  if (!PRODUCTION_URL) origins.add("http://localhost:3000");
+  return [...origins];
+}
 
 /**
  * Better Auth server instance (email/password, Drizzle adapter on Neon).
  *
- * Design decisions (CLAUDE.md sections 1, 5, 8):
- *  - Single-owner app. Public sign-up is closed: the owner account is created
- *    once via the bootstrap flow, and the `user.create.before` hook then refuses
- *    any further account creation, even against the raw endpoint.
+ * Design decisions (CLAUDE.md sections 5 and 8):
  *  - IDs are UUIDs (`generateId: "uuid"`) so app-issued and DB-default ids never
  *    diverge from the schema's `uuid` primary keys.
  *  - `transaction: false`: the Neon HTTP driver is stateless and does not support
  *    interactive transactions; Better Auth then runs its operations sequentially.
  *  - Identity is always derived from the session server-side; the client never
  *    supplies a user id.
+ *
+ * Sign-up is NOT closed here any more. It is gated by invitation in the route
+ * handler (`app/api/auth/[...all]/route.ts`), which is the only path any
+ * sign-up request can take, including a direct call to the raw endpoint.
  */
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: BASE_URL,
   secret: process.env.BETTER_AUTH_SECRET,
+  trustedOrigins: trustedOrigins(),
   database: drizzleAdapter(db, {
     provider: "pg",
     transaction: false,
@@ -43,22 +79,6 @@ export const auth = betterAuth({
   advanced: {
     database: {
       generateId: "uuid",
-    },
-  },
-  databaseHooks: {
-    user: {
-      create: {
-        // Enforce single-owner at the data layer: only the very first account
-        // (the owner) may ever be created. This closes sign-up permanently once
-        // bootstrapped, regardless of how the endpoint is reached.
-        before: async () => {
-          if (await usersRepo.hasAnyUser()) {
-            throw new APIError("FORBIDDEN", {
-              message: "GoHa is a single-owner app. Sign-ups are closed.",
-            });
-          }
-        },
-      },
     },
   },
   // Must be the last plugin: lets Server Actions set Better Auth cookies.

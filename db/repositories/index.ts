@@ -5,6 +5,7 @@
  * argument is always the session user id.
  */
 export * as usersRepo from "./users";
+export * as invitesRepo from "./invites";
 export * as lifeAreasRepo from "./life-areas";
 export * as goalsRepo from "./goals";
 export * as tasksRepo from "./tasks";
