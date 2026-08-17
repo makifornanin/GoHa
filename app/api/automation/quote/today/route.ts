@@ -40,7 +40,10 @@ export async function GET(request: Request): Promise<Response> {
         ? await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref))
         : pool;
 
-    const quote = pickDailyQuote(effective, context.localDate);
+    // A pin beats the pool: an automation that fetched a verse of the day has
+    // named this exact row for this exact date.
+    const pinned = await quotesRepo.getPinnedQuote(context.localDate);
+    const quote = pinned ?? pickDailyQuote(effective, context.localDate);
 
     return await finishAutomation(
       auth,

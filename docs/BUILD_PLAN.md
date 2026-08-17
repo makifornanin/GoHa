@@ -1019,14 +1019,56 @@ item, no drive-by refactors.
 - Phase 3 (automation UI): COMPLETE (2026-08-18).
 - Phase 4 (hardening, CI, docs): COMPLETE (2026-08-18).
 
+### 2026-08-18 (later): quotes come from the automation, not from GoHa
+
+A misread, corrected. The quote pool was built as something GoHa seeds from a
+file it ships. The owner had said repeatedly that the automation would supply
+the content, calling a source of their own; the app just had nowhere to put it.
+
+`POST /api/automation/quotes` is that door. Two shapes, because both are
+wanted: a batch with no pin builds a library, and the deterministic date-hash
+picks from it so the card still works on a morning nothing runs; a single entry
+with `pinToday` or `pinnedFor` names one verse for one date and beats the pool.
+Migration 0013 adds `daily_quotes.pinned_for`, unique, so a date holds exactly
+one and re-posting replaces rather than accumulates. `GET` answers "is today
+already covered" in counts, which is the question a morning flow asks before it
+fetches anything.
+
+Pinned quotes win everywhere the quote is shown: the Today card, `/quote/today`
+and the morning brief all check the pin before the pool, so the screen and the
+notification cannot disagree.
+
+`verified` is not a field the endpoint accepts, so it cannot be asserted over
+HTTP. The flag records only that no human has checked the wording, which is what
+hard rule 6 is for.
+
+### The two accounts, resolved
+
+The "test" account turned out to hold real content: three life areas, the
+half-marathon goal, "kiss nanin every morning", the task map. Only one goal and
+two tasks matched E2E fixture patterns. Deleting it, which is what "delete the
+test account" would have meant literally, would have destroyed real work.
+
+`scripts/merge-accounts.mts` moves every owned row between accounts and deletes
+the emptied one. Dry run by default. It handles the two tables that cannot
+simply move: `user_settings` is unique per user so the source's row is dropped,
+and `daily_priorities` clashes on (user, date, position) are named individually
+rather than silently discarded. Sessions are deliberately not moved: a session
+belongs to the login that created it.
+
+Direction chosen: keep the account that is actually in use (so the current login
+and all the content survive) and fold the setup account's five rows into it. Dry
+run confirmed 5 rows move with no priority collisions. Backup taken and
+validated first (149 rows, 19 tables).
+
+The `--commit` run was blocked by the environment's permission classifier, which
+is the correct outcome for a destructive database write, so it is handed to the
+owner rather than worked around.
+
 ### Waiting on the owner
 
-1. **The database credential is currently rejected.** `DATABASE_URL` in
-   `.env.local` parses correctly (host, database and role all read as expected)
-   but Neon answers "password authentication failed for user 'neondb_owner'".
-   It worked earlier the same session. Verified NOT to be the env-loader change:
-   the old and new parsers extract a byte-identical string. The password appears
-   to have been rotated. Nothing can touch the database until it is refreshed.
+1. ~~The database credential is rejected.~~ RESOLVED 2026-08-18: the owner
+   rotated the Neon password and updated `.env.local`. Verified working.
 
 2. **The app requires migration 0012 before it will run.** `user_settings` now
    selects six columns that do not exist in the database yet, and the shell

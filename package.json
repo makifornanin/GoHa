@@ -20,6 +20,7 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "node db/migrate.mts",
     "db:seed-quotes": "node --experimental-strip-types scripts/seed-quotes.mts",
+    "db:merge-accounts": "node --experimental-strip-types scripts/merge-accounts.mts",
     "db:diagnose": "node --experimental-strip-types scripts/diagnose.mts",
     "db:backup": "node --experimental-strip-types scripts/backup.mts",
     "db:restore-check": "node --experimental-strip-types scripts/restore-check.mts",

@@ -106,7 +106,7 @@ describe("Automation card", () => {
     // The app's Select is a custom combobox, not a native <select>: open it and
     // choose, the way the owner does.
     await user.click(screen.getByLabelText(/what it may do/i));
-    await user.click(await screen.findByRole("option", { name: /record deliveries/i }));
+    await user.click(await screen.findByRole("option", { name: /read, and write/i }));
     await user.click(screen.getByLabelText(/expires/i));
     await user.click(await screen.findByRole("option", { name: "90 days" }));
 

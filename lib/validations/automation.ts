@@ -89,3 +89,47 @@ export const createTokenSchema = z.object({
 });
 
 export type CreateTokenInput = z.input<typeof createTokenSchema>;
+
+/**
+ * Quotes and verses pushed in by an automation.
+ *
+ * GoHa ships no content of its own: the pool is fed from whatever source you
+ * trust, so this is the shape that door accepts. Length caps match the column;
+ * `verified` is deliberately not a field, because it is not something a request
+ * gets to assert (BUILD_PLAN hard rule 6).
+ */
+export const QUOTE_TEXT_MAX = 500;
+export const QUOTE_BATCH_MAX = 200;
+
+const quoteEntrySchema = z
+  .object({
+    source: z.enum(["quote", "verse"]),
+    text: z
+      .string()
+      .trim()
+      .min(1, "A quote needs text.")
+      .max(QUOTE_TEXT_MAX, `Keep the text under ${QUOTE_TEXT_MAX} characters.`),
+    /** "Proverbs 16:3 (WEB)", "Annie Dillard". */
+    attribution: z.string().trim().max(200).optional().nullable(),
+    /** A second rendering, e.g. a Tagalog translation. */
+    translation: z.string().trim().max(QUOTE_TEXT_MAX).optional().nullable(),
+    /** Free tag. "rest" is the pool the Sabbath message draws from. */
+    theme: z.string().trim().max(40).optional().nullable(),
+    /** Show this one on this exact local date, beating the pool pick. */
+    pinnedFor: isoDateSchema.optional().nullable(),
+    /** Shorthand for "pin to the owner's today", resolved server-side. */
+    pinToday: z.boolean().optional(),
+  })
+  .refine((value) => !(value.pinnedFor && value.pinToday), {
+    message: "Use pinnedFor or pinToday, not both.",
+    path: ["pinToday"],
+  });
+
+export const pushQuotesSchema = z.object({
+  quotes: z
+    .array(quoteEntrySchema)
+    .min(1, "Send at least one quote.")
+    .max(QUOTE_BATCH_MAX, `Send at most ${QUOTE_BATCH_MAX} at a time.`),
+});
+
+export type PushQuotesInput = z.input<typeof pushQuotesSchema>;

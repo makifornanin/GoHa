@@ -108,7 +108,7 @@ export async function authenticateAutomation(
     });
     return {
       response: json(
-        { error: "This token is read-only. Create a read and write token to record deliveries." },
+        { error: "This token is read-only. Create a read and write token for this." },
         { status: 403 },
       ),
     };

@@ -75,6 +75,8 @@ also what the rate limiter counts, so the limit holds across instances.
 | GET | `/api/health` | none / read | Liveness; with a token, a database probe |
 | GET | `/api/automation` | read | Does this token work, and what can it reach |
 | GET | `/api/automation/quote/today` | read | The day's quote, and the context envelope |
+| GET | `/api/automation/quotes` | read | Pool status: is today already covered |
+| POST | `/api/automation/quotes` | read_write | Push quotes or verses in; pin one to a date |
 | GET | `/api/automation/brief/morning` | read | The ranked morning payload |
 | GET | `/api/automation/brief/evening` | read | How the day actually went |
 | GET | `/api/automation/due?window=N&evening=true` | read | Deadlines, overdue, focus overrun, streaks |
@@ -181,20 +183,52 @@ every derivation carry on unchanged.
 
 ---
 
-## The quote pool
+## The quote pool: fed by you, not shipped by GoHa
 
-`daily_quotes` ships **empty**, and that is a working state: the Today card
-shows its empty message and the endpoints return `quote: null`.
+`daily_quotes` starts **empty and stays empty** until something fills it. GoHa
+ships no content of its own here, deliberately: it does not know which
+translation you read, and an approximate verse is a wrong verse.
 
-To fill it, create `content/daily-quotes.json` and run `pnpm db:seed-quotes`.
-The loader is idempotent (upsert on source + text) and writes `verified: false`
-for everything, always, with no flag to change that. A verse with a word wrong
-is a wrong verse; confirming wording against a real source is a human act.
+So the pool is fed from outside, by an automation calling whatever source you
+trust. Two ways to use it, and they combine:
 
-Use a public-domain translation you can check (WEB, KJV) or an edition you own.
-Include 30 or more entries tagged `"theme": "rest"` if you use a Sabbath day.
+**A library.** Send a batch with no pin. The card then picks deterministically
+by hashing the local date across the pool, so it keeps working on a morning your
+automation does not run.
 
----
+```bash
+curl -s -X POST https://<host>/api/automation/quotes   -H "Authorization: Bearer $GOHA_TOKEN"   -H "Content-Type: application/json"   -d '{"quotes":[
+        {"source":"verse","text":"...","attribution":"Proverbs 16:3 (WEB)","theme":"work"},
+        {"source":"quote","text":"...","attribution":"Annie Dillard","theme":"rest"}
+      ]}'
+```
+
+**A verse of the day.** Send one with `pinToday: true` (or `pinnedFor`) and that
+exact row is what today shows, beating the pool pick. This is the shape for an
+n8n flow that calls a verse-of-the-day API each morning.
+
+```bash
+-d '{"quotes":[{"source":"verse","text":"...","attribution":"...","pinToday":true}]}'
+```
+
+A bare array is accepted as well as `{ quotes: [...] }`, so a workflow can map an
+API response straight through.
+
+Idempotent both ways: the upsert keys on `(source, text)`, and a date holds
+exactly one pinned quote, so re-running a workflow updates rather than
+accumulates. `GET /api/automation/quotes` answers "is today already covered"
+without reading back the content, which is the question a morning flow asks
+before it fetches anything.
+
+**`verified` is written false and cannot be set true through the API.** It is
+not a field the schema accepts. Nothing hides the text on that account; the flag
+records only that no human has checked the wording against a real source
+(BUILD_PLAN hard rule 6).
+
+`theme: "rest"` marks the pool the Sabbath message draws from.
+
+There is also `pnpm db:seed-quotes`, which loads `content/daily-quotes.json` if
+you would rather keep a fixed library in the repository. Same rules apply.
 
 ## What this surface will not do
 

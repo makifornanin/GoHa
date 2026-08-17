@@ -66,17 +66,19 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    const [tasks, goals, priorities, habits, habitEntries, quotes, delivered] = await Promise.all([
-      tasksRepo.listTasksForUser(auth.userId),
-      goalsRepo.listGoalsWithTaskCounts(auth.userId),
-      dailyPrioritiesRepo.listDailyPriorities(auth.userId, today),
-      habitsRepo.listHabitsWithSchedule(auth.userId),
-      // The same wide window Today uses: streaks need history, and today's
-      // check-ins are derived from these rows rather than fetched a second way.
-      habitsRepo.listEntriesInRange(auth.userId, { from: addDays(today, -400), to: today }),
-      quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref)),
-      automationRepo.getNotification(auth.userId, `brief:morning:${today}`),
-    ]);
+    const [tasks, goals, priorities, habits, habitEntries, quotes, pinnedQuote, delivered] =
+      await Promise.all([
+        tasksRepo.listTasksForUser(auth.userId),
+        goalsRepo.listGoalsWithTaskCounts(auth.userId),
+        dailyPrioritiesRepo.listDailyPriorities(auth.userId, today),
+        habitsRepo.listHabitsWithSchedule(auth.userId),
+        // The same wide window Today uses: streaks need history, and today's
+        // check-ins come from these rows rather than a second fetch.
+        habitsRepo.listEntriesInRange(auth.userId, { from: addDays(today, -400), to: today }),
+        quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref)),
+        quotesRepo.getPinnedQuote(today),
+        automationRepo.getNotification(auth.userId, `brief:morning:${today}`),
+      ]);
 
     const signal = deriveDaySignal({
       tasks,
@@ -95,7 +97,7 @@ export async function GET(request: Request): Promise<Response> {
       goals,
       habits,
       habitEntries,
-      quote: pickDailyQuote(quotes, today),
+      quote: pinnedQuote ?? pickDailyQuote(quotes, today),
       alreadyDelivered: Boolean(delivered),
       today,
       timeZone,

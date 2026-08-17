@@ -167,11 +167,25 @@ export const dailyQuotes = pgTable(
     active: boolean().notNull().default(true),
     /** False until the wording has been checked against a real source. */
     verified: boolean().notNull().default(false),
+    /**
+     * Set when an automation names this row as a specific day's quote.
+     *
+     * Two ways to fill this card, and both are wanted. Without a pin, the day's
+     * quote is a deterministic hash over the local date across the whole active
+     * pool, so the app can answer with no automation running at all. With a
+     * pin, an automation that fetches a verse of the day from somewhere else
+     * says "this one, on this date" and that wins.
+     *
+     * Unique, so a date has exactly one pinned quote and re-posting the same
+     * day replaces rather than accumulates.
+     */
+    pinnedFor: date(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // The seed script upserts on this, so re-running it never duplicates.
+    // Upserts key on this, so re-posting the same text never duplicates.
     unique("daily_quotes_source_text_uq").on(t.source, t.text),
+    unique("daily_quotes_pinned_for_uq").on(t.pinnedFor),
     index("daily_quotes_active_theme_idx").on(t.active, t.theme),
   ],
 );

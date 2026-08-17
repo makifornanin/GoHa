@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 const SCOPE_OPTIONS = [
   { value: "read", label: "Read only" },
-  { value: "read_write", label: "Read, and record deliveries" },
+  { value: "read_write", label: "Read, and write (log, quotes, capture)" },
 ];
 
 const EXPIRY_OPTIONS = [
@@ -47,6 +47,7 @@ const EXPIRY_OPTIONS = [
 const ENDPOINTS = [
   { method: "GET", path: "/api/automation", what: "Check a token and list what it can reach." },
   { method: "GET", path: "/api/automation/quote/today", what: "Today's quote, and the day's context." },
+  { method: "POST", path: "/api/automation/quotes", what: "Push quotes or verses in; pin one to a date." },
   { method: "GET", path: "/api/automation/brief/morning", what: "The morning brief: the same judgement Today shows." },
   { method: "GET", path: "/api/automation/brief/evening", what: "How the day actually went." },
   { method: "GET", path: "/api/automation/due", what: "Deadlines, overdue work, runaway focus, streaks at risk." },
@@ -330,7 +331,7 @@ export function AutomationCard({ className }: { className?: string }) {
                     {token.prefix}...
                   </code>
                   <span className="text-footnote text-label-tertiary">
-                    {token.scope === "read_write" ? "read + deliveries" : "read"}
+                    {token.scope === "read_write" ? "read + write" : "read"}
                   </span>
                   <span className="w-24 text-right text-footnote text-label-tertiary">
                     used {timeAgo(token.lastUsedAt)}

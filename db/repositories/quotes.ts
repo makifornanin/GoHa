@@ -1,7 +1,8 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 
+import type { IsoDate } from "@/lib/date";
 import { db } from "../client";
 import { dailyQuotes } from "../schema";
 import type { QuoteSource } from "../schema";
@@ -44,11 +45,30 @@ export async function countActiveQuotes(): Promise<number> {
 }
 
 /**
- * Upsert by (source, text), so the seed script is idempotent (Guide 00, A6).
+ * The quote an automation pinned to this date, if any.
  *
- * `verified` is never raised here. A seed can add content and correct its
- * attribution or translation, but confirming that wording is right against a
- * real source is a human act, and this function is not that human.
+ * Checked before the deterministic pick: an automation that fetched a verse of
+ * the day from somewhere else has named this exact row for this exact date, and
+ * that beats a hash over the pool.
+ */
+export async function getPinnedQuote(date: IsoDate): Promise<DailyQuote | null> {
+  const [row] = await db
+    .select()
+    .from(dailyQuotes)
+    .where(and(eq(dailyQuotes.active, true), eq(dailyQuotes.pinnedFor, date)))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Upsert by (source, text), so both the seed script and a repeating automation
+ * are idempotent: posting the same verse every morning updates one row rather
+ * than growing the pool by one a day.
+ *
+ * `verified` is never raised here, by any caller. Content can be added and its
+ * attribution corrected, but confirming that wording is right against a real
+ * source is a human act, and neither a script nor an HTTP request is that
+ * human (BUILD_PLAN hard rule 6).
  */
 export async function upsertQuote(input: {
   source: QuoteSource;
@@ -56,24 +76,75 @@ export async function upsertQuote(input: {
   attribution?: string | null;
   translation?: string | null;
   theme?: string | null;
+  pinnedFor?: IsoDate | null;
 }): Promise<DailyQuote> {
+  const values = {
+    attribution: input.attribution ?? null,
+    translation: input.translation ?? null,
+    theme: input.theme ?? null,
+  };
+
   const [row] = await db
     .insert(dailyQuotes)
-    .values({
-      source: input.source,
-      text: input.text,
-      attribution: input.attribution ?? null,
-      translation: input.translation ?? null,
-      theme: input.theme ?? null,
-    })
-    .onConflictDoUpdate({
-      target: [dailyQuotes.source, dailyQuotes.text],
-      set: {
-        attribution: input.attribution ?? null,
-        translation: input.translation ?? null,
-        theme: input.theme ?? null,
-      },
-    })
+    .values({ source: input.source, text: input.text, ...values })
+    .onConflictDoUpdate({ target: [dailyQuotes.source, dailyQuotes.text], set: values })
     .returning();
-  return row;
+
+  if (!input.pinnedFor) return row;
+
+  /*
+   * Pinning is a second statement because it conflicts on a different key: a
+   * date holds one quote, and the row being pinned may already be in the pool
+   * under some other date. Clearing first means re-posting a different verse
+   * for the same day replaces it instead of failing on the unique index.
+   *
+   * Two automations racing for one date is harmless: the later write wins, and
+   * the date still ends up with exactly one quote.
+   */
+  await db
+    .update(dailyQuotes)
+    .set({ pinnedFor: null })
+    .where(and(eq(dailyQuotes.pinnedFor, input.pinnedFor), ne(dailyQuotes.id, row.id)));
+
+  const [pinned] = await db
+    .update(dailyQuotes)
+    .set({ pinnedFor: input.pinnedFor })
+    .where(eq(dailyQuotes.id, row.id))
+    .returning();
+  return pinned ?? row;
+}
+
+/** Retire a quote without deleting it, so it can come back later. */
+export async function setQuoteActive(id: string, active: boolean): Promise<DailyQuote | null> {
+  const [row] = await db
+    .update(dailyQuotes)
+    .set({ active })
+    .where(eq(dailyQuotes.id, id))
+    .returning();
+  return row ?? null;
+}
+
+/** Pool status, for an automation deciding whether it needs to send anything. */
+export async function quotePoolStatus(): Promise<{
+  total: number;
+  active: number;
+  rest: number;
+  pinnedAhead: number;
+}> {
+  const rows = await db
+    .select({
+      active: dailyQuotes.active,
+      theme: dailyQuotes.theme,
+      pinnedFor: dailyQuotes.pinnedFor,
+    })
+    .from(dailyQuotes);
+
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    total: rows.length,
+    active: rows.filter((row) => row.active).length,
+    rest: rows.filter((row) => row.active && row.theme === "rest").length,
+    // Days already covered, so a workflow can top up rather than re-send.
+    pinnedAhead: rows.filter((row) => row.active && row.pinnedFor && row.pinnedFor >= today).length,
+  };
 }
