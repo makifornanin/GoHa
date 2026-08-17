@@ -56,6 +56,54 @@ export function parseDurationMinutes(
 export const ABANDON_AFTER_SECONDS = 12 * 60 * 60;
 export const ABANDON_MAX_SECONDS = 4 * 60 * 60;
 
+/**
+ * Unattended-overtime policy (audit R-17). Reaching the planned time does not
+ * end a session: overtime is deliberate work, and "Need more time" extends the
+ * plan. But a session nobody comes back to used to run until the 12h abandon
+ * sweep, which left the screen claiming a session was live hours after the
+ * person had left, and blocked starting the next one.
+ *
+ * So a session that passes its plan by this much with no interaction completes
+ * itself. Counted time is capped at the plan either way (see
+ * `countedFocusSeconds`), so this changes when the session closes, never how
+ * much time it is credited with. The countdown is shown on screen the whole
+ * time, and any extend pushes the plan out and resets it.
+ */
+export const FOCUS_AUTO_END_GRACE_SECONDS = 10 * 60;
+
+/** Seconds run past the plan. 0 when there is no plan or it has not been reached. */
+export function focusOvertimeSeconds(
+  elapsedSeconds: number,
+  plannedSeconds: number | null,
+): number {
+  if (!plannedSeconds || plannedSeconds <= 0) return 0;
+  if (!Number.isFinite(elapsedSeconds)) return 0;
+  return Math.max(0, Math.floor(elapsedSeconds) - Math.floor(plannedSeconds));
+}
+
+/**
+ * Seconds left before an unattended overtime session completes itself, or null
+ * when auto-end does not apply (no plan, so there is nothing to be late for).
+ */
+export function autoEndCountdownSeconds(
+  elapsedSeconds: number,
+  plannedSeconds: number | null,
+  graceSeconds: number = FOCUS_AUTO_END_GRACE_SECONDS,
+): number | null {
+  if (!plannedSeconds || plannedSeconds <= 0) return null;
+  return Math.max(0, graceSeconds - focusOvertimeSeconds(elapsedSeconds, plannedSeconds));
+}
+
+/** Whether an overtime session has now exceeded the grace period. */
+export function shouldAutoEndFocusSession(
+  elapsedSeconds: number,
+  plannedSeconds: number | null,
+  graceSeconds: number = FOCUS_AUTO_END_GRACE_SECONDS,
+): boolean {
+  const remaining = autoEndCountdownSeconds(elapsedSeconds, plannedSeconds, graceSeconds);
+  return remaining !== null && remaining <= 0;
+}
+
 export type FocusTimestamps = {
   startedAt: Date;
   endedAt: Date | null;

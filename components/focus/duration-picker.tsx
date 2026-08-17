@@ -19,19 +19,24 @@ const CUSTOM = "custom";
  * Session length: one-tap presets plus a free-form field that understands
  * "90", "1h30", "1h 30m", or "45m", so a length outside the presets is one
  * keystroke away rather than impossible.
+ *
+ * An unreadable custom value reports `null` rather than leaving the previous
+ * duration in place (audit R-17). It used to keep the last value it understood,
+ * so the field could read "abc" while Start quietly began a 25 minute session.
  */
 export function DurationPicker({
   minutes,
   onChange,
   disabled,
 }: {
-  minutes: number;
-  onChange: (minutes: number) => void;
+  minutes: number | null;
+  onChange: (minutes: number | null) => void;
   disabled?: boolean;
 }) {
-  const isPreset = (FOCUS_PRESETS_MINUTES as readonly number[]).includes(minutes);
+  const isPreset =
+    minutes !== null && (FOCUS_PRESETS_MINUTES as readonly number[]).includes(minutes);
   const [mode, setMode] = useState<string>(isPreset ? String(minutes) : CUSTOM);
-  const [draft, setDraft] = useState(isPreset ? "" : String(minutes));
+  const [draft, setDraft] = useState(isPreset || minutes === null ? "" : String(minutes));
   const [error, setError] = useState<string | null>(null);
 
   const options = [
@@ -42,12 +47,15 @@ export function DurationPicker({
     { value: CUSTOM, label: "Custom" },
   ];
 
+  const hint = `Try "90", "1h30", or "45m" (${FOCUS_MIN_MINUTES}-${FOCUS_MAX_MINUTES} min).`;
+
   function pick(value: string) {
     setMode(value);
     setError(null);
     if (value === CUSTOM) {
-      const parsed = parseDurationMinutes(draft);
-      if (parsed) onChange(parsed);
+      // Switching to Custom hands the duration over to the field, so an empty
+      // or unreadable draft means "no duration yet", not "keep the last preset".
+      onChange(parseDurationMinutes(draft));
       return;
     }
     onChange(Number(value));
@@ -55,16 +63,8 @@ export function DurationPicker({
 
   function commitCustom(value: string) {
     setDraft(value);
-    if (value.trim() === "") {
-      setError(null);
-      return;
-    }
-    const parsed = parseDurationMinutes(value);
-    if (parsed === null) {
-      setError(`Try "90", "1h30", or "45m" (${FOCUS_MIN_MINUTES}-${FOCUS_MAX_MINUTES} min).`);
-      return;
-    }
-    setError(null);
+    const parsed = value.trim() === "" ? null : parseDurationMinutes(value);
+    setError(parsed === null && value.trim() !== "" ? hint : null);
     onChange(parsed);
   }
 

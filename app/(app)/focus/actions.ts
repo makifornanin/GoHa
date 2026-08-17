@@ -186,6 +186,32 @@ export async function extendFocusSessionAction(
   }
 }
 
+/**
+ * Autosave the note of a running session (audit R-17). The note is part of the
+ * session, not of the act of finishing it, so it is written while the timer
+ * runs and survives a reload. Returns the saved text rather than the row: the
+ * client is mid-edit and must not have its field replaced by a server value.
+ */
+export async function saveFocusNoteAction(
+  id: string,
+  note: string,
+): Promise<ActionResult<{ note: string | null }>> {
+  const user = await requireUser();
+  if (!idSchema.safeParse(id).success) return { ok: false, error: "No active session." };
+
+  const noteResult = noteSchema.safeParse(note);
+  if (!noteResult.success) return { ok: false, error: "That note is too long." };
+
+  try {
+    const saved = await focusRepo.saveSessionNote(user.id, id, noteResult.data);
+    if (!saved) return { ok: false, error: "No active session." };
+    return { ok: true, data: { note: saved.note } };
+  } catch (error) {
+    console.error("saveFocusNoteAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
 /** Complete/stop a session: persist the derived, capped duration. */
 export async function endFocusSessionAction(
   id: string,
@@ -215,7 +241,9 @@ export async function endFocusSessionAction(
       endedAt: now,
       durationSeconds: countedFocusSeconds(raw, session.plannedDurationSeconds),
       pausedSeconds,
-      note: noteResult.data,
+      // Only overwrite the note when the caller actually carried one; an
+      // omitted note keeps whatever was autosaved during the session.
+      note: note === undefined ? undefined : noteResult.data,
     });
     if (!finished) return { ok: false, error: "No active session." };
     revalidatePath("/focus");

@@ -133,6 +133,31 @@ export async function extendPlannedDuration(
   return row ?? null;
 }
 
+/**
+ * Save the note of a session that is still running (audit R-17). Notes used to
+ * exist only in component state until the session was finished, so a reload,
+ * a crash, or a discard took the thinking with it. Scoped to `in_progress` so
+ * this can never rewrite the note of a finished session.
+ */
+export async function saveSessionNote(
+  userId: string,
+  id: string,
+  note: string | null,
+): Promise<FocusSession | null> {
+  const [row] = await db
+    .update(focusSessions)
+    .set({ note })
+    .where(
+      and(
+        eq(focusSessions.id, id),
+        eq(focusSessions.userId, userId),
+        eq(focusSessions.status, "in_progress"),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
 /** Finalize a session (completed or abandoned) with a derived duration. */
 export async function finishFocusSession(
   userId: string,
@@ -142,6 +167,7 @@ export async function finishFocusSession(
     endedAt: Date;
     durationSeconds: number;
     pausedSeconds: number;
+    /** Omit to keep whatever was autosaved while the session ran. */
     note?: string | null;
   },
 ): Promise<FocusSession | null> {
@@ -153,7 +179,10 @@ export async function finishFocusSession(
       durationSeconds: input.durationSeconds,
       pausedSeconds: input.pausedSeconds,
       pausedAt: null,
-      note: input.note ?? null,
+      // `undefined` leaves the column alone. Writing `null` here unconditionally
+      // meant every path that finished a session without carrying the text
+      // (abandon sweep, replaced session) erased the note it had autosaved.
+      ...(input.note !== undefined ? { note: input.note } : {}),
     })
     .where(
       and(

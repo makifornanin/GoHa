@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Pause, Play, Target, X } from "lucide-react";
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -11,14 +11,21 @@ import {
   extendFocusSessionAction,
   pauseFocusSessionAction,
   resumeFocusSessionAction,
+  saveFocusNoteAction,
   startFocusSessionAction,
 } from "@/app/(app)/focus/actions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { FocusSession } from "@/db";
-import { focusElapsedSeconds, formatClock } from "@/lib/focus";
+import {
+  autoEndCountdownSeconds,
+  focusElapsedSeconds,
+  formatClock,
+  shouldAutoEndFocusSession,
+} from "@/lib/focus";
 import { spring } from "@/lib/motion";
 import { useFocusTimer } from "@/stores/focus-timer";
 import { cn } from "@/lib/utils";
@@ -95,7 +102,14 @@ export function FocusView({
         <PageHeader title="Focus" description="One task, one timer. Real focus time, saved." />
 
         {session ? (
-          <ActiveTimer session={session} taskTitleById={taskTitleById} onSession={setSession} />
+          // Keyed by session id: the note field and the "already alerted" flags
+          // belong to one session, and must reset when a different one starts.
+          <ActiveTimer
+            key={session.id}
+            session={session}
+            taskTitleById={taskTitleById}
+            onSession={setSession}
+          />
         ) : (
           <FocusSetup
             candidateTasks={candidateTasks}
@@ -120,7 +134,7 @@ function FocusSetup({
   onStarted: (session: FocusSession) => void;
 }) {
   const [taskId, setTaskId] = useState(preselectTaskId ?? "");
-  const [minutes, setMinutes] = useState(25);
+  const [minutes, setMinutes] = useState<number | null>(25);
   const [pending, startTransition] = useTransition();
   // Generated, not hardcoded. Two of this screen can be mounted at once during a
   // route transition, and a literal id="focus-task" then appears twice: invalid
@@ -129,6 +143,10 @@ function FocusSetup({
   const taskFieldId = useId();
 
   function start() {
+    // The button is disabled without a readable duration; this is the guard for
+    // the keyboard/enter path so an invalid custom value can never start a
+    // session at some earlier, unrelated length (audit R-17).
+    if (minutes === null) return;
     startTransition(async () => {
       const result = await startFocusSessionAction({
         taskId: taskId || null,
@@ -142,10 +160,17 @@ function FocusSetup({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-8">
       <div className="text-center">
-        <p className="font-mono text-large-title tabular-nums text-label">
-          {formatClock(minutes * 60)}
+        <p
+          className={cn(
+            "font-mono text-large-title tabular-nums",
+            minutes === null ? "text-label-quaternary" : "text-label",
+          )}
+        >
+          {minutes === null ? "--:--" : formatClock(minutes * 60)}
         </p>
-        <p className="mt-2 text-callout text-label-secondary">Choose a duration to begin</p>
+        <p className="mt-2 text-callout text-label-secondary">
+          {minutes === null ? "Enter a length you can start" : "Choose a duration to begin"}
+        </p>
       </div>
 
       <DurationPicker minutes={minutes} onChange={setMinutes} disabled={pending} />
@@ -166,7 +191,13 @@ function FocusSetup({
         />
       </div>
 
-      <Button size="lg" className="w-full max-w-60 rounded-full" onClick={start} loading={pending}>
+      <Button
+        size="lg"
+        className="w-full max-w-60 rounded-full"
+        onClick={start}
+        loading={pending}
+        disabled={minutes === null}
+      >
         <Play />
         Start Focus Session
       </Button>
@@ -185,9 +216,10 @@ function ActiveTimer({
 }) {
   const nowMs = useFocusTimer((s) => s.nowMs);
   const tick = useFocusTimer((s) => s.tick);
-  const [note, setNote] = useState(session.note ?? "");
   const noteFieldId = useId();
   const [pending, startTransition] = useTransition();
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const { note, setNote, noteStatus, flushNote, getNote } = useSessionNote(session);
 
   const isPaused = Boolean(session.pausedAt);
 
@@ -213,6 +245,7 @@ function ActiveTimer({
   const timesUp = planned > 0 && elapsed >= planned;
   const progress = planned > 0 ? Math.min(1, elapsed / planned) : 0;
   const taskTitle = session.taskId ? taskTitleById.get(session.taskId) ?? "Task" : null;
+  const autoEndIn = isPaused ? null : autoEndCountdownSeconds(elapsed, planned || null);
 
   const numberColor = isPaused ? "text-label-secondary" : timesUp ? "text-orange" : "text-label";
   const ringColor = isPaused ? "stroke-gray-2" : timesUp ? "stroke-orange" : "stroke-blue";
@@ -228,20 +261,65 @@ function ActiveTimer({
     });
   }
 
-  function finish(kind: "complete" | "discard") {
-    startTransition(async () => {
-      const result =
-        kind === "complete"
-          ? await endFocusSessionAction(session.id, note)
-          : await discardFocusSessionAction(session.id);
-      if (result.ok) {
-        onSession(null);
-        if (kind === "complete") toast.success("Focus session saved");
-      } else {
-        toast.error(result.error);
-      }
+  const finish = useCallback(
+    (kind: "complete" | "discard", reason?: "auto") => {
+      startTransition(async () => {
+        // Flush the note first: an in-flight autosave and the finishing write
+        // otherwise race, and whichever the database applies last wins.
+        if (kind === "complete") await flushNote();
+        const result =
+          kind === "complete"
+            ? await endFocusSessionAction(session.id, getNote())
+            : await discardFocusSessionAction(session.id);
+        if (result.ok) {
+          onSession(null);
+          if (kind === "complete") {
+            toast.success(
+              reason === "auto" ? "Focus session saved automatically" : "Focus session saved",
+              reason === "auto"
+                ? { description: "It had been past its planned time with nothing happening." }
+                : undefined,
+            );
+          }
+        } else {
+          toast.error(result.error);
+        }
+      });
+    },
+    [flushNote, getNote, onSession, session.id],
+  );
+
+  // Time's up: say so once, in the tab and in the document title, so it lands
+  // even when the page is in the background. In-tab only on purpose: no OS
+  // permission prompt and no push service (CLAUDE.md section 2).
+  const alertedRef = useRef(false);
+  useEffect(() => {
+    if (!timesUp || alertedRef.current) return;
+    alertedRef.current = true;
+    toast("Time's up", {
+      description: taskTitle ? `Planned time reached on "${taskTitle}".` : "Planned time reached.",
+      duration: 10000,
     });
-  }
+  }, [timesUp, taskTitle]);
+
+  useEffect(() => {
+    if (!timesUp) return;
+    const previous = document.title;
+    document.title = "Time's up · GoHa";
+    return () => {
+      document.title = previous;
+    };
+  }, [timesUp]);
+
+  // Unattended overtime completes itself (see FOCUS_AUTO_END_GRACE_SECONDS).
+  // The countdown is on screen throughout, and extending resets it.
+  const autoEndedRef = useRef(false);
+  useEffect(() => {
+    if (isPaused || autoEndedRef.current) return;
+    if (!shouldAutoEndFocusSession(elapsed, planned || null)) return;
+    autoEndedRef.current = true;
+    finish("complete", "auto");
+  }, [elapsed, planned, isPaused, finish]);
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -277,7 +355,7 @@ function ActiveTimer({
           type="button"
           disabled={pending}
           aria-label="Discard session"
-          onClick={() => finish("discard")}
+          onClick={() => setConfirmingDiscard(true)}
           className="hit-44 flex size-11 cursor-pointer items-center justify-center rounded-full bg-fill-tertiary text-label-secondary transition-colors hover:bg-red hover:text-white focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50"
         >
           <X className="size-5" aria-hidden />
@@ -315,19 +393,130 @@ function ActiveTimer({
         onExtend={(mins) => runSession(() => extendFocusSessionAction(session.id, mins))}
       />
 
+      {/* Overtime is fine, silently ending is not: say when the timer will
+          close itself, so auto-end is never a surprise (audit R-17). */}
+      {timesUp && autoEndIn !== null ? (
+        <p className="-mt-4 text-footnote text-label-tertiary" role="status">
+          Completes itself in{" "}
+          <span className="font-mono tabular-nums">{formatClock(autoEndIn)}</span> unless you add
+          time.
+        </p>
+      ) : null}
+
       <div className="w-full max-w-xl">
         <label htmlFor={noteFieldId} className="mb-1.5 flex items-center gap-1.5 text-subhead text-label-secondary">
           <Target className="size-4" aria-hidden />
-          Session notes <span className="text-label-tertiary">(saved when you finish)</span>
+          Session notes
+          <span className="text-label-tertiary" aria-live="polite">
+            {noteStatus === "saving"
+              ? "(saving...)"
+              : noteStatus === "error"
+                ? "(not saved, retrying)"
+                : "(saved as you type)"}
+          </span>
         </label>
         <Textarea
           id={noteFieldId}
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          onBlur={() => void flushNote()}
           placeholder="Capture thoughts, blockers, or distractions to handle later..."
           className="min-h-24 bg-surface"
         />
       </div>
+
+      <Modal
+        open={confirmingDiscard}
+        onClose={() => setConfirmingDiscard(false)}
+        title="Discard this session?"
+        description="The time and notes are deleted, not saved. Use the tick to keep them."
+      >
+        <div className="flex items-center justify-end gap-3 px-6 py-5">
+          <Button variant="ghost" onClick={() => setConfirmingDiscard(false)}>
+            Keep focusing
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setConfirmingDiscard(false);
+              finish("discard");
+            }}
+          >
+            Discard
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
+}
+
+type NoteStatus = "idle" | "saving" | "error";
+
+/**
+ * Autosave for the session note (audit R-17). The note used to live in
+ * component state until the session was finished, so a reload, a crash, or a
+ * misfired discard took it with them.
+ *
+ * Each save is an independent request with its own guard rather than a shared
+ * `useTransition`: the same coupling that stranded rapid Brain Dump captures
+ * (see the 2026-08-17 entry) would otherwise disable this field between
+ * keystrokes.
+ */
+function useSessionNote(session: FocusSession) {
+  const [note, setNote] = useState(session.note ?? "");
+  const [noteStatus, setNoteStatus] = useState<NoteStatus>("idle");
+  const savedRef = useRef(session.note ?? "");
+  const noteRef = useRef(note);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionId = session.id;
+
+  // Mirrored in an effect, not during render: callbacks that must survive
+  // keystrokes (flush, finish) read the ref instead of a stale closure.
+  useEffect(() => {
+    noteRef.current = note;
+  }, [note]);
+
+  const getNote = useCallback(() => noteRef.current, []);
+
+  const flushNote = useCallback(async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const text = noteRef.current;
+    if (text === savedRef.current) return;
+    setNoteStatus("saving");
+    const result = await saveFocusNoteAction(sessionId, text);
+    if (result.ok) {
+      savedRef.current = text;
+      setNoteStatus("idle");
+    } else {
+      // Left un-saved on purpose: the next keystroke or the finishing write
+      // tries again, and the label says so rather than claiming it is stored.
+      setNoteStatus("error");
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (note === savedRef.current) return;
+    timerRef.current = setTimeout(() => void flushNote(), 800);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [note, flushNote]);
+
+  // Leaving the page (navigation or a hidden tab) is exactly when an unsaved
+  // draft is most likely to be lost, so flush there too.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void flushNote();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      void flushNote();
+    };
+  }, [flushNote]);
+
+  return { note, setNote, noteStatus, flushNote, getNote };
 }

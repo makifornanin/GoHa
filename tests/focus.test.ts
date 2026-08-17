@@ -3,12 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   ABANDON_MAX_SECONDS,
   aggregateFocus,
+  autoEndCountdownSeconds,
   countedFocusSeconds,
+  FOCUS_AUTO_END_GRACE_SECONDS,
   focusElapsedSeconds,
+  focusOvertimeSeconds,
   formatClock,
   formatDurationHm,
   isStaleFocusSession,
   resolvePausedSeconds,
+  shouldAutoEndFocusSession,
 } from "@/lib/focus";
 
 const T0 = new Date("2026-07-08T00:00:00.000Z");
@@ -143,5 +147,56 @@ describe("aggregateFocus", () => {
     expect(result.byTask[0]).toEqual({ id: "t1", label: "Write", seconds: 1500 });
     expect(result.byGoal).toEqual([{ id: "g1", label: "Launch", seconds: 2400 }]);
     expect(result.byLifeArea.find((b) => b.id === "a1")?.seconds).toBe(1500);
+  });
+});
+
+describe("unattended overtime (audit R-17)", () => {
+  it("has no overtime before the plan is reached, or without a plan", () => {
+    expect(focusOvertimeSeconds(1400, 1500)).toBe(0);
+    expect(focusOvertimeSeconds(1500, 1500)).toBe(0);
+    expect(focusOvertimeSeconds(9999, null)).toBe(0);
+    expect(focusOvertimeSeconds(9999, 0)).toBe(0);
+  });
+
+  it("counts seconds run past the plan", () => {
+    expect(focusOvertimeSeconds(1560, 1500)).toBe(60);
+    expect(focusOvertimeSeconds(1500 + FOCUS_AUTO_END_GRACE_SECONDS, 1500)).toBe(
+      FOCUS_AUTO_END_GRACE_SECONDS,
+    );
+  });
+
+  it("counts the grace period down from the moment the plan is reached", () => {
+    expect(autoEndCountdownSeconds(1500, 1500)).toBe(FOCUS_AUTO_END_GRACE_SECONDS);
+    expect(autoEndCountdownSeconds(1560, 1500)).toBe(FOCUS_AUTO_END_GRACE_SECONDS - 60);
+    // Never negative: the countdown bottoms out rather than reading backwards.
+    expect(autoEndCountdownSeconds(9999, 1500)).toBe(0);
+  });
+
+  it("does not apply auto-end to a session with no planned duration", () => {
+    expect(autoEndCountdownSeconds(99999, null)).toBeNull();
+    expect(shouldAutoEndFocusSession(99999, null)).toBe(false);
+  });
+
+  it("ends only once the whole grace period has passed", () => {
+    const planned = 1500;
+    expect(shouldAutoEndFocusSession(planned, planned)).toBe(false);
+    expect(shouldAutoEndFocusSession(planned + FOCUS_AUTO_END_GRACE_SECONDS - 1, planned)).toBe(false);
+    expect(shouldAutoEndFocusSession(planned + FOCUS_AUTO_END_GRACE_SECONDS, planned)).toBe(true);
+  });
+
+  it("credits only the planned time when a session auto-ends, never the overtime", () => {
+    const planned = 1500;
+    const elapsed = planned + FOCUS_AUTO_END_GRACE_SECONDS;
+    expect(shouldAutoEndFocusSession(elapsed, planned)).toBe(true);
+    expect(countedFocusSeconds(elapsed, planned)).toBe(planned);
+  });
+
+  it("extending pushes the plan out and restarts the countdown", () => {
+    const elapsed = 1560; // one minute into overtime on a 25 minute plan
+    expect(autoEndCountdownSeconds(elapsed, 1500)).toBe(FOCUS_AUTO_END_GRACE_SECONDS - 60);
+    // "+5 min" extends the plan to 1800; the session is no longer overtime.
+    expect(focusOvertimeSeconds(elapsed, 1800)).toBe(0);
+    expect(autoEndCountdownSeconds(elapsed, 1800)).toBe(FOCUS_AUTO_END_GRACE_SECONDS);
+    expect(shouldAutoEndFocusSession(elapsed, 1800)).toBe(false);
   });
 });
