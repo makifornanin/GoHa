@@ -19,6 +19,10 @@ import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { AutomationCard } from "@/components/settings/automation-card";
+import {
+  AutomationPrefsCard,
+  type AutomationPrefs,
+} from "@/components/settings/automation-prefs-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -47,6 +51,7 @@ type SettingsData = {
   weekStartsOn: number;
   dailyPlanningTime: string | null;
   eveningReflectionTime: string | null;
+  automation: AutomationPrefs;
 };
 
 
@@ -79,6 +84,7 @@ export function SettingsView({
         eveningReflectionTime={settings.eveningReflectionTime}
       />
       <SecurityCard />
+      <AutomationPrefsCard prefs={settings.automation} />
       <AutomationCard className="lg:col-span-2" />
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />

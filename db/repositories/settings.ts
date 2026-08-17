@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { userSettings } from "../schema";
-import type { ThemePreference } from "../schema";
+import type { QuoteSourcePref, ThemePreference } from "../schema";
 import type { UserSettings } from "../types";
 
 /** User settings repository. One row per user; created on demand with defaults. */
@@ -18,6 +18,14 @@ export type UserSettingsInput = {
   notificationsEnabled?: boolean;
   onboardingCompletedAt?: Date | null;
   preferences?: Record<string, unknown> | null;
+  /* Automation preferences (automation Guide 00, phase A4). */
+  morningBriefEnabled?: boolean;
+  eveningSummaryEnabled?: boolean;
+  deadlineAlertsEnabled?: boolean;
+  deadlineLeadMinutes?: number;
+  quoteSourcePref?: QuoteSourcePref;
+  /** 0=Sunday..6=Saturday, or null for no rest day. */
+  sabbathDay?: number | null;
 };
 
 export async function getUserSettings(userId: string): Promise<UserSettings | null> {

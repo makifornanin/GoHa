@@ -895,6 +895,77 @@ budgets (a budget with no deploy target is a number with no consequence), and
 Firefox/WebKit/axe coverage in Playwright, which belongs with a real E2E run on
 the test database.
 
+### 2026-08-18: The automation layer, built to the eight guides
+
+The owner supplied eight revised guides (`docs/GoHa-Guide-00..07`) and made them
+the specification. They describe a different shape from the surface built the
+day before, so the app was reconciled to them rather than the other way round.
+
+What changed from that first pass, and why:
+
+- `automation_deliveries` keyed on (kind, date), which cannot express
+  `deadline:{taskId}:{dueAtIso}` or `focus:{sessionId}:overrun`. Replaced by
+  `notification_log`: free-text dedupe key, kind enum, jsonb payload. The
+  guides' shape is a strict superset, and nothing external depended on the old
+  one yet.
+- `/api/health` returned 503 when the database was down. Guide 04's classifier
+  reads non-200 as DOWN, so a database blip would have paged as though the whole
+  app had gone. It now always answers 200 when the process answered, carrying
+  `db: "fail"` in the payload, with a 3s probe timeout and two levels: bare for
+  uptime checkers, detailed for a token.
+- `/brief` became `/brief/morning`, `/habits` folded into `/due`.
+
+Migration 0012 was regenerated in place (unapplied, so nothing to preserve) and
+is now the whole of Foundations phase A: `automation_tokens`,
+`automation_requests`, `notification_log`, `daily_quotes`, six `user_settings`
+columns, and two partial indexes on `tasks`.
+
+Ten endpoints, each behind the token guard, the Sabbath gate and the toggles:
+quote/today, brief/morning, brief/evening, due, graveyard, review/week-stats,
+review/draft, log, brain-dump, plus the discovery probe. Every payload reuses
+the app's own derivations, so a notification cannot say something the screen
+disagrees with: deriveDaySignal for the morning ranking, buildHabitViews and the
+shared habit outcome for habits, deriveReviewStats for the week.
+
+The Sabbath gate is enforced once, in the shared wrapper, so a forgotten IF node
+in a future workflow cannot leak an alert onto the rest day. Three exemptions,
+each argued: health (infrastructure does not rest), quote/today (the rest verse
+is the one thing still being said), brain-dump (capturing a thought is not work,
+losing one is). The data never rests; only the messaging does.
+
+The toggles are enforced by the API rather than shown and trusted. A switch that
+only works if some workflow remembers to check it is decoration. All three
+default to off.
+
+One collision resolved: the app auto-ended an unattended focus session at ten
+minutes of overtime, and Guide 03 alerts on a runaway session at exactly ten
+minutes. Auto-end moved to thirty. The nudge comes first; auto-end is the
+backstop for when nobody acts on it. A test now pins the ordering.
+
+`daily_quotes` ships EMPTY and `pnpm db:seed-quotes` writes `verified = false`
+for everything with no flag to change it. Scripture is not something to
+approximate, and this is the one table where GoHa presents text as authoritative
+rather than as the owner's own words. The pool, and its sourcing, is the owner's.
+
+Also in this slice: the QR code in Settings that carries the address and token to
+a phone (server-rendered, so no encoder reaches the browser), the base URL read
+from the request rather than an env var so it is right wherever the page is being
+read, and per-call history from the request log.
+
+A hand-written QR encoder was attempted first and abandoned. It was checked
+against a reference implementation, its format bits were wrong, and a QR code
+that scans as the wrong credential is worse than no QR code, so the proven
+library ships instead.
+
+Verification: typecheck, lint, 373 unit tests (64 new across the Sabbath gate,
+the quote pick, the deadline poll's exactly-once keys, and the graveyard
+buckets), `pnpm build`, all ten endpoints probed at runtime for 401 without a
+token, and a browser sweep of six routes in both themes with an empty console.
+
+NOT verified against live data: the database credential stopped authenticating
+part-way through this session (see below), so no authenticated screen and no
+live query could be exercised after that point.
+
 ---
 
 ## Automation Foundation: remediation plan (from the 17 Aug 2026 audit)
@@ -949,6 +1020,22 @@ item, no drive-by refactors.
 - Phase 4 (hardening, CI, docs): COMPLETE (2026-08-18).
 
 ### Waiting on the owner
+
+1. **The database credential is currently rejected.** `DATABASE_URL` in
+   `.env.local` parses correctly (host, database and role all read as expected)
+   but Neon answers "password authentication failed for user 'neondb_owner'".
+   It worked earlier the same session. Verified NOT to be the env-loader change:
+   the old and new parsers extract a byte-identical string. The password appears
+   to have been rotated. Nothing can touch the database until it is refreshed.
+
+2. **The app requires migration 0012 before it will run.** `user_settings` now
+   selects six columns that do not exist in the database yet, and the shell
+   layout reads settings on every page, so an un-migrated database means every
+   authenticated route errors. This is ordinary migrate-before-deploy
+   discipline, but it is a hard order: migrate, then run.
+
+3. **The harness account still blocks 0011** and would put a second account with
+   a repository-committed password on the public internet. See `docs/DEPLOY.md`.
 
 Two migrations are generated, read, committed, and deliberately NOT applied
 (hard rule 2). Apply them in order with `pnpm db:migrate`:

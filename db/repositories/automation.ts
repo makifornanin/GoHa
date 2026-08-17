@@ -1,12 +1,12 @@
 import "server-only";
 
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import type { IsoDate } from "@/lib/date";
 import { db } from "../client";
-import { automationDeliveries, automationRequests, automationTokens } from "../schema";
-import type { AutomationScope } from "../schema";
-import type { AutomationDelivery, AutomationRequest, AutomationToken } from "../types";
+import { automationRequests, automationTokens, notificationLog } from "../schema";
+import type { AutomationScope, NotificationKind } from "../schema";
+import type { AutomationRequest, AutomationToken, NotificationLogEntry } from "../types";
 
 /**
  * Automation repository. User-scoped like every other repository, with one
@@ -141,66 +141,95 @@ export async function pruneRequests(userId: string, before: Date): Promise<numbe
   return rows.length;
 }
 
-// --- Delivery ledger (idempotency for external senders) ---
+// --- Notification log (exactly-once delivery for external senders) ---
 
 /**
- * Claim (kind, date) for this user, once.
+ * Claim a dedupe key for this user, once.
  *
- * The first caller gets the row and sends its notification; every later caller
- * gets null and sends nothing. One statement, settled by
- * `automation_deliveries_user_kind_date_uq`, so two automations firing together
- * cannot both believe they are first.
+ * ONE race-safe `INSERT ... ON CONFLICT DO NOTHING`, never select-then-insert
+ * (Guide 00, dedupe scheme). The first caller gets the row and sends its
+ * message; every later caller gets null, and the endpoint answers 409 so the
+ * workflow drops that item instead of sending it twice.
  */
-export async function claimDelivery(
+export async function claimNotification(
   userId: string,
-  input: { kind: string; deliveryDate: IsoDate; detail?: string | null },
-): Promise<AutomationDelivery | null> {
+  input: {
+    kind: NotificationKind;
+    dedupeKey: string;
+    localDate: IsoDate;
+    entityType?: string | null;
+    entityId?: string | null;
+    payload?: Record<string, unknown> | null;
+  },
+): Promise<NotificationLogEntry | null> {
   const [row] = await db
-    .insert(automationDeliveries)
+    .insert(notificationLog)
     .values({
       userId,
       kind: input.kind,
-      deliveryDate: input.deliveryDate,
-      detail: input.detail ?? null,
+      dedupeKey: input.dedupeKey,
+      localDate: input.localDate,
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      payload: input.payload ?? null,
     })
-    .onConflictDoNothing({
-      target: [
-        automationDeliveries.userId,
-        automationDeliveries.kind,
-        automationDeliveries.deliveryDate,
-      ],
-    })
+    .onConflictDoNothing({ target: [notificationLog.userId, notificationLog.dedupeKey] })
     .returning();
   return row ?? null;
 }
 
-export async function getDelivery(
+/** The winner of a key, for re-serving what was already sent. */
+export async function getNotification(
   userId: string,
-  kind: string,
-  deliveryDate: IsoDate,
-): Promise<AutomationDelivery | null> {
+  dedupeKey: string,
+): Promise<NotificationLogEntry | null> {
   const [row] = await db
     .select()
-    .from(automationDeliveries)
-    .where(
-      and(
-        eq(automationDeliveries.userId, userId),
-        eq(automationDeliveries.kind, kind),
-        eq(automationDeliveries.deliveryDate, deliveryDate),
-      ),
-    )
+    .from(notificationLog)
+    .where(and(eq(notificationLog.userId, userId), eq(notificationLog.dedupeKey, dedupeKey)))
     .limit(1);
   return row ?? null;
 }
 
-export async function listRecentDeliveries(
+/** Which of these keys are already claimed. Used to exclude alerted items. */
+export async function claimedKeys(userId: string, keys: string[]): Promise<Set<string>> {
+  if (keys.length === 0) return new Set();
+  const rows = await db
+    .select({ dedupeKey: notificationLog.dedupeKey })
+    .from(notificationLog)
+    .where(and(eq(notificationLog.userId, userId), inArray(notificationLog.dedupeKey, keys)));
+  return new Set(rows.map((row) => row.dedupeKey));
+}
+
+/**
+ * Prior entries of one kind, newest first.
+ *
+ * The graveyard sweep reads these back to count how many weeks running a task
+ * has appeared, by task id inside the payload rather than by title (Guide 05,
+ * step 1.4): two different tasks that happen to share a title must not share a
+ * repeat history.
+ */
+export async function listNotificationsByKind(
   userId: string,
-  limit = 20,
-): Promise<AutomationDelivery[]> {
+  kind: NotificationKind,
+  limit = 12,
+): Promise<NotificationLogEntry[]> {
   return db
     .select()
-    .from(automationDeliveries)
-    .where(eq(automationDeliveries.userId, userId))
-    .orderBy(desc(automationDeliveries.createdAt))
+    .from(notificationLog)
+    .where(and(eq(notificationLog.userId, userId), eq(notificationLog.kind, kind)))
+    .orderBy(desc(notificationLog.sentAt))
+    .limit(limit);
+}
+
+export async function listRecentNotifications(
+  userId: string,
+  limit = 20,
+): Promise<NotificationLogEntry[]> {
+  return db
+    .select()
+    .from(notificationLog)
+    .where(eq(notificationLog.userId, userId))
+    .orderBy(desc(notificationLog.sentAt))
     .limit(limit);
 }

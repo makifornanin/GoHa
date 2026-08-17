@@ -1,7 +1,10 @@
 import "server-only";
 
-import { automationRepo, type AutomationToken } from "@/db";
+import { automationRepo, type AutomationToken, type UserSettings } from "@/db";
 import type { AutomationScope } from "@/db/schema";
+import { zonedToday } from "@/lib/date";
+import { sabbathContext, type SabbathContext } from "@/lib/sabbath";
+import { getUserSettingsCached } from "@/lib/user-settings";
 
 import {
   rateLimitDecision,
@@ -32,7 +35,13 @@ import { bearerToken, hashesMatch, hashToken, isTokenUsable, tokenPrefix } from 
  * only useful to someone guessing.
  */
 
-export type AuthedAutomation = { token: AutomationToken; userId: string };
+export type AuthedAutomation = {
+  token: AutomationToken;
+  userId: string;
+  /** The owner's day, resolved once per request from their saved timezone. */
+  context: SabbathContext;
+  settings: UserSettings;
+};
 
 export type AutomationFailure = { response: Response };
 
@@ -129,7 +138,52 @@ export async function authenticateAutomation(
     };
   }
 
-  return { token, userId: token.userId };
+  // The owner's day, resolved once per request. Every endpoint below buckets
+  // dates from THIS, never from a hard-coded zone (Guide 01, step 2.4).
+  const settings = await getUserSettingsCached(token.userId);
+  const localDate = zonedToday(now, settings.timezone);
+
+  return {
+    token,
+    userId: token.userId,
+    settings,
+    context: sabbathContext({
+      sabbathDay: settings.sabbathDay,
+      localDate,
+      timezone: settings.timezone,
+    }),
+  };
+}
+
+/**
+ * The envelope every automation response carries (Guide 07, step 2.1).
+ *
+ * `goha-lib-guard` in n8n reads exactly these three fields and branches on
+ * them, so they are attached here rather than assembled per endpoint: one
+ * forgotten spread and a workflow would think every day was a working day.
+ */
+export function withContext(auth: AuthedAutomation, body: Record<string, unknown>): Response {
+  return automationJson({ ...auth.context, ...body });
+}
+
+/**
+ * The quiet answer for a work endpoint on the rest day: 200, empty, and
+ * labelled. Not an error, because nothing went wrong; there is simply nothing
+ * to say today.
+ */
+export function sabbathSilence(auth: AuthedAutomation): Response {
+  return withContext(auth, { sabbath: true, items: [] });
+}
+
+/**
+ * The answer when the owner has switched this notification off in Settings.
+ *
+ * The API enforces its own toggles (Guide 00, phase B). Leaving that to the
+ * workflows would make the Settings controls cosmetic: a switch that only stops
+ * a message if some flow out there remembers to check it is not a switch.
+ */
+export function disabledSilence(auth: AuthedAutomation, setting: string): Response {
+  return withContext(auth, { enabled: false, setting, items: [] });
 }
 
 export function isFailure(

@@ -90,6 +90,29 @@ export const brainDumpConvertedType = pgEnum("brain_dump_converted_type", [
  */
 export const automationScope = pgEnum("automation_scope", ["read", "read_write"]);
 
+/**
+ * What an automation sent. One value per kind of message the layer can deliver
+ * (automation Guide 00, phase A2), so the log can be grouped and read back
+ * without parsing free text.
+ */
+export const notificationKind = pgEnum("notification_kind", [
+  "morning_brief",
+  "evening_summary",
+  "deadline",
+  "focus_overrun",
+  "streak_risk",
+  "graveyard",
+  "review_draft",
+  "health",
+  "sabbath",
+]);
+
+/** Where a daily quote comes from: a quote, or a scripture verse. */
+export const quoteSource = pgEnum("quote_source", ["quote", "verse"]);
+
+/** Which of those the owner wants to see on a given day. */
+export const quoteSourcePref = pgEnum("quote_source_pref", ["quote", "verse", "both"]);
+
 /** User appearance preference. Mirrors next-themes. */
 export const themePreference = pgEnum("theme_preference", [
   "light",
@@ -130,3 +153,6 @@ export type BrainDumpConvertedType = (typeof brainDumpConvertedType.enumValues)[
 export type ThemePreference = (typeof themePreference.enumValues)[number];
 export type TaskMapNodeType = (typeof taskMapNodeType.enumValues)[number];
 export type AutomationScope = (typeof automationScope.enumValues)[number];
+export type NotificationKind = (typeof notificationKind.enumValues)[number];
+export type QuoteSource = (typeof quoteSource.enumValues)[number];
+export type QuoteSourcePref = (typeof quoteSourcePref.enumValues)[number];

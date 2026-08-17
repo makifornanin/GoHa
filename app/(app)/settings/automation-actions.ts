@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
 import { z } from "zod";
 
 import { automationRepo } from "@/db";
@@ -44,18 +46,19 @@ export type RequestSummary = {
   at: string;
 };
 
-export type DeliverySummary = {
+export type SentSummary = {
   id: string;
   kind: string;
   date: string;
-  detail: string | null;
   at: string;
 };
 
 export type AutomationOverview = {
   tokens: TokenSummary[];
   requests: RequestSummary[];
-  deliveries: DeliverySummary[];
+  sent: SentSummary[];
+  /** Where the automations should point. Read from the request, not guessed. */
+  baseUrl: string;
 };
 
 function toSummary(token: {
@@ -92,10 +95,10 @@ function toSummary(token: {
 export async function listAutomationAction(): Promise<AutomationOverview> {
   const user = await requireUser();
 
-  const [tokens, requests, deliveries] = await Promise.all([
+  const [tokens, requests, sent] = await Promise.all([
     automationRepo.listTokens(user.id),
     automationRepo.listRecentRequests(user.id, 20),
-    automationRepo.listRecentDeliveries(user.id, 10),
+    automationRepo.listRecentNotifications(user.id, 10),
   ]);
 
   return {
@@ -106,14 +109,57 @@ export async function listAutomationAction(): Promise<AutomationOverview> {
       status: request.status,
       at: request.createdAt.toISOString(),
     })),
-    deliveries: deliveries.map((delivery) => ({
-      id: delivery.id,
-      kind: delivery.kind,
-      date: delivery.deliveryDate,
-      detail: delivery.detail,
-      at: delivery.createdAt.toISOString(),
+    sent: sent.map((entry) => ({
+      id: entry.id,
+      kind: entry.kind,
+      date: entry.localDate,
+      at: entry.sentAt.toISOString(),
     })),
+    baseUrl: await resolveBaseUrl(),
   };
+}
+
+/**
+ * The URL an automation should call.
+ *
+ * Taken from the request headers rather than an env var, so the QR code handed
+ * to the phone points at wherever the owner is actually reading this page. A
+ * hardcoded localhost in a deployed app would be a QR code that silently leads
+ * nowhere, which is worse than no QR code at all.
+ */
+async function resolveBaseUrl(): Promise<string> {
+  const incoming = await headers();
+  const host = incoming.get("x-forwarded-host") ?? incoming.get("host");
+  if (!host) return process.env.BETTER_AUTH_URL ?? "";
+  const proto = incoming.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+/**
+ * The token as a QR code, so the phone never types a 45-character secret.
+ *
+ * Rendered SERVER-side and handed over as finished SVG markup: the encoder
+ * never reaches the browser bundle, and the secret is already in this response
+ * anyway. The payload is the same JSON the Shortcut expects, so scanning it
+ * with the Camera app and pasting into Shortcuts is one step, not four.
+ *
+ * Failure is not fatal. The secret is displayed as text beside it, and losing
+ * the convenience of a QR code must never cost the owner the credential.
+ */
+async function qrSvgFor(baseUrl: string, secret: string): Promise<string | null> {
+  try {
+    return await QRCode.toString(JSON.stringify({ url: baseUrl, token: secret }), {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 2,
+      // Transparent background with black modules; the card sits it on a
+      // light surface in both themes so it always scans.
+      color: { dark: "#000000", light: "#00000000" },
+    });
+  } catch (error) {
+    console.error("QR generation failed", error);
+    return null;
+  }
 }
 
 /** Mint a token. The secret in the result is the only copy that will exist. */
@@ -121,7 +167,7 @@ export async function createAutomationTokenAction(input: {
   name: string;
   scope?: "read" | "read_write";
   expiresInDays?: number | null;
-}): Promise<ActionResult<{ token: TokenSummary; secret: string }>> {
+}): Promise<ActionResult<{ token: TokenSummary; secret: string; qrSvg: string | null }>> {
   const user = await requireUser();
 
   const parsed = createTokenSchema.safeParse(input);
@@ -143,8 +189,10 @@ export async function createAutomationTokenAction(input: {
       expiresAt,
     });
 
+    const qrSvg = await qrSvgFor(await resolveBaseUrl(), secret.secret);
+
     revalidatePath("/settings");
-    return { ok: true, data: { token: toSummary(row), secret: secret.secret } };
+    return { ok: true, data: { token: toSummary(row), secret: secret.secret, qrSvg } };
   } catch (error) {
     console.error("createAutomationTokenAction failed", error);
     return { ok: false, error: GENERIC_ERROR };

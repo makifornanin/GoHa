@@ -239,6 +239,10 @@ excluded, zero countable = 0%); in `manual` mode it is `manual_progress`; a
   (apply, needs `DATABASE_URL`), `pnpm db:push` (dev sync), `pnpm db:studio`.
 - Never edit generated SQL by hand or reset destructively as a normal workflow
   (CLAUDE.md section 8).
+- `0012_mysterious_hannibal_king.sql` is the automation foundation (Guide 00,
+  phase A): `automation_tokens`, `automation_requests`, `notification_log`,
+  `daily_quotes`, the six `user_settings` columns, and two partial indexes on
+  `tasks`. Purely additive, nothing existing is touched. **Not applied.**
 - `0011_silky_hardball.sql` (the concurrency invariants above) is generated and
   committed but **not applied**. It creates unique indexes over existing rows,
   so it fails rather than corrupts if the data already breaks a rule. Check

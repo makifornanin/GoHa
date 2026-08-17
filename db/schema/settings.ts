@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
 import { user } from "./auth";
-import { themePreference } from "./enums";
+import { quoteSourcePref, themePreference } from "./enums";
 
 /**
  * Per-user settings. One row per user (unique `userId`). Notifications here are
@@ -30,12 +30,41 @@ export const userSettings = pgTable(
     notificationsEnabled: boolean().notNull().default(true),
     onboardingCompletedAt: timestamp({ withTimezone: true }),
     preferences: jsonb().$type<Record<string, unknown>>(),
+
+    /*
+     * Automation preferences (Guide 00, phase A4).
+     *
+     * All three toggles default to FALSE. A notification the owner did not ask
+     * for is worse than no automation at all, and a default-on switch means the
+     * first thing a new setup does is interrupt someone. The API layer enforces
+     * these, so turning one off silences the endpoint itself rather than
+     * relying on every workflow to check.
+     */
+    morningBriefEnabled: boolean().notNull().default(false),
+    eveningSummaryEnabled: boolean().notNull().default(false),
+    deadlineAlertsEnabled: boolean().notNull().default(false),
+    /** How far ahead /due looks by default, in minutes. */
+    deadlineLeadMinutes: smallint().notNull().default(60),
+    quoteSourcePref: quoteSourcePref().notNull().default("both"),
+    /**
+     * The rest day, 0=Sunday..6=Saturday, matching `weekStartsOn`. Null means
+     * disabled. On this day the automation layer stays quiet (Guide 07).
+     */
+    sabbathDay: smallint(),
     ...auditTimestamps,
   },
   (t) => [
     check(
       "user_settings_week_starts_on_range",
       sql`${t.weekStartsOn} between 0 and 6`,
+    ),
+    check(
+      "user_settings_sabbath_day_range",
+      sql`${t.sabbathDay} is null or (${t.sabbathDay} between 0 and 6)`,
+    ),
+    check(
+      "user_settings_deadline_lead_range",
+      sql`${t.deadlineLeadMinutes} between 5 and 1440`,
     ),
   ],
 );

@@ -7,6 +7,7 @@ import {
   goalsRepo,
   habitsRepo,
   lifeAreasRepo,
+  quotesRepo,
   tasksRepo,
 } from "@/db";
 import {
@@ -16,10 +17,12 @@ import {
   zonedPartOfDay,
   zonedToday,
 } from "@/lib/date";
+import { pickDailyQuote, sourcesFor } from "@/lib/daily-quote";
 import { buildHabitViews } from "@/lib/habit-view";
 import { completionsByDay } from "@/lib/progress";
+import { isSabbathDate, SABBATH_MESSAGE } from "@/lib/sabbath";
 import { requireUser } from "@/lib/session";
-import { getUserDatePrefs } from "@/lib/user-settings";
+import { getUserSettingsCached } from "@/lib/user-settings";
 
 export const metadata = { title: "Today" };
 
@@ -29,7 +32,9 @@ const MOMENTUM_DAYS = 14;
 export default async function TodayPage() {
   // Identity from the session; every query below is user-scoped in the repos.
   const user = await requireUser();
-  const { timeZone, weekStartsOn } = await getUserDatePrefs(user.id);
+  const settings = await getUserSettingsCached(user.id);
+  const timeZone = settings.timezone;
+  const weekStartsOn = settings.weekStartsOn as 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
   const now = new Date();
   const today = zonedToday(now, timeZone);
@@ -49,6 +54,28 @@ export default async function TodayPage() {
       lifeAreasRepo.listLifeAreas(user.id),
       focusRepo.listCompletedSessionsInRange(user.id, { from: momentumFrom, to: today }),
     ]);
+
+  /*
+   * The rest day, and the day's quote.
+   *
+   * The quote is picked from the same deterministic rule the automation
+   * endpoint uses, so the card and the morning notification cannot show
+   * different quotes on the same morning. On the Sabbath the pool narrows to
+   * rest-themed entries, falling back to the ordinary pool rather than showing
+   * nothing (Guide 07, step 3.1).
+   */
+  const isSabbath = isSabbathDate(settings.sabbathDay, today);
+  const quotePool = isSabbath
+    ? await quotesRepo.listRestQuotes()
+    : await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref));
+  const pool =
+    isSabbath && quotePool.length === 0
+      ? await quotesRepo.listActiveQuotes(sourcesFor(settings.quoteSourcePref))
+      : quotePool;
+  const picked = pickDailyQuote(pool, today);
+  const quote = picked
+    ? { text: picked.text, attribution: picked.attribution, translation: picked.translation }
+    : null;
 
   // --- Momentum, derived from records already written elsewhere ---
   const views = buildHabitViews({ habits, entries: habitEntries, today, weekStartsOn, timeZone });
@@ -107,6 +134,8 @@ export default async function TodayPage() {
         weekStartsOn={weekStartsOn}
         lifeAreas={lifeAreas}
         momentum={momentum}
+        quote={quote}
+        sabbath={isSabbath ? { message: SABBATH_MESSAGE } : null}
       />
     </>
   );

@@ -24,6 +24,14 @@ export default async function SettingsPage() {
           weekStartsOn: settings.weekStartsOn,
           dailyPlanningTime: settings.dailyPlanningTime,
           eveningReflectionTime: settings.eveningReflectionTime,
+          automation: {
+            morningBriefEnabled: settings.morningBriefEnabled,
+            eveningSummaryEnabled: settings.eveningSummaryEnabled,
+            deadlineAlertsEnabled: settings.deadlineAlertsEnabled,
+            deadlineLeadMinutes: settings.deadlineLeadMinutes,
+            quoteSourcePref: settings.quoteSourcePref,
+            sabbathDay: settings.sabbathDay,
+          },
         }}
       />
     </div>

@@ -1,199 +1,206 @@
 # AUTOMATION.md — the surface GoHa exposes
 
 GoHa contains no notification infrastructure, no scheduler, and no third-party
-integrations. That is written into the project constitution (CLAUDE.md section
-2), and it does not change here. What this document describes is the small,
-token-authenticated, read-mostly surface that lets something **outside** GoHa
-read your day: n8n, Make, Apple Shortcuts, a Scriptable widget, a push service
-like Pushcut.
+integrations. That is in the project constitution (CLAUDE.md section 2) and does
+not change here. What follows is the small, token-authenticated surface that
+lets something **outside** GoHa read your day and say something about it: n8n,
+Apple Shortcuts, a Scriptable widget.
 
-The companion `docs/GoHa-Automation-Guide.pdf` covers the other side of the
-wire: which tools to use, what to build first, and the operating rules. This
-file covers only what the app itself offers.
+This file is the app side. The eight `GoHa-Guide-*.pdf` documents in this folder
+are the other side of the wire: the workflows, the prompts, the Shortcuts.
 
 ---
 
 ## Why an API and not a database role
 
-The guide's phase 0 hands automations a read-only Postgres role, and for plain
-questions ("which tasks are late") that works. It cannot answer the question
-that matters most: **what should I start with?** That judgement lives in
-`lib/today-brain.ts`, it is real code, and reimplementing it in SQL guarantees
-the two drift apart the first time the ranking improves.
+A read-only Postgres role answers plain questions ("which tasks are late") and
+cannot answer the one that matters: **what should I start with?** That judgement
+lives in `lib/today-brain.ts`, it is real code, and a SQL reimplementation
+drifts from the app the first time the ranking improves.
 
-So the app grows one endpoint that runs the actual engine, and the notification
-says what the app says, because it is the same code.
+So the automations call the actual engine. The notification says what the app
+says, because it is the same function.
 
-A read-only database role is still the right tool for bulk history queries. Use
-both; keep the role `SELECT`-only, so no automation can write around the app's
-validation and ownership checks.
+Keep a `SELECT`-only role for bulk history queries and backups. Every write goes
+through these endpoints, where Zod validation and ownership checks live.
 
 ---
 
 ## Getting a token
 
-Settings -> Automations -> New token.
+**Settings → Automations → New token.**
 
-- The secret is shown **once**. Only a SHA-256 hash of it is stored, so there is
-  no copy to come back for. Lost token, new token.
-- Choose the scope in plain terms: read only, or read plus recording
-  deliveries. Neither can create, complete, or reschedule anything.
-- Set an expiry if the token lives somewhere you do not fully control.
-- Revoke stops it working immediately and keeps its request history. Delete
-  removes the row.
+- The secret appears **once**. Only its SHA-256 hash is stored, so there is no
+  copy to come back for.
+- A **QR code** is shown with it, carrying `{ url, token }`. Point your phone's
+  camera at the screen instead of typing 45 characters.
+- Scope in plain terms: read only, or read plus writes. Neither can create,
+  complete, or reschedule anything.
+- Revoke stops it immediately and keeps its history. Delete removes the row.
 
-Store it in your automation platform's credential store. Never in a node body,
-a query string, or a screenshot.
+Store it in n8n's credential store as a Header Auth credential. Never in a node
+body, a query string, or a screenshot.
 
 ---
 
-## Calling it
+## The rules this surface keeps
 
-```bash
-curl -s https://<your-goha-host>/api/automation \
-  -H "Authorization: Bearer $GOHA_TOKEN"
-```
-
-Rules the surface enforces:
-
-| Rule | What happens if you break it |
+| Rule | If you break it |
 | --- | --- |
-| Bearer token in the `Authorization` header | No header, or a token in a query string: `401` |
-| Token must be live | Unknown, revoked, or expired: `401`, all three identical |
-| Scope must cover the call | Read-only token posting a delivery: `403` |
+| Bearer token in the `Authorization` header | `401`. A token in a query string is never read |
+| Token must be live | Unknown, revoked and expired are one identical `401` |
+| Scope must cover the call | Read-only token posting: `403` |
 | 60 requests per minute per token | `429` with `Retry-After` |
-| Identity comes from the token | There is no `user_id` parameter anywhere to forge |
+| Identity comes from the token | There is no `userId` parameter anywhere to forge |
 
 `503` means the app could not verify the token at all (database unreachable, or
-the automation tables not migrated yet). Retry; do not treat it as a bad
-credential.
+the automation tables not migrated). Retry; it is not a bad credential.
 
-Every call is logged with its route and status, and shows up in Settings ->
-Automations. That log is also what the rate limiter counts, so it holds even if
-the app runs as more than one instance.
+Every response to a live token carries the day's envelope, which is what
+`goha-lib-guard` reads:
+
+```jsonc
+{ "localDate": "2026-08-18", "timezone": "Asia/Manila", "isSabbath": false }
+```
+
+Every call is logged with route and status and appears in Settings. That log is
+also what the rate limiter counts, so the limit holds across instances.
 
 ---
 
 ## Endpoints
 
-### `GET /api/automation`
+| Method | Path | Scope | Serves |
+| --- | --- | --- | --- |
+| GET | `/api/health` | none / read | Liveness; with a token, a database probe |
+| GET | `/api/automation` | read | Does this token work, and what can it reach |
+| GET | `/api/automation/quote/today` | read | The day's quote, and the context envelope |
+| GET | `/api/automation/brief/morning` | read | The ranked morning payload |
+| GET | `/api/automation/brief/evening` | read | How the day actually went |
+| GET | `/api/automation/due?window=N&evening=true` | read | Deadlines, overdue, focus overrun, streaks |
+| GET | `/api/automation/graveyard` | read | Work that has stopped moving |
+| GET | `/api/automation/review/week-stats?week=` | read | The week's numbers, as Review derives them |
+| POST | `/api/automation/review/draft` | read_write | Draft into EMPTY review fields only |
+| POST | `/api/automation/log` | read_write | Claim a dedupe key; `201` or `409` |
+| POST | `/api/automation/brain-dump` | read_write | Capture a thought into the inbox |
 
-Does this token work, and what can it reach. Use it once when wiring things up,
-and as the health check of your workflow.
+### `/api/health` has two levels
 
-### `GET /api/automation/brief`
+Unauthenticated it returns `200 {"status":"ok"}` and nothing else, which is safe
+to hand to any uptime service. With a token it adds `db`, `latencyMs`, `version`
+and `time`.
 
-The day's brief: exactly the judgement the Today screen shows.
+**It answers 200 even when the database is down**, with `db: "fail"` and
+`status: "degraded"`. That is deliberate and Guide 04's classifier depends on
+it: a non-200 means DOWN (nothing answered at all), while 200 with `db: "fail"`
+means DEGRADED (the app is up, its database is not). Those need different
+emails. The probe times out after 3 seconds so a hanging connection cannot hang
+the check.
 
-```jsonc
-{
-  "date": "2026-08-17",
-  "timeZone": "Asia/Manila",
-  "generatedAt": "2026-08-16T23:30:00.000Z",
-  "state": "late",                  // late | focus | plan | clear | done
-  "headline": "2 things have slipped",
-  "detail": "Start with \"Draft the proposal\" — 3 days late.",
-  "lateCount": 2,
-  "completedToday": 1,
-  "totalToday": 4,
-  "habitsRemaining": 1,
-  "canReflect": false,
-  "task": {
-    "id": "…",
-    "title": "Draft the proposal",
-    "priority": "high",
-    "daysLate": 3,
-    "focusPath": "/focus?taskId=…",  // a real deep link: Focus preselects it
-    "reason": ""
-  },
-  "suggestions": [ /* same shape, each with the app's stated reason */ ],
-  "quiet": false
-}
+### The morning brief
+
+`quiet` is the field to branch on: true when there is genuinely nothing to act
+on. Never notifying when there is nothing to say is the first operating rule,
+and it is decided server-side so every flow decides it the same way.
+
+`tasks.overdue` is **never truncated**. A cap would be data truncation, and no
+downstream step could put back what the API had stopped knowing. If naming every
+overdue title makes the notification too long, state the exact count and append
+"+N more" — that is display overflow handling, not forgetting.
+
+`alreadyDelivered` reflects `brief:morning:{localDate}` in the log, so a re-run
+can re-serve rather than recompose.
+
+On the Sabbath this serves `{ sabbath: true, message, quote }` and no task
+content at all.
+
+### `/api/automation/due`
+
+Every item arrives with a **server-computed `dedupeKey`**. Claim it through
+`/log` before sending; items already claimed never appear, so two polls back to
+back produce one alert between them.
+
+```
+deadline:{taskId}:{dueAtIso}    rescheduling changes the key, so it re-arms
+focus:{sessionId}:overrun       one nudge per session, not one per poll
+streak:{habitId}:{localDate}    one per habit per day, evening poll only
 ```
 
-`quiet` is the field to branch on. It is true when there is genuinely nothing to
-act on, and the first operating rule is never to notify when there is nothing to
-act on. Let the app make that call, so every flow makes it the same way.
+`window` is in minutes (5..1440), defaulting to your saved
+`deadlineLeadMinutes`. `evening=true` adds the streak section.
 
-### `GET /api/automation/habits`
-
-What is still open today, and which streaks are at risk.
-
-```jsonc
-{
-  "date": "2026-08-17",
-  "scheduledToday": 3,
-  "doneToday": 1,
-  "due": [
-    { "id": "…", "name": "Read", "state": "pending", "currentStreak": 12,
-      "streakAtRisk": true, "targetValue": null, "unit": null }
-  ],
-  "atRisk": [ /* the subset with a streak of 3 or more */ ],
-  "quiet": false
-}
-```
-
-Enough for both habit automations in the guide: the evening check that stays
-silent unless something is unchecked (`quiet`), and the streak rescue that only
-speaks when a real streak is about to end (`atRisk`).
-
-A deliberately skipped habit never appears. A skip is a decision that has
-already been made; chasing it is arguing with the owner.
-
-### `POST /api/automation/deliveries` (scope: read and write)
-
-Claim a notification once per `(kind, local date)`. This is how a flow that runs
-twice sends once.
+### `/api/automation/log`
 
 ```bash
-curl -s -X POST https://<host>/api/automation/deliveries \
+curl -s -X POST https://<host>/api/automation/log \
   -H "Authorization: Bearer $GOHA_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"morning-brief","detail":"3 late"}'
+  -d '{"kind":"morning_brief","dedupeKey":"brief:morning:2026-08-18","payload":{"...":"..."}}'
 ```
 
-```jsonc
-// 201: you are first. Send it.
-{ "claimed": true, "kind": "morning-brief", "date": "2026-08-17" }
+`201 { claimed: true }` — you are first, send it.
+`409 { claimed: false, payload }` — someone already did; the winner's payload
+comes back so a re-run re-serves it rather than writing a second version.
 
-// 200: someone already did. Send nothing.
-{ "claimed": false, "kind": "morning-brief", "date": "2026-08-17",
-  "sentAt": "2026-08-16T23:30:11.482Z", "detail": "3 late" }
-```
+Store real structure in `payload`. The graveyard sweep reads prior payloads back
+to count repeat appearances **by task id**, so include `taskIds`.
 
-`date` defaults to **your** local today, resolved from the timezone saved in
-Settings, not from the caller's clock. An automation platform running in UTC
-would otherwise claim tomorrow eight hours early.
+### `/api/automation/review/draft`
 
-`kind` is lowercased and must be a slug (`morning-brief`, not `Morning Brief`),
-so two spellings cannot both believe they are first.
-
-The unique constraint behind this is what makes it a claim rather than a hope.
-Two flows firing together: one gets `claimed: true`, the other `false`.
+Writes only into fields that are currently **empty**, never `completedAt`, never
+`rating`, and prefixes each drafted field with `[AI draft] ` so authorship is
+visible. A completed review is skipped entirely. The response says which fields
+were written and which were skipped.
 
 ---
 
-## What this surface deliberately does not do
+## Switches that actually switch
 
-- **No writes to your work.** Nothing here can create a task, complete a habit,
-  or move a date. Those stay behind the app's Server Actions, where Zod
-  validation, ownership checks and revalidation live. An automation writing
-  straight to Postgres bypasses all of it and can produce rows the app considers
-  impossible.
-- **No export.** The nightly backup the guide recommends is `pnpm db:backup`
-  (all 19 tables, no caps, verified by `pnpm db:restore-check`). Publishing the
-  whole database behind an HTTP token would widen this surface for something a
-  script already does better.
+Settings → "What automations may send". All three default to **off**.
+
+| Setting | Effect |
+| --- | --- |
+| `morningBriefEnabled` | Off: `/brief/morning` returns a silent response |
+| `eveningSummaryEnabled` | Off: `/brief/evening` is silent |
+| `deadlineAlertsEnabled` | Off: `/due` returns no items |
+| `sabbathDay` | On that weekday, work endpoints return `{ sabbath: true, items: [] }` |
+| `quoteSourcePref` | Which pool the daily quote is drawn from |
+| `deadlineLeadMinutes` | Default `window` for `/due` |
+
+Enforced by the API, not by the workflows. A switch that only works if some flow
+remembers to check it is decoration.
+
+The Sabbath gate is server-side and applies once, so a forgotten IF node in a
+future workflow cannot leak a deadline alert onto your rest day. Exempt:
+`/api/health` (infrastructure failure does not keep a rest day),
+`/quote/today` (the rest verse is the one thing still being said), and
+`/brain-dump` (capturing a thought is not work; losing one is).
+
+**The data does not rest, only the messaging does.** Streaks, overdue maths and
+every derivation carry on unchanged.
+
+---
+
+## The quote pool
+
+`daily_quotes` ships **empty**, and that is a working state: the Today card
+shows its empty message and the endpoints return `quote: null`.
+
+To fill it, create `content/daily-quotes.json` and run `pnpm db:seed-quotes`.
+The loader is idempotent (upsert on source + text) and writes `verified: false`
+for everything, always, with no flag to change that. A verse with a word wrong
+is a wrong verse; confirming wording against a real source is a human act.
+
+Use a public-domain translation you can check (WEB, KJV) or an edition you own.
+Include 30 or more entries tagged `"theme": "rest"` if you use a Sabbath day.
+
+---
+
+## What this surface will not do
+
+- **No bulk writes to your work.** Nothing can complete a habit, move a date, or
+  cancel a task. The graveyard digest recommends; you decide.
+- **No export.** The backup is `pnpm db:backup` (every table, no caps, verified
+  by `pnpm db:restore-check`), which does that job better without publishing the
+  whole database behind an HTTP token.
 - **No delivery.** GoHa never sends anything. It answers questions.
-
----
-
-## If you are wiring this up for the first time
-
-1. Test your push channel before anything else (guide, phase 0.3). A working
-   webhook first makes everything after it debuggable.
-2. Create a read-only token and call `GET /api/automation` from a terminal.
-3. Build one flow: cron -> `GET /api/automation/brief` -> stop if `quiet` ->
-   format -> push.
-4. Live with it for a week before building the second one. Whether you actually
-   read it should decide what comes next, far more than any list.

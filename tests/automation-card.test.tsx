@@ -44,7 +44,7 @@ function token(overrides: Partial<TokenSummary> = {}): TokenSummary {
 }
 
 function overview(overrides: Partial<AutomationOverview> = {}): AutomationOverview {
-  return { tokens: [], requests: [], deliveries: [], ...overrides };
+  return { tokens: [], requests: [], sent: [], baseUrl: "https://goha.example.com", ...overrides };
 }
 
 describe("Automation card", () => {
@@ -60,7 +60,7 @@ describe("Automation card", () => {
 
   it("shows the secret once, and never again", async () => {
     const user = userEvent.setup();
-    createAction.mockResolvedValue({ ok: true, data: { token: token(), secret: SECRET } });
+    createAction.mockResolvedValue({ ok: true, data: { token: token(), secret: SECRET, qrSvg: null } });
     render(<AutomationCard />);
 
     await user.click(screen.getByRole("button", { name: /show tokens/i }));
@@ -95,7 +95,7 @@ describe("Automation card", () => {
     const user = userEvent.setup();
     createAction.mockResolvedValue({
       ok: true,
-      data: { token: token({ scope: "read_write" }), secret: SECRET },
+      data: { token: token({ scope: "read_write" }), secret: SECRET, qrSvg: null },
     });
     render(<AutomationCard />);
 

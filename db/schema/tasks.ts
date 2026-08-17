@@ -57,6 +57,21 @@ export const tasks = pgTable(
     index("tasks_goal_id_idx").on(t.goalId),
     index("tasks_life_area_id_idx").on(t.lifeAreaId),
     index("tasks_parent_task_id_idx").on(t.parentTaskId),
+    /*
+     * Partial indexes for the automation reads (Guide 00, phase A5).
+     *
+     * The graveyard sweep asks for in-progress tasks that have not moved, and
+     * the deadline poll asks for unfinished work with a due date. Both are
+     * small slices of a table that is mostly neither, so a partial index is a
+     * fraction of the size of the full ones above and is the one actually
+     * chosen for those queries.
+     */
+    index("tasks_user_in_progress_idx")
+      .on(t.userId, t.status)
+      .where(sql`${t.status} = 'in_progress'`),
+    index("tasks_user_open_due_idx")
+      .on(t.userId, t.dueAt)
+      .where(sql`${t.completedAt} is null`),
     check("tasks_no_self_parent", sql`${t.parentTaskId} is null or ${t.parentTaskId} <> ${t.id}`),
     check(
       "tasks_estimate_minutes_positive",

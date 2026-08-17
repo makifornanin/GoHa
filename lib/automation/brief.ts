@@ -1,20 +1,24 @@
-import type { Task } from "@/db/types";
-import type { IsoDate } from "@/lib/date";
-import type { DaySignal, ScoredTask } from "@/lib/today-brain";
-import { daysLate } from "@/lib/today-brain";
+import type { DailyQuote, HabitEntry, Task } from "@/db";
+import type { GoalWithCounts } from "@/db/repositories/goals";
+import type { HabitWithSchedule } from "@/db/repositories/habits";
+import type { IsoDate, Weekday } from "@/lib/date";
+import { calculateGoalProgress } from "@/lib/goal-progress";
+import { buildHabitViews } from "@/lib/habit-view";
+import { taskEffectiveDate } from "@/lib/task-buckets";
+import { daysLate, type DaySignal, type ScoredTask } from "@/lib/today-brain";
 
 /**
- * The shape of the brief an automation receives.
+ * The morning payload (automation Guide 01, phase 2).
  *
- * Deliberately a projection of `DaySignal` rather than a second opinion: the
- * ranking, the headline and the reasons are the app's own, produced by the same
- * `deriveDaySignal` the Today screen renders. SQL could find late tasks, but it
- * could not reproduce this judgement, and a reimplementation drifts from the
- * app the first time the ranking improves.
+ * A projection of the app's own judgement rather than a second opinion: the
+ * ranking, the headline and the reasons all come from `deriveDaySignal`, the
+ * same function the Today screen renders. SQL could find late tasks; it could
+ * not reproduce this, and a reimplementation drifts from the app the first time
+ * the ranking improves.
  *
  * Pure, so the contract external automations depend on is unit-tested here
  * rather than discovered in production by a notification that says the wrong
- * thing.
+ * thing at seven in the morning.
  */
 
 export type BriefTask = {
@@ -26,34 +30,60 @@ export type BriefTask = {
   focusPath: string;
   /** Why the app picked it, in the app's words. Empty for the headline task. */
   reason: string;
+  /** Present when the task carries one; the narrator may quote it. */
+  description: string | null;
+  dueAt: string | null;
+  goalTitle: string | null;
 };
 
-export type BriefPayload = {
-  /** The owner's local date this brief describes. */
-  date: IsoDate;
-  timeZone: string;
+export type BriefHabit = {
+  id: string;
+  name: string;
+  state: "pending" | "partial" | "done" | "skip" | "miss" | "off";
+  currentStreak: number;
+  targetValue: number | null;
+  unit: string | null;
+};
+
+export type BriefGoal = {
+  id: string;
+  title: string;
+  progress: number;
+  targetDate: string | null;
+};
+
+export type MorningBriefPayload = {
+  localDate: IsoDate;
+  timezone: string;
+  isSabbath: boolean;
   generatedAt: string;
+  quote: { text: string; attribution: string | null; translation: string | null } | null;
+  recommendation: string;
+  reason: string;
   state: DaySignal["state"];
-  headline: string;
-  detail: string;
-  lateCount: number;
-  completedToday: number;
-  totalToday: number;
-  habitsRemaining: number;
-  canReflect: boolean;
-  /** The one thing to start with, or null when there is nothing to act on. */
-  task: BriefTask | null;
-  /** Ranked alternatives, already excluding what is pinned. */
-  suggestions: BriefTask[];
-  /**
-   * True when there is genuinely nothing worth interrupting someone for. The
-   * guide's first operating rule is never to notify when there is nothing to
-   * act on, and that decision should not be re-derived by every flow.
-   */
+  topPriorities: BriefTask[];
+  tasks: {
+    /** NEVER truncated. Overflow is a display problem, not a data one. */
+    overdue: BriefTask[];
+    dueToday: BriefTask[];
+    scheduledToday: BriefTask[];
+  };
+  habitsToday: BriefHabit[];
+  activeGoals: BriefGoal[];
+  counts: { completedToday: number; totalToday: number; habitsRemaining: number };
+  /** True when the log already holds brief:morning:{localDate}. */
+  alreadyDelivered: boolean;
+  /** Nothing worth interrupting anyone for. */
   quiet: boolean;
 };
 
-function briefTask(task: Task, today: IsoDate, timeZone: string, reason = ""): BriefTask {
+function toBriefTask(
+  task: Task,
+  today: IsoDate,
+  timeZone: string,
+  goalTitles: Map<string, string>,
+  reason = "",
+): BriefTask {
   return {
     id: task.id,
     title: task.title,
@@ -61,40 +91,133 @@ function briefTask(task: Task, today: IsoDate, timeZone: string, reason = ""): B
     daysLate: daysLate(task, today, timeZone),
     focusPath: `/focus?taskId=${task.id}`,
     reason,
+    description: task.description,
+    dueAt: task.dueAt ? task.dueAt.toISOString() : null,
+    goalTitle: task.goalId ? goalTitles.get(task.goalId) ?? null : null,
   };
 }
 
-export function toBriefPayload(params: {
+const OPEN = new Set(["todo", "in_progress"]);
+
+export function toMorningPayload(params: {
   signal: DaySignal;
+  tasks: Task[];
+  goals: GoalWithCounts[];
+  habits: HabitWithSchedule[];
+  habitEntries: HabitEntry[];
+  quote: DailyQuote | null;
+  alreadyDelivered: boolean;
   today: IsoDate;
   timeZone: string;
+  weekStartsOn: Weekday;
+  isSabbath: boolean;
   now: Date;
-}): BriefPayload {
+}): MorningBriefPayload {
   const { signal, today, timeZone } = params;
-  const suggestions = signal.suggestions.map((scored: ScoredTask) =>
-    briefTask(scored.task, today, timeZone, scored.reason),
+  const goalTitles = new Map(params.goals.map((goal) => [goal.id, goal.title]));
+  const asBrief = (task: Task, reason = "") =>
+    toBriefTask(task, today, timeZone, goalTitles, reason);
+
+  /*
+   * The overdue set is complete, deliberately (Guide 01 revision highlight).
+   *
+   * It used to be capped at five. A cap here is data truncation: the API stops
+   * knowing about work the owner has already failed to do, and no downstream
+   * step can put it back. Keeping the notification readable is the narrator's
+   * problem, solved with an explicit "+N more" line, not by forgetting.
+   */
+  const overdue: BriefTask[] = [];
+  const dueToday: BriefTask[] = [];
+  const scheduledToday: BriefTask[] = [];
+
+  for (const task of params.tasks) {
+    if (!OPEN.has(task.status) || task.parentTaskId) continue;
+    const late = daysLate(task, today, timeZone);
+    if (late > 0) {
+      overdue.push(asBrief(task));
+      continue;
+    }
+    const effective = taskEffectiveDate(task, timeZone);
+    if (effective !== today) continue;
+    if (task.dueAt) dueToday.push(asBrief(task));
+    else scheduledToday.push(asBrief(task));
+  }
+
+  overdue.sort((a, b) => b.daysLate - a.daysLate || a.title.localeCompare(b.title));
+
+  const views = buildHabitViews({
+    habits: params.habits,
+    entries: params.habitEntries,
+    today,
+    weekStartsOn: params.weekStartsOn,
+    timeZone,
+  });
+
+  const habitsToday: BriefHabit[] = views
+    .filter((view) => view.scheduledToday)
+    .map((view) => ({
+      id: view.habit.id,
+      name: view.habit.name,
+      state: view.todayState as BriefHabit["state"],
+      currentStreak: view.streaks.current,
+      targetValue: view.habit.targetValue === null ? null : Number(view.habit.targetValue),
+      unit: view.habit.unit,
+    }));
+
+  const activeGoals: BriefGoal[] = params.goals
+    .filter((goal) => goal.status === "active" && !goal.isArchived)
+    .map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      progress: calculateGoalProgress({
+        status: goal.status,
+        progressMode: goal.progressMode,
+        manualProgress: goal.manualProgress,
+        tasks: {
+          total: goal.totalTasks,
+          completed: goal.completedTasks,
+          cancelled: goal.cancelledTasks,
+        },
+      }).percent,
+      targetDate: goal.targetDate,
+    }));
+
+  const topPriorities = signal.suggestions.map((scored: ScoredTask) =>
+    asBrief(scored.task, scored.reason),
   );
 
   return {
-    date: today,
-    timeZone,
+    localDate: today,
+    timezone: timeZone,
+    isSabbath: params.isSabbath,
     generatedAt: params.now.toISOString(),
+    quote: params.quote
+      ? {
+          text: params.quote.text,
+          attribution: params.quote.attribution,
+          translation: params.quote.translation,
+        }
+      : null,
+    recommendation: signal.headline,
+    reason: signal.detail,
     state: signal.state,
-    headline: signal.headline,
-    detail: signal.detail,
-    lateCount: signal.lateCount,
-    completedToday: signal.completedToday,
-    totalToday: signal.totalToday,
-    habitsRemaining: signal.habitsRemaining,
-    canReflect: signal.canReflect,
-    task: signal.task ? briefTask(signal.task, today, timeZone) : null,
-    suggestions,
+    topPriorities,
+    tasks: { overdue, dueToday, scheduledToday },
+    habitsToday,
+    activeGoals,
+    counts: {
+      completedToday: signal.completedToday,
+      totalToday: signal.totalToday,
+      habitsRemaining: signal.habitsRemaining,
+    },
+    alreadyDelivered: params.alreadyDelivered,
     // Nothing late, nothing to start, no habit outstanding: there is no message
-    // worth sending. "Clear" and "done" are states, not news.
+    // worth sending. Decided here so every workflow decides it the same way.
     quiet:
-      signal.lateCount === 0 &&
-      signal.habitsRemaining === 0 &&
-      signal.task === null &&
-      suggestions.length === 0,
+      overdue.length === 0 &&
+      dueToday.length === 0 &&
+      scheduledToday.length === 0 &&
+      topPriorities.length === 0 &&
+      signal.habitsRemaining === 0,
   };
 }

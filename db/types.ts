@@ -5,9 +5,10 @@
  */
 import type {
   account,
-  automationDeliveries,
   automationRequests,
   automationTokens,
+  dailyQuotes,
+  notificationLog,
   brainDumpItems,
   dailyPriorities,
   focusSessions,
@@ -77,5 +78,7 @@ export type AutomationToken = typeof automationTokens.$inferSelect;
 export type NewAutomationToken = typeof automationTokens.$inferInsert;
 export type AutomationRequest = typeof automationRequests.$inferSelect;
 export type NewAutomationRequest = typeof automationRequests.$inferInsert;
-export type AutomationDelivery = typeof automationDeliveries.$inferSelect;
-export type NewAutomationDelivery = typeof automationDeliveries.$inferInsert;
+export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type NewNotificationLogEntry = typeof notificationLog.$inferInsert;
+export type DailyQuote = typeof dailyQuotes.$inferSelect;
+export type NewDailyQuote = typeof dailyQuotes.$inferInsert;

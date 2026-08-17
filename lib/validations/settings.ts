@@ -56,3 +56,32 @@ export const rhythmSchema = z.object({
 export type ThemeValue = z.infer<typeof themeSchema>;
 export type PreferencesInput = z.input<typeof preferencesSchema>;
 export type RhythmInput = z.input<typeof rhythmSchema>;
+
+/**
+ * The automation preferences (automation Guide 00, phase A4; Guide 07, 1.2).
+ *
+ * The toggles are enforced by the API itself, not just shown here: an endpoint
+ * whose switch is off returns a silent response. A control that only works if
+ * some workflow remembers to check it is decoration.
+ */
+export const sabbathDaySchema = z.union([
+  z.literal(null),
+  z.coerce.number().int().min(0).max(6),
+]);
+
+export const quoteSourcePrefSchema = z.enum(["quote", "verse", "both"]);
+
+/** Matches the DB check constraint: 5 minutes to a full day. */
+export const deadlineLeadSchema = z.coerce.number().int().min(5).max(1440);
+
+export const automationPrefsSchema = z.object({
+  morningBriefEnabled: z.boolean(),
+  eveningSummaryEnabled: z.boolean(),
+  deadlineAlertsEnabled: z.boolean(),
+  deadlineLeadMinutes: deadlineLeadSchema,
+  quoteSourcePref: quoteSourcePrefSchema,
+  sabbathDay: sabbathDaySchema,
+});
+
+export type AutomationPrefsInput = z.input<typeof automationPrefsSchema>;
+export type QuoteSourcePrefValue = z.infer<typeof quoteSourcePrefSchema>;

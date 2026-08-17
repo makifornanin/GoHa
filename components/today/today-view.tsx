@@ -50,7 +50,7 @@ import type { TaskFormInput } from "@/lib/validations/task";
 
 import { ActiveGoalsCard } from "./active-goals-card";
 import { BrainCard } from "./brain-card";
-import { DailyQuoteCard } from "./daily-quote-card";
+import { DailyQuoteCard, type DailyQuote } from "./daily-quote-card";
 import { MomentumCard, type MomentumData } from "./momentum-card";
 import { QuickAddTask } from "./quick-add-task";
 import { TaskChecklistItem } from "./task-checklist-item";
@@ -85,6 +85,8 @@ export function TodayView({
   hour,
   allHabitEntries = [],
   weekStartsOn = 1,
+  quote = null,
+  sabbath = null,
 }: {
   userName: string;
   greetingPart: string;
@@ -105,6 +107,10 @@ export function TodayView({
   /** Full habit history, used only for streak-milestone detection. */
   allHabitEntries?: HabitEntry[];
   weekStartsOn?: Weekday;
+  /** Today's quote, already picked on the server. Null when the pool is empty. */
+  quote?: DailyQuote | null;
+  /** Set on the owner's rest day (Guide 07, phase 4). */
+  sabbath?: { message: string } | null;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -286,11 +292,20 @@ export function TodayView({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
             {/* Main column */}
             <div className="flex flex-col gap-4 md:col-span-8">
-              <BrainCard
-                signal={signal}
-                canPlan={pinnedCount < 3}
-                onOpenTask={(task) => setDetailId(task.id)}
-              />
+              {/*
+                On the rest day the recommendation and Plan My Day are gone,
+                and their absence IS the feature (Guide 07, step 4.1). Tasks
+                stay reachable through To-dos: GoHa is a nudge, not a jail.
+              */}
+              {sabbath ? (
+                <SabbathBanner message={sabbath.message} quote={quote ?? null} />
+              ) : (
+                <BrainCard
+                  signal={signal}
+                  canPlan={pinnedCount < 3}
+                  onOpenTask={(task) => setDetailId(task.id)}
+                />
+              )}
 
               <TopPriorities
                 priorities={data.priorities}
@@ -439,7 +454,7 @@ export function TodayView({
               {/* Under Momentum, per automation Guide 01 phase 1.5. Empty until
                   the quote pool exists; the slot is settled now so filling it
                   later moves nothing else on this page. */}
-              <DailyQuoteCard />
+              {sabbath ? null : <DailyQuoteCard quote={quote ?? null} />}
 
               <ActiveGoalsCard goals={data.activeGoals} />
 
@@ -502,6 +517,35 @@ function EmptyDay() {
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * The rest-day banner (automation Guide 07, phase 4).
+ *
+ * Takes the place of the recommendation card rather than sitting above it: the
+ * point of a Sabbath is that the day has nothing to rank, and a "what to do
+ * next" card underneath a rest message would argue with itself.
+ *
+ * The message is a fixed sentence, deliberately not generated. A rest reminder
+ * should be the same calm words every week.
+ */
+function SabbathBanner({ message, quote }: { message: string; quote: DailyQuote | null }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 py-5">
+        <p className="text-caption uppercase tracking-wide text-label-tertiary">Sabbath</p>
+        <p className="text-title-3 text-label">{message}</p>
+        {quote ? (
+          <div className="mt-1 border-l-2 border-separator pl-3">
+            <p className="text-body text-label-secondary">{quote.text}</p>
+            {quote.attribution ? (
+              <p className="mt-1 text-footnote text-label-tertiary">{quote.attribution}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </CardContent>
     </Card>
   );
 }

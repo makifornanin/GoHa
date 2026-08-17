@@ -46,10 +46,29 @@ const EXPIRY_OPTIONS = [
 
 const ENDPOINTS = [
   { method: "GET", path: "/api/automation", what: "Check a token and list what it can reach." },
-  { method: "GET", path: "/api/automation/brief", what: "The day's brief: the same judgement Today shows." },
-  { method: "GET", path: "/api/automation/habits", what: "Habits still open today, and streaks at risk." },
-  { method: "POST", path: "/api/automation/deliveries", what: "Claim (kind, date) once, so a repeat run sends nothing." },
+  { method: "GET", path: "/api/automation/quote/today", what: "Today's quote, and the day's context." },
+  { method: "GET", path: "/api/automation/brief/morning", what: "The morning brief: the same judgement Today shows." },
+  { method: "GET", path: "/api/automation/brief/evening", what: "How the day actually went." },
+  { method: "GET", path: "/api/automation/due", what: "Deadlines, overdue work, runaway focus, streaks at risk." },
+  { method: "GET", path: "/api/automation/graveyard", what: "Work that has stopped moving." },
+  { method: "GET", path: "/api/automation/review/week-stats", what: "The week's numbers, as Review derives them." },
+  { method: "POST", path: "/api/automation/review/draft", what: "Draft into EMPTY review fields only." },
+  { method: "POST", path: "/api/automation/log", what: "Claim a key once, so a repeat run sends nothing." },
+  { method: "POST", path: "/api/automation/brain-dump", what: "Capture a thought from Siri or a Shortcut." },
 ];
+
+/** Plain names for the notification kinds the log stores. */
+const KIND_LABEL: Record<string, string> = {
+  morning_brief: "Morning brief",
+  evening_summary: "Evening summary",
+  deadline: "Deadline alert",
+  focus_overrun: "Focus overrun",
+  streak_risk: "Streak at risk",
+  graveyard: "Graveyard sweep",
+  review_draft: "Review draft",
+  health: "Health alert",
+  sabbath: "Sabbath reminder",
+};
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
@@ -79,7 +98,7 @@ function NewTokenModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: (token: TokenSummary, secret: string) => void;
+  onCreated: (token: TokenSummary, secret: string, qrSvg: string | null) => void;
 }) {
   const [name, setName] = useState("");
   const [scope, setScope] = useState("read");
@@ -98,7 +117,7 @@ function NewTokenModal({
         return;
       }
       setName("");
-      onCreated(result.data.token, result.data.secret);
+      onCreated(result.data.token, result.data.secret, result.data.qrSvg);
     });
   }
 
@@ -164,7 +183,9 @@ export function AutomationCard({ className }: { className?: string }) {
   const [data, setData] = useState<AutomationOverview | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [secret, setSecret] = useState<{ value: string; name: string } | null>(null);
+  const [secret, setSecret] = useState<{ value: string; name: string; qrSvg: string | null } | null>(
+    null,
+  );
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -176,17 +197,17 @@ export function AutomationCard({ className }: { className?: string }) {
       } catch (error) {
         console.error("listAutomationAction failed", error);
         toast.error("Could not load your automation tokens.");
-        setData({ tokens: [], requests: [], deliveries: [] });
+        setData({ tokens: [], requests: [], sent: [], baseUrl: "" });
       }
     });
   }
 
-  function created(token: TokenSummary, value: string) {
+  function created(token: TokenSummary, value: string, qrSvg: string | null) {
     setData((current) => (current ? { ...current, tokens: [token, ...current.tokens] } : current));
     setCreating(false);
     setCopied(false);
     // The one and only time this value exists outside the caller's clipboard.
-    setSecret({ value, name: token.name });
+    setSecret({ value, name: token.name, qrSvg });
   }
 
   function revoke(token: TokenSummary) {
@@ -336,6 +357,23 @@ export function AutomationCard({ className }: { className?: string }) {
             </ul>
           )}
 
+          {data.baseUrl ? (
+            <div className="rounded-xl bg-fill-quaternary px-3 py-2.5">
+              <p className="text-footnote text-label-secondary">
+                Point your automations at
+              </p>
+              <code className="mt-0.5 block font-mono text-footnote break-all text-label select-all">
+                {data.baseUrl}
+              </code>
+              {data.baseUrl.includes("localhost") ? (
+                <p className="mt-1 text-footnote text-orange">
+                  This is a local address. Your phone and n8n cannot reach it; deploy first, then
+                  create the token you will actually use.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div>
             <h3 className="text-subhead text-label">What a token can reach</h3>
             <ul className="mt-2 flex flex-col gap-1.5">
@@ -382,23 +420,20 @@ export function AutomationCard({ className }: { className?: string }) {
             </div>
           ) : null}
 
-          {data.deliveries.length > 0 ? (
+          {data.sent.length > 0 ? (
             <div>
               <h3 className="text-subhead text-label">Sent by your automations</h3>
               <ul className="mt-2 flex flex-col">
-                {data.deliveries.map((delivery) => (
+                {data.sent.map((entry) => (
                   <li
-                    key={delivery.id}
+                    key={entry.id}
                     className="flex items-center gap-3 border-b border-separator py-1.5 text-footnote last:border-0"
                   >
                     <span className="min-w-0 flex-1 truncate text-label-secondary">
-                      {delivery.kind}
-                      {delivery.detail ? (
-                        <span className="text-label-tertiary"> · {delivery.detail}</span>
-                      ) : null}
+                      {KIND_LABEL[entry.kind] ?? entry.kind}
                     </span>
                     <span className="shrink-0 font-mono tabular-nums text-label-tertiary">
-                      {delivery.date}
+                      {entry.date}
                     </span>
                   </li>
                 ))}
@@ -421,6 +456,28 @@ export function AutomationCard({ className }: { className?: string }) {
         description="This is the only time it can be shown. GoHa stores a hash of it, so there is no copy to come back for."
       >
         <div className="flex flex-col gap-4 px-6 py-5">
+          {secret?.qrSvg ? (
+            <div className="flex flex-col items-center gap-2">
+              {/*
+                Server-rendered SVG from the `qrcode` library, so no encoder
+                reaches the browser bundle. On a white plate in both themes,
+                because a scanner needs the contrast the spec assumes and a
+                dark-mode QR code is a QR code that does not scan.
+              */}
+              <div
+                className="rounded-xl bg-white p-3 [&_svg]:block [&_svg]:size-44"
+                // Our own SVG, from our own encoder call on the server, never
+                // user input.
+                dangerouslySetInnerHTML={{ __html: secret.qrSvg }}
+                role="img"
+                aria-label="QR code containing this GoHa address and token"
+              />
+              <p className="text-footnote text-label-tertiary">
+                Point your phone&apos;s camera at this to carry the address and token across.
+              </p>
+            </div>
+          ) : null}
+
           <code className="block max-h-32 overflow-auto rounded-xl bg-fill-quaternary px-3 py-2.5 font-mono text-footnote break-all text-label select-all">
             {secret?.value}
           </code>

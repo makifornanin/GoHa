@@ -7,8 +7,8 @@ import { z } from "zod";
  */
 
 export const TOKEN_NAME_MAX = 60;
-export const DELIVERY_KIND_MAX = 60;
-export const DELIVERY_DETAIL_MAX = 500;
+export const DEDUPE_KEY_MAX = 200;
+export const BRAIN_DUMP_MAX = 2000;
 
 /** A local calendar date, never an instant (CLAUDE.md section 6). */
 export const isoDateSchema = z
@@ -17,32 +17,61 @@ export const isoDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a local date in YYYY-MM-DD form.")
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), "That is not a real date.");
 
-/**
- * The name an automation gives what it sends. Constrained to a slug so the
- * ledger stays groupable: "morning-brief" and "Morning Brief " must not become
- * two different kinds that both think they are first.
- */
-export const deliveryKindSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .min(1, "Name what you are sending, e.g. \"morning-brief\".")
-  .max(DELIVERY_KIND_MAX, `Keep the kind under ${DELIVERY_KIND_MAX} characters.`)
-  .regex(/^[a-z0-9][a-z0-9-]*$/, "Use lowercase letters, numbers and hyphens.");
+/** The kinds the log accepts, matching the `notification_kind` enum. */
+export const notificationKindSchema = z.enum([
+  "morning_brief",
+  "evening_summary",
+  "deadline",
+  "focus_overrun",
+  "streak_risk",
+  "graveyard",
+  "review_draft",
+  "health",
+  "sabbath",
+]);
 
-export const claimDeliverySchema = z.object({
-  kind: deliveryKindSchema,
-  /** Optional: defaults to the owner's local today, resolved on the server. */
-  date: isoDateSchema.optional(),
-  detail: z
+/**
+ * The claim itself.
+ *
+ * `dedupeKey` is free text because the scheme keys on things that are not days
+ * (`deadline:{taskId}:{dueAtIso}`, `focus:{sessionId}:overrun`). It is trimmed
+ * and length-capped, and that is all: inventing a format here would break the
+ * moment a guide adds a kind, and the uniqueness that matters is enforced by
+ * the database.
+ */
+export const claimLogSchema = z.object({
+  kind: notificationKindSchema,
+  dedupeKey: z
     .string()
     .trim()
-    .max(DELIVERY_DETAIL_MAX, `Keep the detail under ${DELIVERY_DETAIL_MAX} characters.`)
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : null)),
+    .min(1, "A dedupeKey is required so a repeat run cannot send twice.")
+    .max(DEDUPE_KEY_MAX, `Keep the dedupeKey under ${DEDUPE_KEY_MAX} characters.`),
+  /** Defaults to the OWNER's local today, resolved server-side. */
+  localDate: isoDateSchema.optional(),
+  entityType: z.string().trim().max(40).optional().nullable(),
+  entityId: z.uuid().optional().nullable(),
+  /** What was sent. Read back for repeat detection (Guide 05, step 1.4). */
+  payload: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
-export type ClaimDeliveryInput = z.infer<typeof claimDeliverySchema>;
+export type ClaimLogInput = z.infer<typeof claimLogSchema>;
+
+/** Voice capture from a Shortcut, straight into the Brain Dump inbox. */
+export const brainDumpCaptureSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "Nothing to capture.")
+    .max(BRAIN_DUMP_MAX, `Keep it under ${BRAIN_DUMP_MAX} characters.`),
+});
+
+/** The AI's weekly review draft. Length-capped so the '[AI draft] ' prefix fits. */
+export const reviewDraftSchema = z.object({
+  weekStart: isoDateSchema,
+  wins: z.string().trim().min(1).max(1500).optional().nullable(),
+  challenges: z.string().trim().min(1).max(1500).optional().nullable(),
+  nextWeekFocus: z.string().trim().min(1).max(1500).optional().nullable(),
+});
 
 export const tokenNameSchema = z
   .string()

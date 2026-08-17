@@ -7,10 +7,12 @@ import { settingsRepo } from "@/db";
 import { auth } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import {
+  automationPrefsSchema,
   displayNameSchema,
   preferencesSchema,
   rhythmSchema,
   themeSchema,
+  type AutomationPrefsInput,
   type PreferencesInput,
   type RhythmInput,
   type ThemeValue,
@@ -95,6 +97,32 @@ export async function updatePreferencesAction(input: PreferencesInput): Promise<
     return { ok: true };
   } catch (error) {
     console.error("updatePreferencesAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Persist the automation preferences.
+ *
+ * Unlike the rhythm times, these are enforced: `morningBriefEnabled` off means
+ * `/api/automation/brief/morning` returns a silent response, and a Sabbath day
+ * makes every work endpoint go quiet on that weekday. The switch does the thing
+ * it says (automation Guide 00, phase B).
+ */
+export async function updateAutomationPrefsAction(
+  input: AutomationPrefsInput,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = automationPrefsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? GENERIC_ERROR };
+
+  try {
+    await settingsRepo.updateUserSettings(user.id, parsed.data);
+    revalidatePath("/settings");
+    revalidatePath("/today");
+    return { ok: true };
+  } catch (error) {
+    console.error("updateAutomationPrefsAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }

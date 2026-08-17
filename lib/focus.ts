@@ -68,8 +68,15 @@ export const ABANDON_MAX_SECONDS = 4 * 60 * 60;
  * `countedFocusSeconds`), so this changes when the session closes, never how
  * much time it is credited with. The countdown is shown on screen the whole
  * time, and any extend pushes the plan out and resets it.
+ *
+ * THIRTY minutes, not ten, and the difference is deliberate. The automation
+ * layer alerts on a runaway session at ten minutes past its plan
+ * (`FOCUS_OVERRUN_GRACE_SECONDS` in `lib/automation/due.ts`). If auto-end fired
+ * at the same moment, the session would close as the alert was being composed
+ * and the notification would arrive about a session that had already ended.
+ * The nudge comes first; this is the backstop for when nobody acts on it.
  */
-export const FOCUS_AUTO_END_GRACE_SECONDS = 10 * 60;
+export const FOCUS_AUTO_END_GRACE_SECONDS = 30 * 60;
 
 /** Seconds run past the plan. 0 when there is no plan or it has not been reached. */
 export function focusOvertimeSeconds(
