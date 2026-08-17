@@ -16,5 +16,6 @@ export * as dailyPrioritiesRepo from "./daily-priorities";
 export * as taskMapsRepo from "./task-maps";
 export * as reviewsRepo from "./reviews";
 export * as settingsRepo from "./settings";
+export * as appSettingsRepo from "./app-settings";
 export * as automationRepo from "./automation";
 export * as quotesRepo from "./quotes";

@@ -74,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
     const saved = [];
     for (const quote of parsed.data.quotes) {
       saved.push(
-        await quotesRepo.upsertQuote({
+        await quotesRepo.upsertQuote(auth.userId, {
           source: quote.source,
           text: quote.text,
           attribution: quote.attribution,
@@ -87,7 +87,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const status = await quotesRepo.quotePoolStatus();
+    const status = await quotesRepo.quotePoolStatus(auth.userId);
 
     return await finishAutomation(
       auth,
@@ -125,8 +125,8 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const [status, pinnedToday] = await Promise.all([
-      quotesRepo.quotePoolStatus(),
-      quotesRepo.getPinnedQuote(auth.context.localDate),
+      quotesRepo.quotePoolStatus(auth.userId),
+      quotesRepo.getPinnedQuote(auth.userId, auth.context.localDate),
     ]);
 
     return await finishAutomation(

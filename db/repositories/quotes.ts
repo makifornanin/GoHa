@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 
 import type { IsoDate } from "@/lib/date";
 import { db } from "../client";
@@ -18,30 +18,44 @@ import type { DailyQuote } from "../types";
  * moment Postgres returned the rows differently.
  */
 
-export async function listActiveQuotes(sources: QuoteSource[]): Promise<DailyQuote[]> {
+/**
+ * The pool a person actually sees: their own entries plus anything shared.
+ *
+ * `userId` is required rather than optional. An accidental call without it
+ * would quietly return everyone's quotes, which is the exact leak this scoping
+ * exists to prevent, and a parameter that is easy to forget is one that will be.
+ */
+export async function listActiveQuotes(
+  userId: string,
+  sources: QuoteSource[],
+): Promise<DailyQuote[]> {
   if (sources.length === 0) return [];
   return db
     .select()
     .from(dailyQuotes)
-    .where(and(eq(dailyQuotes.active, true), inArray(dailyQuotes.source, sources)))
+    .where(
+      and(
+        eq(dailyQuotes.active, true),
+        inArray(dailyQuotes.source, sources),
+        or(eq(dailyQuotes.userId, userId), isNull(dailyQuotes.userId)),
+      ),
+    )
     .orderBy(asc(dailyQuotes.createdAt), asc(dailyQuotes.id));
 }
 
 /** The rest-themed pool the Sabbath message draws from (Guide 07, step 3.1). */
-export async function listRestQuotes(): Promise<DailyQuote[]> {
+export async function listRestQuotes(userId: string): Promise<DailyQuote[]> {
   return db
     .select()
     .from(dailyQuotes)
-    .where(and(eq(dailyQuotes.active, true), eq(dailyQuotes.theme, "rest")))
+    .where(
+      and(
+        eq(dailyQuotes.active, true),
+        eq(dailyQuotes.theme, "rest"),
+        or(eq(dailyQuotes.userId, userId), isNull(dailyQuotes.userId)),
+      ),
+    )
     .orderBy(asc(dailyQuotes.createdAt), asc(dailyQuotes.id));
-}
-
-export async function countActiveQuotes(): Promise<number> {
-  const rows = await db
-    .select({ id: dailyQuotes.id })
-    .from(dailyQuotes)
-    .where(eq(dailyQuotes.active, true));
-  return rows.length;
 }
 
 /**
@@ -51,11 +65,19 @@ export async function countActiveQuotes(): Promise<number> {
  * the day from somewhere else has named this exact row for this exact date, and
  * that beats a hash over the pool.
  */
-export async function getPinnedQuote(date: IsoDate): Promise<DailyQuote | null> {
+export async function getPinnedQuote(userId: string, date: IsoDate): Promise<DailyQuote | null> {
   const [row] = await db
     .select()
     .from(dailyQuotes)
-    .where(and(eq(dailyQuotes.active, true), eq(dailyQuotes.pinnedFor, date)))
+    .where(
+      and(
+        eq(dailyQuotes.active, true),
+        eq(dailyQuotes.pinnedFor, date),
+        // Own pin first; a shared pin applies to anyone without one.
+        or(eq(dailyQuotes.userId, userId), isNull(dailyQuotes.userId)),
+      ),
+    )
+    .orderBy(asc(dailyQuotes.userId))
     .limit(1);
   return row ?? null;
 }
@@ -70,24 +92,32 @@ export async function getPinnedQuote(date: IsoDate): Promise<DailyQuote | null> 
  * source is a human act, and neither a script nor an HTTP request is that
  * human (BUILD_PLAN hard rule 6).
  */
-export async function upsertQuote(input: {
-  source: QuoteSource;
-  text: string;
-  attribution?: string | null;
-  translation?: string | null;
-  theme?: string | null;
-  pinnedFor?: IsoDate | null;
-}): Promise<DailyQuote> {
+export async function upsertQuote(
+  userId: string,
+  input: {
+    source: QuoteSource;
+    text: string;
+    attribution?: string | null;
+    translation?: string | null;
+    theme?: string | null;
+    pinnedFor?: IsoDate | null;
+  },
+): Promise<DailyQuote> {
   const values = {
     attribution: input.attribution ?? null,
     translation: input.translation ?? null,
     theme: input.theme ?? null,
   };
 
+  // Written into the caller's own pool, never the shared one: a push arrives
+  // with a token, a token belongs to a person, and that is whose quote it is.
   const [row] = await db
     .insert(dailyQuotes)
-    .values({ source: input.source, text: input.text, ...values })
-    .onConflictDoUpdate({ target: [dailyQuotes.source, dailyQuotes.text], set: values })
+    .values({ userId, source: input.source, text: input.text, ...values })
+    .onConflictDoUpdate({
+      target: [dailyQuotes.userId, dailyQuotes.source, dailyQuotes.text],
+      set: values,
+    })
     .returning();
 
   if (!input.pinnedFor) return row;
@@ -104,7 +134,13 @@ export async function upsertQuote(input: {
   await db
     .update(dailyQuotes)
     .set({ pinnedFor: null })
-    .where(and(eq(dailyQuotes.pinnedFor, input.pinnedFor), ne(dailyQuotes.id, row.id)));
+    .where(
+      and(
+        eq(dailyQuotes.userId, userId),
+        eq(dailyQuotes.pinnedFor, input.pinnedFor),
+        ne(dailyQuotes.id, row.id),
+      ),
+    );
 
   const [pinned] = await db
     .update(dailyQuotes)
@@ -125,7 +161,7 @@ export async function setQuoteActive(id: string, active: boolean): Promise<Daily
 }
 
 /** Pool status, for an automation deciding whether it needs to send anything. */
-export async function quotePoolStatus(): Promise<{
+export async function quotePoolStatus(userId: string): Promise<{
   total: number;
   active: number;
   rest: number;
@@ -137,7 +173,8 @@ export async function quotePoolStatus(): Promise<{
       theme: dailyQuotes.theme,
       pinnedFor: dailyQuotes.pinnedFor,
     })
-    .from(dailyQuotes);
+    .from(dailyQuotes)
+    .where(or(eq(dailyQuotes.userId, userId), isNull(dailyQuotes.userId)));
 
   const today = new Date().toISOString().slice(0, 10);
   return {

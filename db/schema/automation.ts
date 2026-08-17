@@ -8,8 +8,10 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
 import { user } from "./auth";
@@ -156,6 +158,16 @@ export const dailyQuotes = pgTable(
   "daily_quotes",
   {
     id: primaryId(),
+    /**
+     * Whose pool this belongs to. NULL means shared: content that everyone on
+     * this install can be shown.
+     *
+     * It was shared by default when GoHa had one account, which was the same
+     * thing. With more than one, an automation pushing verses would otherwise
+     * change what everybody else reads in the morning, which is not a small
+     * surprise to hand someone.
+     */
+    userId: uuid().references(() => user.id, { onDelete: "cascade" }),
     source: quoteSource().notNull(),
     text: text().notNull(),
     /** "Proverbs 16:3 (WEB)", "Annie Dillard". Null only for anonymous quotes. */
@@ -183,9 +195,23 @@ export const dailyQuotes = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // Upserts key on this, so re-posting the same text never duplicates.
-    unique("daily_quotes_source_text_uq").on(t.source, t.text),
-    unique("daily_quotes_pinned_for_uq").on(t.pinnedFor),
+    /*
+     * Upserts key on this, so re-posting the same text never duplicates.
+     *
+     * The owner is part of the key: two people may well save the same verse,
+     * and one of them arriving second must not silently rewrite the other's row.
+     * Postgres treats NULLs as distinct in a unique constraint, so the shared
+     * pool is handled by the partial index below instead.
+     */
+    unique("daily_quotes_user_source_text_uq").on(t.userId, t.source, t.text),
+    uniqueIndex("daily_quotes_shared_source_text_uq")
+      .on(t.source, t.text)
+      .where(sql`${t.userId} is null`),
+    // A date holds one pinned quote PER PERSON, for the same reason.
+    uniqueIndex("daily_quotes_user_pinned_for_uq")
+      .on(t.userId, t.pinnedFor)
+      .where(sql`${t.pinnedFor} is not null`),
     index("daily_quotes_active_theme_idx").on(t.active, t.theme),
+    index("daily_quotes_user_idx").on(t.userId),
   ],
 );
