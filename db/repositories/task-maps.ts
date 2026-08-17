@@ -114,6 +114,8 @@ export type TaskMapNodeInput = {
   taskId?: string | null;
   nodeType?: TaskMapNodeType;
   label?: string | null;
+  /** The node's body text (what a Note node is actually for). */
+  note?: string | null;
   positionX?: number;
   positionY?: number;
   width?: number | null;
@@ -207,6 +209,23 @@ export async function countNodesInMap(
 }
 
 // --- Edges ---
+
+/**
+ * Rename a connection. User-scoped, so a stale client id can never relabel
+ * another owner's edge.
+ */
+export async function updateTaskMapEdge(
+  userId: string,
+  id: string,
+  input: { label?: string | null; data?: unknown },
+): Promise<TaskMapEdge | null> {
+  const [row] = await db
+    .update(taskMapEdges)
+    .set({ ...input, updatedAt: new Date() })
+    .where(and(eq(taskMapEdges.id, id), eq(taskMapEdges.userId, userId)))
+    .returning();
+  return row ?? null;
+}
 
 /**
  * Create an edge between two nodes of a map. Idempotent on the

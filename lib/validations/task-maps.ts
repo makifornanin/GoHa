@@ -5,6 +5,7 @@ import {
   LEGEND_LABEL_MAX,
   NODE_COLOR_KEYS,
   NODE_LABEL_MAX,
+  NODE_NOTE_MAX,
   TASK_MAP_DESCRIPTION_MAX,
   TASK_MAP_NAME_MAX,
   TASK_MAP_NODE_TYPES,
@@ -53,10 +54,19 @@ export const viewportSchema = z.object({
 
 export const nodeColorSchema = z.enum(NODE_COLOR_KEYS).default(DEFAULT_NODE_COLOR);
 
+/** A node's body text; blank normalises to null so an emptied field clears. */
+export const nodeNoteSchema = z
+  .string()
+  .trim()
+  .max(NODE_NOTE_MAX, `Keep the note under ${NODE_NOTE_MAX} characters.`)
+  .nullish()
+  .transform((v) => (v ? v : null));
+
 export const createNodeSchema = z.object({
   taskMapId: taskMapIdSchema,
   nodeType: nodeTypeSchema.default("task"),
   label: nodeLabelSchema,
+  note: nodeNoteSchema,
   color: nodeColorSchema,
   taskId: z.uuid().nullish().transform((v) => v ?? null),
   positionX: finiteNumber,
@@ -65,10 +75,19 @@ export const createNodeSchema = z.object({
 
 export const updateNodeSchema = z.object({
   label: nodeLabelSchema,
+  note: nodeNoteSchema,
   nodeType: nodeTypeSchema.optional(),
   color: nodeColorSchema,
   taskId: z.uuid().nullish().transform((v) => v ?? null),
 });
+
+/** Rename a connection, e.g. the "Yes" / "No" leaving a decision. */
+export const edgeLabelSchema = z
+  .string()
+  .trim()
+  .max(40, "Keep the connection label under 40 characters.")
+  .nullish()
+  .transform((v) => (v ? v : null));
 
 /**
  * The map's colour legend: colour key -> the user's own label.

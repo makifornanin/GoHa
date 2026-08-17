@@ -8,6 +8,7 @@ import {
   createEdgeSchema,
   createNodeSchema,
   edgeIdSchema,
+  edgeLabelSchema,
   importTasksSchema,
   legendSchema,
   moveNodesSchema,
@@ -164,6 +165,7 @@ export async function addNodeAction(input: CreateNodeInput): Promise<ActionResul
       taskId,
       data: { color },
     });
+    revalidatePath("/task-maps");
     return { ok: true, data: created };
   } catch (error) {
     console.error("addNodeAction failed", error);
@@ -191,6 +193,7 @@ export async function updateNodeAction(
       data: { color },
     });
     if (!node) return fail("That node could not be found.");
+    revalidatePath("/task-maps");
     return { ok: true, data: node };
   } catch (error) {
     console.error("updateNodeAction failed", error);
@@ -315,6 +318,45 @@ export async function importTasksAction(
     console.error("importTasksAction failed", error);
     return fail(GENERIC_ERROR);
   }
+}
+
+/**
+ * Rename a connection. The label is what turns a decision node into an actual
+ * branch: the answers live on the edges leaving it ("Yes", "No", "if blocked").
+ */
+export async function updateEdgeLabelAction(
+  id: string,
+  label: string | null,
+): Promise<ActionResult<TaskMapEdge>> {
+  const user = await requireUser();
+  const idResult = edgeIdSchema.safeParse(id);
+  if (!idResult.success) return fail(idResult.error.issues[0]?.message);
+  const parsed = edgeLabelSchema.safeParse(label);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message);
+
+  try {
+    const edge = await taskMapsRepo.updateTaskMapEdge(user.id, idResult.data, {
+      label: parsed.data,
+    });
+    if (!edge) return fail("That connection could not be found.");
+    return { ok: true, data: edge };
+  } catch (error) {
+    console.error("updateEdgeLabelAction failed", error);
+    return fail(GENERIC_ERROR);
+  }
+}
+
+/**
+ * Persist a whole tidy-up in one write.
+ *
+ * Auto-layout moves every node at once, and firing one request per node would
+ * be dozens of round trips with a half-arranged map if any of them failed.
+ * Reuses the batched, map-scoped position update the drag handler already uses.
+ */
+export async function layoutMapAction(
+  input: MoveNodesInput,
+): Promise<ActionResult<{ updated: number }>> {
+  return moveNodesAction(input);
 }
 
 // --- Edges ---

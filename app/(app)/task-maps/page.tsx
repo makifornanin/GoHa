@@ -28,7 +28,14 @@ export default async function TaskMapsPage({
     null;
 
   const graph = activeMapId ? await taskMapsRepo.getTaskMapGraph(user.id, activeMapId) : null;
-  const taskOptions = tasks.map((t) => ({ id: t.id, title: t.title }));
+  // Status and priority travel with each task so a linked node can show the
+  // work's real state on the canvas instead of a drawing that goes stale.
+  const taskOptions = tasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    priority: t.priority,
+  }));
 
   return (
     <div className="space-y-6">
