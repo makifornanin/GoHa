@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FocusSession, HabitEntry, Task } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
+import { habitCompletionRate, habitHeatmap } from "@/lib/progress";
 import { deriveReviewStats, weekBounds } from "@/lib/review";
 
 const TZ = "Asia/Manila";
@@ -200,6 +201,58 @@ describe("deriveReviewStats", () => {
     expect(stats.habitDaysScheduled).toBe(7);
     expect(stats.habitDaysDone).toBe(2);
     expect(stats.habitRate).toBe(29);
+  });
+
+  /*
+   * Review derives habit consistency by calling habitHeatmap, so it inherits
+   * the R-06 fix rather than implementing anything itself. That inheritance is
+   * the thing worth pinning: if Review ever grows its own habit counting, these
+   * fail and say so.
+   */
+  describe("R-06: numeric habits in the weekly numbers", () => {
+    const numeric = {
+      ...habit,
+      id: "h2",
+      name: "Water",
+      type: "numeric",
+      targetValue: "8",
+      higherIsBetter: true,
+      schedule: { ...habit.schedule, id: "s2", habitId: "h2" },
+    } as HabitWithSchedule;
+
+    function numericEntry(entryDate: string, value: string): HabitEntry {
+      return { ...entry(entryDate), id: `n-${entryDate}`, habitId: "h2", value } as HabitEntry;
+    }
+
+    it("excludes a below-target day from habitDaysDone", () => {
+      const stats = deriveReviewStats({
+        ...base,
+        tasks: [],
+        habits: [numeric],
+        // Monday met the target, Tuesday fell short. Both are stored as `done`.
+        habitEntries: [numericEntry("2026-08-10", "8"), numericEntry("2026-08-11", "4")],
+      });
+      expect(stats.habitDaysScheduled).toBe(7);
+      expect(stats.habitDaysDone).toBe(1);
+      expect(stats.habitRate).toBe(14);
+    });
+
+    it("agrees with the Progress heatmap for the same inputs", () => {
+      // The point of the finding: these two surfaces must not disagree.
+      const entries = [numericEntry("2026-08-10", "8"), numericEntry("2026-08-11", "4")];
+      const stats = deriveReviewStats({ ...base, tasks: [], habits: [numeric], habitEntries: entries });
+      const cells = habitHeatmap({
+        habits: [numeric],
+        entries,
+        from: WEEK.start,
+        to: WEEK.end,
+        today: TODAY,
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      expect(stats.habitDaysDone).toBe(cells.reduce((sum, c) => sum + c.done, 0));
+      expect(stats.habitRate).toBe(habitCompletionRate(cells));
+    });
   });
 
   it("counts goals completed inside the week", () => {
