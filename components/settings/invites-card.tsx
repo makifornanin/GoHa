@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   createInviteAction,
   deleteInviteAction,
-  listInvitesAction,
   revokeInviteAction,
   setSignupModeAction,
   type InviteSummary,
@@ -130,9 +129,19 @@ function NewInviteModal({
  * has been user-scoped since the first migration, so this is a statement about
  * how the data already works rather than a promise about how it will.
  */
-export function InvitesCard({ className }: { className?: string }) {
-  const [data, setData] = useState<PeopleOverview | null>(null);
-  const [open, setOpen] = useState(false);
+export function InvitesCard({
+  initial,
+  className,
+}: {
+  /**
+   * Loaded on the server with the page. This card is settings, and settings
+   * should be readable the moment the page is, without a click to reveal them
+   * or a spinner where the answer should be.
+   */
+  initial: PeopleOverview;
+  className?: string;
+}) {
+  const [data, setData] = useState<PeopleOverview>(initial);
   const [creating, setCreating] = useState(false);
   const [issued, setIssued] = useState<{
     link: string;
@@ -141,19 +150,6 @@ export function InvitesCard({ className }: { className?: string }) {
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  function load() {
-    setOpen(true);
-    startTransition(async () => {
-      try {
-        setData(await listInvitesAction());
-      } catch (error) {
-        console.error("listInvitesAction failed", error);
-        toast.error("Could not load your invitations.");
-        setData({ invites: [], signupMode: "invite_only", isOwner: false });
-      }
-    });
-  }
 
   function created(
     invite: InviteSummary,
@@ -217,20 +213,7 @@ export function InvitesCard({ className }: { className?: string }) {
         </div>
       </div>
 
-      {!open ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-xl text-callout text-label-secondary">
-            Anyone with an invitation can create an account. Without one, sign-up is closed, which
-            is what keeps a public address from becoming a public sign-up page.
-          </p>
-          <Button variant="secondary" onClick={load} loading={pending}>
-            Show invitations
-          </Button>
-        </div>
-      ) : data === null ? (
-        <p className="py-4 text-center text-callout text-label-secondary">Loading...</p>
-      ) : (
-        <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5">
           {/*
             Who may sign up at all. Owner only, and enforced server-side: this
             is the one setting in GoHa that is about everyone rather than about
@@ -366,8 +349,7 @@ export function InvitesCard({ className }: { className?: string }) {
               ))}
             </ul>
           )}
-        </div>
-      )}
+      </div>
 
       <NewInviteModal
         open={creating}

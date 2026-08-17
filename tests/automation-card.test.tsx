@@ -61,9 +61,8 @@ describe("Automation card", () => {
   it("shows the secret once, and never again", async () => {
     const user = userEvent.setup();
     createAction.mockResolvedValue({ ok: true, data: { token: token(), secret: SECRET, qrSvg: null } });
-    render(<AutomationCard />);
+    render(<AutomationCard initial={overview()} />);
 
-    await user.click(screen.getByRole("button", { name: /show tokens/i }));
     await user.click(await screen.findByRole("button", { name: /new token/i }));
     await user.type(screen.getByLabelText(/^name$/i), "n8n morning brief");
     await user.click(screen.getByRole("button", { name: /create token/i }));
@@ -82,9 +81,8 @@ describe("Automation card", () => {
 
   it("does not create a token without a name", async () => {
     const user = userEvent.setup();
-    render(<AutomationCard />);
+    render(<AutomationCard initial={overview()} />);
 
-    await user.click(screen.getByRole("button", { name: /show tokens/i }));
     await user.click(await screen.findByRole("button", { name: /new token/i }));
 
     expect(screen.getByRole("button", { name: /create token/i })).toBeDisabled();
@@ -97,9 +95,8 @@ describe("Automation card", () => {
       ok: true,
       data: { token: token({ scope: "read_write" }), secret: SECRET, qrSvg: null },
     });
-    render(<AutomationCard />);
+    render(<AutomationCard initial={overview()} />);
 
-    await user.click(screen.getByRole("button", { name: /show tokens/i }));
     await user.click(await screen.findByRole("button", { name: /new token/i }));
     await user.type(screen.getByLabelText(/^name$/i), "n8n deliveries");
 
@@ -122,12 +119,10 @@ describe("Automation card", () => {
 
   it("revokes without deleting, then offers deletion", async () => {
     const user = userEvent.setup();
-    listAction.mockResolvedValue(overview({ tokens: [token()] }));
     revokeAction.mockResolvedValue({ ok: true, data: { id: "t1" } });
     deleteAction.mockResolvedValue({ ok: true, data: { id: "t1" } });
-    render(<AutomationCard />);
+    render(<AutomationCard initial={overview({ tokens: [token()] })} />);
 
-    await user.click(screen.getByRole("button", { name: /show tokens/i }));
     await user.click(await screen.findByRole("button", { name: /revoke/i }));
 
     await waitFor(() => expect(revokeAction).toHaveBeenCalledWith("t1"));
@@ -140,14 +135,4 @@ describe("Automation card", () => {
     await waitFor(() => expect(screen.queryByText("n8n morning brief")).not.toBeInTheDocument());
   });
 
-  it("survives a failed load rather than showing an empty promise", async () => {
-    const user = userEvent.setup();
-    listAction.mockRejectedValue(new Error("network gone"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<AutomationCard />);
-
-    await user.click(screen.getByRole("button", { name: /show tokens/i }));
-
-    expect(await screen.findByText(/no tokens yet/i)).toBeInTheDocument();
-  });
 });
