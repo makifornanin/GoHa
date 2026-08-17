@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { hashPassword } from "better-auth/crypto";
 
+import { requireTestDatabase } from "./lib/require-test-db.mts";
+
 /**
  * Creates (or removes) an ISOLATED end-to-end test account.
  *
@@ -15,10 +17,15 @@ import { hashPassword } from "better-auth/crypto";
  * user-scoped account whose data never mixes with the owner's.
  *
  *   pnpm test:account:create   -> create the account
+ *   pnpm test:account:reset    -> empty its content, keep the account
  *   pnpm test:account:destroy  -> delete it and everything it owns (cascade)
  *
- * The password is a local, non-secret test constant and never touches the
- * owner's credentials.
+ * Every mode writes, and `destroy` cascades, so the whole script is gated by
+ * `requireTestDatabase()` below: it refuses to run unless DATABASE_URL is
+ * visibly a test database (audit R-02). Credentials default to the local
+ * harness constants and can be overridden with E2E_EMAIL / E2E_PASSWORD /
+ * E2E_NAME, which is what e2e/auth.setup.ts already reads, so the two stay in
+ * step when a different account is used.
  */
 function loadEnv(file: string) {
   const path = resolve(process.cwd(), file);
@@ -35,11 +42,22 @@ function loadEnv(file: string) {
 }
 loadEnv(".env.local");
 
+/**
+ * Refuse to touch anything unless the target is a test database. Runs before
+ * the client is constructed, so a blocked invocation never opens a connection.
+ */
+requireTestDatabase("pnpm test:account:*");
+
 const sql = neon(process.env.DATABASE_URL!);
 
-export const TEST_EMAIL = "e2e.harness@goha.test";
-export const TEST_PASSWORD = "goha-e2e-harness-pw";
-const TEST_NAME = "E2E Harness";
+/**
+ * Harness identity. The defaults are local, non-secret test constants shared
+ * with e2e/auth.setup.ts; the env overrides let a different database use a
+ * different account without editing either file.
+ */
+export const TEST_EMAIL = process.env.E2E_EMAIL ?? "e2e.harness@goha.test";
+export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? "goha-e2e-harness-pw";
+const TEST_NAME = process.env.E2E_NAME ?? "E2E Harness";
 
 const mode = process.argv[2];
 
@@ -101,7 +119,7 @@ if (mode === "destroy") {
 } else {
   const existing = await sql`select id from "user" where email = ${TEST_EMAIL}`;
   if (existing.length > 0) {
-    console.log("Test account already exists:", TEST_EMAIL);
+    console.log("Test account already exists.");
   } else {
     const userId = randomUUID();
     const hash = await hashPassword(TEST_PASSWORD);
@@ -114,10 +132,18 @@ if (mode === "destroy") {
       insert into "account" (id, account_id, provider_id, user_id, password, created_at, updated_at)
       values (${randomUUID()}, ${userId}, 'credential', ${userId}, ${hash}, now(), now())
     `;
-    console.log("Created isolated test account:", TEST_EMAIL);
+    console.log("Created isolated test account.");
   }
 
-  // Confirm the owner account is untouched.
-  const users = await sql`select email from "user" order by created_at`;
-  console.log("accounts now present:", users.map((u) => u.email).join(", "));
+  /*
+   * Structural confirmation only.
+   *
+   * This used to print every address in the `user` table, which put the
+   * owner's real email into terminal output, CI logs and any screenshot of
+   * them (audit R-21). The useful signal was never the addresses; it was
+   * "did I just add a second account to something that should have one".
+   * A count answers that without disclosing anything.
+   */
+  const [{ n }] = await sql`select count(*)::int as n from "user"`;
+  console.log(`accounts present: ${n}`);
 }

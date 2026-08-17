@@ -8,12 +8,18 @@ import { defineConfig, devices } from "@playwright/test";
  * or logging in if it already exists) and saves the session; the `chromium`
  * project reuses that storage state. By default Playwright starts the dev server
  * itself; point E2E_BASE_URL at an already-running instance to skip that.
+ *
+ * The suite is DESTRUCTIVE: it resets domain tables and creates/deletes real
+ * rows. `globalSetup` therefore refuses to start unless DATABASE_URL points at
+ * a database marked as a test database (audit R-02). See
+ * scripts/lib/require-test-db.mts for the exact rule and the override.
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
