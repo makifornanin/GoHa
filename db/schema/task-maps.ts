@@ -59,6 +59,14 @@ export const taskMapNodes = pgTable(
     nodeType: taskMapNodeType().notNull().default("task"),
     /** Label for non-task nodes, or an override for task nodes. */
     label: text(),
+    /**
+     * The node's body text.
+     *
+     * A "Note" node with only a label was a note you could not write a note in.
+     * This is CONTENT, so it gets a real column rather than living in the
+     * `data` jsonb below, which is documented as presentation-only.
+     */
+    note: text(),
     positionX: doublePrecision().notNull().default(0),
     positionY: doublePrecision().notNull().default(0),
     width: doublePrecision(),

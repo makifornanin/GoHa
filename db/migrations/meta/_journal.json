@@ -71,6 +71,13 @@
       "when": 1786563003025,
       "tag": "0009_shiny_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786602704295,
+      "tag": "0010_jazzy_husk",
+      "breakpoints": true
     }
   ]
 }

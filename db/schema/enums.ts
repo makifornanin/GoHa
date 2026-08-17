@@ -89,12 +89,22 @@ export const themePreference = pgEnum("theme_preference", [
   "system",
 ]);
 
-/** Kind of node placed on a Task Map canvas. */
+/**
+ * Kind of node placed on a Task Map canvas.
+ *
+ * Four types could only draw a flat list of boxes. `decision`, `blocker` and
+ * `phase` are what a map needs to express a ROUTE rather than an inventory: a
+ * branch point, a thing in the way, and a stage that groups the rest. Between
+ * them they cover both readings of a map, an automation flow and a roadmap.
+ */
 export const taskMapNodeType = pgEnum("task_map_node_type", [
   "task",
   "note",
   "group",
   "milestone",
+  "decision",
+  "blocker",
+  "phase",
 ]);
 
 /** String-union types derived from the enums above, for use in inputs and the seam. */
