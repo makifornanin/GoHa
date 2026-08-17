@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { spring } from "@/lib/motion";
+import { safeRedirectPath } from "@/lib/redirect";
 import { useMounted } from "@/lib/use-mounted";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -41,9 +42,15 @@ const registerSchema = z.object({
 export function AuthForm({
   mode,
   redirectTo,
+  canBootstrap = true,
 }: {
   mode: "login" | "register";
   redirectTo?: string;
+  /**
+   * Whether the owner account can still be created. False once one exists, so
+   * the login screen stops offering a route that always fails.
+   */
+  canBootstrap?: boolean;
 }) {
   const isLogin = mode === "login";
   const router = useRouter();
@@ -51,7 +58,9 @@ export function AuthForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/today";
+  // Shared with the server component. A startsWith("/") test accepted
+  // //attacker.example, which the browser resolves off-site (audit R-09).
+  const target = safeRedirectPath(redirectTo);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -174,23 +183,28 @@ export function AuthForm({
         </Button>
       </form>
 
-      <p className="mt-8 text-center text-callout text-label-secondary">
-        {isLogin ? (
-          <>
-            First time setting up GoHa?{" "}
-            <Link className="font-medium text-blue hover:underline" href="/register">
-              Create the owner account
-            </Link>
-          </>
-        ) : (
-          <>
-            Already set up?{" "}
-            <Link className="font-medium text-blue hover:underline" href="/login">
-              Sign in
-            </Link>
-          </>
-        )}
-      </p>
+      {/* Nothing at all once the owner exists and we are on the sign-in
+          screen: there is no second account to create, so the only honest
+          footer is no footer. */}
+      {isLogin && !canBootstrap ? null : (
+        <p className="mt-8 text-center text-callout text-label-secondary">
+          {isLogin ? (
+            <>
+              First time setting up GoHa?{" "}
+              <Link className="font-medium text-blue hover:underline" href="/register">
+                Create the owner account
+              </Link>
+            </>
+          ) : (
+            <>
+              Already set up?{" "}
+              <Link className="font-medium text-blue hover:underline" href="/login">
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
+      )}
     </motion.div>
   );
 }
