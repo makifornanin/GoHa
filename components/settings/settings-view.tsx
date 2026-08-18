@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { AutomationCard } from "@/components/settings/automation-card";
 import type { AutomationOverview } from "@/app/(app)/settings/automation-actions";
 import type { PeopleOverview } from "@/app/(app)/settings/invite-actions";
+import { IphoneConnectionCard } from "@/components/settings/iphone-connection-card";
 import { InvitesCard } from "@/components/settings/invites-card";
 import {
   AutomationPrefsCard,
@@ -74,11 +75,13 @@ export function SettingsView({
   profile,
   settings,
   automationOverview,
+  showAdvancedAutomation,
   people,
 }: {
   profile: { name: string; email: string };
   settings: SettingsData;
   automationOverview: AutomationOverview;
+  showAdvancedAutomation: boolean;
   people: PeopleOverview;
 }) {
   return (
@@ -93,7 +96,11 @@ export function SettingsView({
       <SecurityCard />
       <AutomationPrefsCard prefs={settings.automation} />
       <InvitesCard initial={people} className="lg:col-span-2" />
-      <AutomationCard initial={automationOverview} className="lg:col-span-2" />
+      {showAdvancedAutomation ? (
+        <AutomationCard initial={automationOverview} className="lg:col-span-2" />
+      ) : (
+        <IphoneConnectionCard initial={automationOverview} className="lg:col-span-2" />
+      )}
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />
     </div>

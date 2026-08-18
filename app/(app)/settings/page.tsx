@@ -7,6 +7,8 @@ import { getUserSettingsCached } from "@/lib/user-settings";
 
 export const metadata = { title: "Settings" };
 
+const ADVANCED_AUTOMATION_EMAIL = "milcamark7@gmail.com";
+
 export default async function SettingsPage() {
   // Identity from the session; settings are read/created for this user only.
   const user = await requireUser();
@@ -49,6 +51,9 @@ export default async function SettingsPage() {
           },
         }}
         automationOverview={automation}
+        showAdvancedAutomation={
+          user.email.trim().toLowerCase() === ADVANCED_AUTOMATION_EMAIL
+        }
         people={people}
       />
     </div>
