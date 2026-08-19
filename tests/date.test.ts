@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatClockLabel,
   addDays,
   manilaBucketRange,
   manilaDayRangeUtc,
@@ -153,5 +154,28 @@ describe("manilaBucketRange", () => {
       start: "2026-10-01",
       endExclusive: "2027-01-01",
     });
+  });
+});
+
+describe("formatClockLabel", () => {
+  it("reads a stored time as a clock label", () => {
+    expect(formatClockLabel("14:30")).toBe("2:30 PM");
+    expect(formatClockLabel("14:30:00")).toBe("2:30 PM");
+    expect(formatClockLabel("09:05")).toBe("9:05 AM");
+  });
+
+  it("gets both ends of the day right", () => {
+    // The two every naive 12-hour conversion gets wrong.
+    expect(formatClockLabel("00:00")).toBe("12:00 AM");
+    expect(formatClockLabel("12:00")).toBe("12:00 PM");
+    expect(formatClockLabel("23:59")).toBe("11:59 PM");
+  });
+
+  it("returns null rather than guessing at nonsense", () => {
+    expect(formatClockLabel(null)).toBeNull();
+    expect(formatClockLabel("")).toBeNull();
+    expect(formatClockLabel("nope")).toBeNull();
+    expect(formatClockLabel("25:00")).toBeNull();
+    expect(formatClockLabel("10:99")).toBeNull();
   });
 });

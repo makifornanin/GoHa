@@ -14,7 +14,7 @@ import {
 
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Task } from "@/db";
-import { formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
+import { formatClockLabel, formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
 import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { taskPriorityConfig, taskStatusConfig } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,12 @@ export function TaskCard({
   const areaColor = lifeArea
     ? lifeAreaColorConfig[resolveColorKey(lifeArea.color, lifeArea.id)]
     : null;
-  const scheduledLabel = formatIsoDateMedium(task.scheduledFor);
+  const scheduledDate = formatIsoDateMedium(task.scheduledFor);
+  // "Aug 19, 2026 at 2:30 PM" when a start time is set, the date alone when not.
+  const scheduledLabel =
+    scheduledDate && task.scheduledTime
+      ? `${scheduledDate} at ${formatClockLabel(task.scheduledTime)}`
+      : scheduledDate;
   const dueLabel = formatZonedDateTimeMedium(task.dueAt, timeZone);
 
   return (

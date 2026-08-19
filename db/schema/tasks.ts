@@ -1,5 +1,5 @@
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { check, date, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, date, index, integer, pgTable, text, time, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { auditTimestamps, primaryId } from "./_shared";
@@ -40,6 +40,17 @@ export const tasks = pgTable(
     status: taskStatus().notNull().default("todo"),
     priority: priority().notNull().default("medium"),
     scheduledFor: date(),
+    /**
+     * An optional time of day for the planned start.
+     *
+     * Kept beside `scheduledFor` rather than folded into it: every date-bucket
+     * rule in the app reads `scheduledFor` as a local calendar DATE, and
+     * widening that column to an instant would change what "today" means in
+     * Today, Calendar, Progress, Review and the automation worker at once. The
+     * date still decides which day a task belongs to; this only says when in
+     * that day it starts, for display and ordering.
+     */
+    scheduledTime: time(),
     dueAt: timestamp({ withTimezone: true }),
     completedAt: timestamp({ withTimezone: true }),
     /** Persistent completion feedback/reflection, captured during or after done. */

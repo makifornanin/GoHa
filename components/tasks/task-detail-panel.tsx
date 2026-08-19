@@ -216,13 +216,32 @@ function TaskDetailBody({
           />
         </DetailRow>
 
-        <DetailRow label="Scheduled">
-          <Input
-            type="date"
-            aria-label="Scheduled for"
-            defaultValue={task.scheduledFor ?? ""}
-            onChange={(e) => void patch({ scheduledFor: e.target.value })}
-          />
+        <DetailRow label="Start">
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              aria-label="Start date"
+              className="flex-1"
+              defaultValue={task.scheduledFor ?? ""}
+              onChange={(e) =>
+                void patch(
+                  // Clearing the day clears the hour with it: a time with no
+                  // date has nowhere to be shown.
+                  e.target.value
+                    ? { scheduledFor: e.target.value }
+                    : { scheduledFor: "", scheduledTime: "" },
+                )
+              }
+            />
+            <Input
+              type="time"
+              aria-label="Start time"
+              className="w-[7.5rem] shrink-0"
+              disabled={!task.scheduledFor}
+              defaultValue={task.scheduledTime ? task.scheduledTime.slice(0, 5) : ""}
+              onChange={(e) => void patch({ scheduledTime: e.target.value })}
+            />
+          </div>
         </DetailRow>
 
         <DetailRow label="Due date">

@@ -288,3 +288,18 @@ export async function listHabitEntriesForDate(userId: string, date: IsoDate): Pr
     .from(habitEntries)
     .where(and(eq(habitEntries.userId, userId), eq(habitEntries.entryDate, date)));
 }
+
+/**
+ * Hard-delete an archived habit.
+ *
+ * Its schedules and its whole entry history cascade away. That history is the
+ * streak, so this is the one archive deletion that genuinely destroys a record
+ * of what someone did; the UI says so before asking. Archived rows only.
+ */
+export async function deleteHabit(userId: string, id: string): Promise<boolean> {
+  const rows = await db
+    .delete(habits)
+    .where(and(eq(habits.id, id), eq(habits.userId, userId), eq(habits.isArchived, true)))
+    .returning({ id: habits.id });
+  return rows.length > 0;
+}

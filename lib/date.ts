@@ -386,3 +386,23 @@ export function manilaBucketRange(
 ): DateRange {
   return zonedBucketRange(bucket, now, weekStartsOn, MANILA_TZ);
 }
+
+/**
+ * A stored "HH:MM[:SS]" as a readable clock label: "14:30" -> "2:30 PM".
+ *
+ * A `time` column carries no date and no zone, so this is pure formatting on
+ * the wall-clock value the user typed. It deliberately does not go through
+ * `Intl` with a fabricated date, which would drag a timezone into a value that
+ * has none and shift it by an hour across a DST boundary.
+ */
+export function formatClockLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{2}):(\d{2})/.exec(value);
+  if (!match) return null;
+  const hour24 = Number(match[1]);
+  const minute = match[2];
+  if (hour24 > 23 || Number(minute) > 59) return null;
+  const suffix = hour24 < 12 ? "AM" : "PM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${minute} ${suffix}`;
+}

@@ -11,6 +11,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Sun,
+  Trash2,
   User,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -30,6 +31,7 @@ import {
 } from "@/components/settings/automation-prefs-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
@@ -41,6 +43,7 @@ import {
   updateThemeAction,
 } from "@/app/(app)/settings/actions";
 import {
+  deleteArchivedAction,
   listArchivedAction,
   restoreArchivedAction,
   type ArchivedItem,
@@ -277,14 +280,38 @@ const ARCHIVE_LABEL: Record<ArchivedKind, string> = {
   "task-map": "Task map",
 };
 
+const DELETE_CONSEQUENCE: Record<ArchivedKind, string> = {
+  "life-area":
+    "Only the label goes. Goals, tasks and habits filed under it stay, with no life area.",
+  goal: "Its sub-goals and its progress history go with it. Linked tasks stay.",
+  habit:
+    "Its whole entry history goes with it, which means the streak. This is the one deletion here that destroys a record of something you actually did.",
+  "task-map": "Its nodes and connections go with it. Any tasks they linked to stay.",
+};
+
 function ArchiveCard({ className }: { className?: string }) {
   const router = useRouter();
   const [items, setItems] = useState<ArchivedItem[] | null>(null);
-  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState<ArchivedItem | null>(null);
   const [pending, startTransition] = useTransition();
 
+  function confirmDelete() {
+    const item = deleting;
+    if (!item) return;
+    setDeleting(null);
+    startTransition(async () => {
+      const res = await deleteArchivedAction(item.kind, item.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setItems((current) => current?.filter((i) => i.id !== item.id) ?? null);
+      toast.success(`Deleted "${item.name}"`);
+      router.refresh();
+    });
+  }
+
   function load() {
-    setOpen(true);
     startTransition(async () => {
       try {
         setItems(await listArchivedAction());
@@ -316,18 +343,16 @@ function ArchiveCard({ className }: { className?: string }) {
       description="Anything you archived, and the way to bring it back."
       className={className}
     >
-      {!open ? (
+      {items === null ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-xl text-callout text-label-secondary">
-            Archiving hides something without deleting it. Nothing here is ever lost, and habits
-            keep their full history.
+            Archiving hides something without deleting it. Restoring brings it back exactly as it
+            was, with its history intact.
           </p>
           <Button variant="secondary" onClick={load} loading={pending}>
             Show archive
           </Button>
         </div>
-      ) : items === null ? (
-        <p className="py-4 text-center text-callout text-label-secondary">Loading your archive...</p>
       ) : items.length === 0 ? (
         <p className="rounded-xl bg-fill-quaternary px-4 py-6 text-center text-callout text-label-secondary">
           Nothing is archived.
@@ -337,20 +362,56 @@ function ArchiveCard({ className }: { className?: string }) {
           {items.map((item) => (
             <li
               key={`${item.kind}-${item.id}`}
-              className="flex min-h-11 items-center gap-3 border-b border-separator py-1.5 last:border-0"
+              className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 border-b border-separator py-2 last:border-0"
             >
-              <span className="w-20 shrink-0 text-footnote uppercase text-label-tertiary">
+              <span className="w-16 shrink-0 text-caption uppercase tracking-wide text-label-tertiary">
                 {ARCHIVE_LABEL[item.kind]}
               </span>
               <span className="min-w-0 flex-1 truncate text-body text-label">{item.name}</span>
-              <Button variant="ghost" size="sm" onClick={() => restore(item)} disabled={pending}>
-                <RotateCcw className="size-3.5" aria-hidden />
-                Restore
-              </Button>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => restore(item)} disabled={pending}>
+                  <RotateCcw className="size-3.5" aria-hidden />
+                  Restore
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red hover:bg-red/10"
+                  onClick={() => setDeleting(item)}
+                  disabled={pending}
+                  aria-label={`Delete ${item.name} permanently`}
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                  Delete
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      <Modal
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        title="Delete permanently?"
+        description={deleting ? `"${deleting.name}" cannot be brought back.` : undefined}
+      >
+        <div className="flex flex-col gap-4 px-6 py-5">
+          {/* What each deletion actually takes with it. Saying "this cannot be
+              undone" is true of everything and tells nobody anything. */}
+          <p className="text-callout text-label-secondary">
+            {deleting ? DELETE_CONSEQUENCE[deleting.kind] : null}
+          </p>
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleting(null)}>
+              Keep it
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} loading={pending}>
+              Delete permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </SettingsCard>
   );
 }

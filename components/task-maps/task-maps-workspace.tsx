@@ -390,23 +390,29 @@ function CreateMapModal({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <Modal open={open} onClose={onClose} title="New task map" description="Give your map a name to get started.">
       <form
-        className="space-y-4 px-6 py-5"
+        className="flex flex-col gap-5 px-6 py-5"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <label className="space-y-1">
-          <span className="text-caption uppercase text-label-secondary">Name</span>
+        <div className="space-y-1.5">
+          <label htmlFor="task-map-name" className="text-subhead text-label-secondary">
+            Name
+          </label>
           <Input
+            id="task-map-name"
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Dashboard redesign"
+            placeholder="Dashboard redesign"
           />
-        </label>
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+          <p className="text-footnote text-label-tertiary">
+            You can rename it later, so a working title is fine.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
           <Button type="submit" disabled={name.trim().length === 0} loading={pending}>

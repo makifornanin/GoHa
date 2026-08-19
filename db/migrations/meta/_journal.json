@@ -120,6 +120,13 @@
       "when": 1787068523949,
       "tag": "0016_famous_joseph",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787127143178,
+      "tag": "0017_fluffy_baron_strucker",
+      "breakpoints": true
     }
   ]
 }

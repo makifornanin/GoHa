@@ -22,6 +22,7 @@ export type TaskInput = {
   status?: TaskStatus;
   priority?: Priority;
   scheduledFor?: string | null;
+  scheduledTime?: string | null;
   dueAt?: Date | null;
   estimateMinutes?: number | null;
   sortOrder?: number;

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { updateAutomationPrefsAction } from "@/app/(app)/settings/actions";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,14 @@ const QUOTE_OPTIONS = [
   { value: "quote", label: "Quotes only" },
 ];
 
-/** A plain switch. The app has no toggle primitive yet and needs exactly one. */
-function Toggle({
+/**
+ * One switch row: what it does, why, and the control.
+ *
+ * The label is a real `<label for>` so the text is part of the hit target, and
+ * the hint sits under it rather than beside the switch, which keeps the switches
+ * in one vertical line however long the wording gets.
+ */
+function ToggleRow({
   id,
   checked,
   onChange,
@@ -52,34 +59,14 @@ function Toggle({
   hint: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex items-start justify-between gap-5 py-1">
       <div className="min-w-0">
-        <label htmlFor={id} className="text-body text-label">
+        <label htmlFor={id} className="cursor-pointer text-body text-label">
           {label}
         </label>
-        <p className="mt-0.5 text-footnote text-label-tertiary">{hint}</p>
+        <p className="mt-1 text-footnote leading-snug text-label-tertiary">{hint}</p>
       </div>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "hit-44 relative mt-0.5 h-[31px] w-[51px] shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:opacity-50",
-          checked ? "bg-green" : "bg-fill-secondary",
-        )}
-      >
-        <span
-          aria-hidden
-          className={cn(
-            "absolute top-[2px] size-[27px] rounded-full bg-white shadow-e1 transition-transform",
-            checked ? "translate-x-[22px]" : "translate-x-[2px]",
-          )}
-        />
-      </button>
+      <Switch id={id} checked={checked} onChange={onChange} disabled={disabled} label={label} />
     </div>
   );
 }
@@ -150,7 +137,7 @@ export function AutomationPrefsCard({
       </div>
 
       <div className="flex flex-col gap-5">
-        <Toggle
+        <ToggleRow
           id="pref-morning"
           label="Morning brief"
           hint="The day's ranking, overdue work, habits and your quote."
@@ -158,7 +145,7 @@ export function AutomationPrefsCard({
           disabled={pending}
           onChange={(next) => persist({ ...value, morningBriefEnabled: next })}
         />
-        <Toggle
+        <ToggleRow
           id="pref-evening"
           label="Evening summary"
           hint="What you finished, what slipped, habits against their targets."
@@ -166,7 +153,7 @@ export function AutomationPrefsCard({
           disabled={pending}
           onChange={(next) => persist({ ...value, eveningSummaryEnabled: next })}
         />
-        <Toggle
+        <ToggleRow
           id="pref-deadline"
           label="Deadline and focus alerts"
           hint="Due soon, overdue today, or a focus timer left running."

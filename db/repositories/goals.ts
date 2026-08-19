@@ -202,3 +202,18 @@ export async function listGoalProgressUpdates(
     .where(and(eq(goalProgressUpdates.userId, userId), eq(goalProgressUpdates.goalId, goalId)))
     .orderBy(desc(goalProgressUpdates.createdAt));
 }
+
+/**
+ * Hard-delete an archived goal.
+ *
+ * Sub-goals cascade away with it, and its progress journal goes too. Tasks
+ * survive with a null goal (`set null`), so the work is not deleted along with
+ * the ambition. Archived rows only.
+ */
+export async function deleteGoal(userId: string, id: string): Promise<boolean> {
+  const rows = await db
+    .delete(goals)
+    .where(and(eq(goals.id, id), eq(goals.userId, userId), eq(goals.isArchived, true)))
+    .returning({ id: goals.id });
+  return rows.length > 0;
+}

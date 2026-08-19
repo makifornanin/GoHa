@@ -82,6 +82,10 @@ function TaskFormFields({
   const [scheduledFor, setScheduledFor] = useState(
     () => task?.scheduledFor ?? defaultScheduledFor ?? "",
   );
+  const [scheduledTime, setScheduledTime] = useState(
+    // A `time` column returns "HH:MM:SS"; the input wants "HH:MM".
+    () => (task?.scheduledTime ? task.scheduledTime.slice(0, 5) : ""),
+  );
   const [dueAt, setDueAt] = useState(() => instantToZonedDateTimeInput(task?.dueAt, timeZone));
 
   const [fieldErrors, setFieldErrors] = useState<TaskFieldErrors>({});
@@ -89,7 +93,18 @@ function TaskFormFields({
   const [submitting, setSubmitting] = useState(false);
 
   function values(): TaskFormInput {
-    return { title, description, goalId, lifeAreaId, status, priority, scheduledFor, dueAt };
+    return {
+      title,
+      description,
+      goalId,
+      lifeAreaId,
+      status,
+      priority,
+      scheduledFor,
+      // A time without a day cannot be shown anywhere, so it never leaves here.
+      scheduledTime: scheduledFor ? scheduledTime : "",
+      dueAt,
+    };
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -217,16 +232,35 @@ function TaskFormFields({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="task-scheduled">
-            Scheduled for <span className="text-outline">(optional)</span>
+            Start <span className="text-outline">(optional)</span>
           </Label>
-          <Input
-            id="task-scheduled"
-            type="date"
-            value={scheduledFor}
-            onChange={(e) => setScheduledFor(e.target.value)}
-            disabled={submitting}
-          />
+          {/* Date and time together, the same shape the Due field has. The time
+              is optional on its own: a day with no hour is a normal way to plan,
+              and it is cleared automatically if the date is removed. */}
+          <div className="flex items-center gap-2">
+            <Input
+              id="task-scheduled"
+              type="date"
+              className="flex-1"
+              value={scheduledFor}
+              onChange={(e) => {
+                setScheduledFor(e.target.value);
+                if (!e.target.value) setScheduledTime("");
+              }}
+              disabled={submitting}
+            />
+            <Input
+              id="task-scheduled-time"
+              type="time"
+              aria-label="Start time"
+              className="w-[7.5rem] shrink-0"
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
+              disabled={submitting || !scheduledFor}
+            />
+          </div>
           <FieldError id="task-scheduled-error" message={fieldErrors.scheduledFor} />
+          <FieldError id="task-scheduled-time-error" message={fieldErrors.scheduledTime} />
         </div>
         <div>
           <Label htmlFor="task-due">Due <span className="text-outline">(optional)</span></Label>

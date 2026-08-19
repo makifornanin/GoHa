@@ -101,3 +101,56 @@ export async function restoreArchivedAction(
     return { ok: false, error: "Could not restore that item. Please try again." };
   }
 }
+
+/**
+ * Permanently delete something already archived.
+ *
+ * Archiving is the reversible step; this is the one that is not, so it is only
+ * offered for rows that are already archived. What each deletion takes with it
+ * differs, and the UI says so before asking:
+ *
+ *  - a life area: only the label. Goals, tasks and habits filed under it survive
+ *    with no area (`set null`).
+ *  - a goal: its sub-goals and its progress journal. Linked tasks survive.
+ *  - a habit: its schedules AND its entire entry history, which is the streak.
+ *  - a task map: its nodes and connections. Linked tasks survive.
+ */
+export async function deleteArchivedAction(
+  kind: ArchivedKind,
+  id: string,
+): Promise<ActionResult<{ id: string }>> {
+  const user = await requireUser();
+
+  const kindResult = kindSchema.safeParse(kind);
+  const idResult = idSchema.safeParse(id);
+  if (!kindResult.success || !idResult.success) {
+    return { ok: false, error: "That item could not be found." };
+  }
+
+  try {
+    const deleted = await (async () => {
+      switch (kindResult.data) {
+        case "life-area":
+          return lifeAreasRepo.deleteLifeArea(user.id, idResult.data);
+        case "goal":
+          return goalsRepo.deleteGoal(user.id, idResult.data);
+        case "habit":
+          return habitsRepo.deleteHabit(user.id, idResult.data);
+        case "task-map":
+          return taskMapsRepo.deleteTaskMap(user.id, idResult.data);
+      }
+    })();
+
+    if (!deleted) {
+      // Either it is gone already or it is no longer archived, and both mean
+      // the same thing to the person looking at a stale list.
+      return { ok: false, error: "That item is no longer in your archive." };
+    }
+
+    revalidatePath("/settings");
+    return { ok: true, data: { id: idResult.data } };
+  } catch (error) {
+    console.error("deleteArchivedAction failed", error);
+    return { ok: false, error: "Could not delete that. Please try again." };
+  }
+}

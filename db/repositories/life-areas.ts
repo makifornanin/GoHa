@@ -154,3 +154,19 @@ export async function restoreLifeArea(userId: string, id: string): Promise<LifeA
     .returning();
   return row ?? null;
 }
+
+/**
+ * Hard-delete an archived life area.
+ *
+ * Goals, tasks and habits that pointed at it survive with a null life area
+ * (`set null` on their foreign keys), so this removes a label rather than the
+ * work filed under it. Restricted to archived rows: deleting something still in
+ * use should go through archiving first, which is the reversible step.
+ */
+export async function deleteLifeArea(userId: string, id: string): Promise<boolean> {
+  const rows = await db
+    .delete(lifeAreas)
+    .where(and(eq(lifeAreas.id, id), eq(lifeAreas.userId, userId), eq(lifeAreas.isArchived, true)))
+    .returning({ id: lifeAreas.id });
+  return rows.length > 0;
+}

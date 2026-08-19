@@ -54,6 +54,25 @@ function optionalDueAt(timeZone: string) {
  * timezone (from Settings): the Server Action builds the schema with the
  * caller's saved zone, so "5:00 PM" means 5 PM where the user lives.
  */
+/**
+ * An optional start time, "HH:MM".
+ *
+ * Only meaningful alongside a date, and the schema says so: a time with no day
+ * is not a plan, and silently keeping it would leave a value nothing can ever
+ * display. Cleared to null instead, which is what the empty field means.
+ */
+const optionalScheduledTime = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : null))
+  .pipe(
+    z.union([
+      z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Enter a start time as HH:MM."),
+      z.null(),
+    ]),
+  );
+
 export function makeTaskFormSchema(timeZone: string = MANILA_TZ) {
   return z.object({
     title: z
@@ -72,6 +91,7 @@ export function makeTaskFormSchema(timeZone: string = MANILA_TZ) {
     status: z.enum(TASK_STATUS_VALUES).default("todo"),
     priority: z.enum(TASK_PRIORITY_VALUES).default("medium"),
     scheduledFor: optionalScheduledFor,
+    scheduledTime: optionalScheduledTime,
     dueAt: optionalDueAt(timeZone),
   });
 }
