@@ -29,9 +29,16 @@ const buttonVariants = cva(
         link: "text-blue underline-offset-4 hover:underline",
       },
       size: {
-        sm: "h-7 rounded-md px-2.5 text-[13px]/[18px]",
-        default: "h-8 rounded-lg px-3.5 text-[14px]/[20px]",
-        lg: "h-10 rounded-xl px-4.5 text-[15px]/[20px]",
+        /*
+         * Two heights per size: a phone one and the macOS-adjacent one from
+         * section 8 of the spec. The desktop metrics are deliberate density,
+         * but 28-32px is well under the 44px tap target the same spec
+         * mandates, which on a touch screen means missed taps. The `sm:`
+         * value restores the documented height, so desktop is unchanged.
+         */
+        sm: "h-9 rounded-md px-2.5 text-[13px]/[18px] sm:h-7",
+        default: "h-10 rounded-lg px-3.5 text-[14px]/[20px] sm:h-8",
+        lg: "h-11 rounded-xl px-4.5 text-[15px]/[20px] sm:h-10",
         icon: "hit-44 size-9 rounded-lg",
       },
     },

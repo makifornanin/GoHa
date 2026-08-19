@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { SettingsCard } from "@/components/settings/settings-card";
 import { cn } from "@/lib/utils";
 
 /**
@@ -254,29 +255,13 @@ export function AutomationCard({
   }
 
   return (
-    <section
-      className={cn(
-        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
-        className,
-      )}
+    <SettingsCard
+      className={className}
+      icon={<Plug className="size-5" />}
+      title="Automations"
+      description="Let something outside GoHa read your day: a morning brief on your phone, a streak rescue in the evening."
     >
-      <div className="mb-6 flex items-start gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
-          aria-hidden
-        >
-          <Plug className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-headline text-label">Automations</h2>
-          <p className="mt-0.5 text-callout text-label-secondary">
-            Let something outside GoHa read your day: a morning brief on your phone, a streak
-            rescue in the evening.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-callout text-label-secondary">
               {data.tokens.filter((t) => t.active).length} active{" "}
@@ -469,6 +454,6 @@ export function AutomationCard({
           </div>
         </div>
       </Modal>
-    </section>
+    </SettingsCard>
   );
 }

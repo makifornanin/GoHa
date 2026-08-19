@@ -866,6 +866,7 @@ function FlowCanvasInner({
           nodeBorderRadius={3}
           maskColor="color-mix(in oklab, var(--canvas) 70%, transparent)"
         />
+        {readOnly ? null : (
         <Panel position="top-center">
           <div className="relative">
             <div className="glass-regular flex flex-wrap items-center gap-1 rounded-full p-1 shadow-e2">
@@ -954,8 +955,9 @@ function FlowCanvasInner({
             ) : null}
           </div>
         </Panel>
+        )}
 
-        {legendOpen ? (
+        {legendOpen && !readOnly ? (
           <Panel position="top-left">
             <LegendEditor legend={legend} onSave={saveLegend} onClose={() => setLegendOpen(false)} />
           </Panel>

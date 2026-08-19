@@ -22,7 +22,7 @@ import {
 import { usePushDevice } from "@/components/pwa/use-push-device";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { cn } from "@/lib/utils";
+import { SettingsCard } from "@/components/settings/settings-card";
 
 const BENEFITS = [
   { icon: Sunrise, label: "Morning Brief" },
@@ -157,28 +157,13 @@ export function IphoneConnectionCard({
   }
 
   return (
-    <section
-      className={cn(
-        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
-        className,
-      )}
+    <SettingsCard
+      className={className}
+      icon={<Smartphone className="size-5" />}
+      title="Connect your iPhone"
+      description="Receive GoHa smart notifications directly on your iPhone."
     >
-      <div className="mb-6 flex items-start gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
-          aria-hidden
-        >
-          <Smartphone className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-headline text-label">Connect your iPhone</h2>
-          <p className="mt-0.5 text-callout text-label-secondary">
-            Receive GoHa smart notifications directly on your iPhone.
-          </p>
-        </div>
-      </div>
-
-      <ul className="mb-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {BENEFITS.map(({ icon: Icon, label }) => (
           <li
             key={label}
@@ -398,7 +383,7 @@ export function IphoneConnectionCard({
           </Button>
         </div>
       </Modal>
-    </section>
+    </SettingsCard>
   );
 }
 

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { SettingsCard } from "@/components/settings/settings-card";
 import { cn } from "@/lib/utils";
 
 const EXPIRY_OPTIONS = [
@@ -192,27 +193,12 @@ export function InvitesCard({
   }
 
   return (
-    <section
-      className={cn(
-        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
-        className,
-      )}
+    <SettingsCard
+      className={className}
+      icon={<UserPlus className="size-5" />}
+      title="Invitations"
+      description="Invite someone to their own GoHa on this install. Each account is separate."
     >
-      <div className="mb-6 flex items-start gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
-          aria-hidden
-        >
-          <UserPlus className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-headline text-label">People</h2>
-          <p className="mt-0.5 text-callout text-label-secondary">
-            Invite someone to their own GoHa on this install. Each account is separate.
-          </p>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-5">
           {/*
             Who may sign up at all. Owner only, and enforced server-side: this
@@ -397,6 +383,6 @@ export function InvitesCard({
           </div>
         </div>
       </Modal>
-    </section>
+    </SettingsCard>
   );
 }

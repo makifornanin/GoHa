@@ -189,6 +189,25 @@ Status: [x] Completed (2026-07-08)
 
 ## Change log
 
+### 2026-08-19: Mobile navigation fix and mobile UI pass
+- **Fixed the broken mobile drawer.** The nav sheet is now portaled to `document.body` (`components/shell/mobile-header.tsx`). The mobile header carries `glass-thin`, and `backdrop-filter` makes an element a containing block for every descendant including `position: fixed` ones, so the drawer resolved `fixed inset-0` against the 56px top bar instead of the viewport. It opened as a small clipped box with the nav and logout row spilling across the page, which is why no other section was reachable from a phone. Regression test in `tests/mobile-drawer.test.tsx` asserts the drawer is not a descendant of the header.
+- Task maps are view-only below `lg`. Building a map needs drag-and-connect gestures that fight panning on a phone, so `FlowCanvas` receives `readOnly`, the build toolbar and legend editor are hidden, the header actions are replaced by a "View only on mobile" badge, and map creation is not offered (creating a map that cannot then be built is a dead end). Maps made on a desktop open and read normally. `readOnly` now actually gates the build toolbar, which it did not before: archived maps were still showing add-node controls that could not act.
+- Evened out the tasks toolbar. The four filter Selects carried different fixed widths (`w-44`, `w-44`, `w-40`, `w-36`), fine in one desktop row but wrapping into a ragged staircase on a phone. They are a two-column grid at equal width on mobile and keep the documented widths from `sm:` up.
+- Phone-sized controls below `sm`, restored to the documented desktop metrics at `sm:` and up, since spec section 7 mandates a 44x44px tap target while section 8's heights are deliberate desktop density: Button `sm`/`default`/`lg` 28/32/40 -> 36/40/44, Select 32 -> 44, SegmentedControl 30 -> 40 and full width with equal-width segments.
+- `PageHeader` actions span the width on mobile (two actions split it evenly) instead of sitting as a small left-aligned chip.
+- Drawer padding respects `env(safe-area-inset-*)` now that it is genuinely full height.
+- Verification: typecheck clean, lint clean, 515/515 unit tests pass, `pnpm build` compiles. The drawer fix is verified structurally by test and by the CSS containing-block rule; it has not been re-checked on a physical phone.
+
+### 2026-08-19: Settings layout and spacing pass
+- Extracted one shared card shell into `components/settings/settings-card.tsx` (`SettingsCard`) and adopted it in `settings-view.tsx`, `automation-card.tsx`, `automation-prefs-card.tsx`, `invites-card.tsx`, and `iphone-connection-card.tsx`. The same markup had been copied into five files, so padding and header spacing drifted between cards; there is now one definition. The other pages (goals, habits, focus, tasks) keep their own card styling deliberately: this primitive is settings-specific, not an app-wide card.
+- Grouped the page with a new `SettingsSection`: Account, Time and rhythm, Notifications, People (owner only), Developer (advanced only), Your data. Settings had been ten cards in one flat two-column grid, so nothing read as more important than anything else and finding a setting meant scanning all of it.
+- Fixed heading hierarchy: section titles are `h2`, card titles `h3`. Both were `h2`, which flattened the page for screen readers.
+- Renamed two card titles that only repeated the section above them: "People" -> "Invitations", and the account export/delete card "Your data" -> "Export and delete".
+- Section headings use `--label-secondary` (60% opacity), not `--label-tertiary` (30%), which is too faint to read as text.
+- Normalized the remaining spacing outliers: the automation card body `gap-6` -> `gap-5`, and the iPhone card benefits list `mb-6` -> `mb-5`, both matching the shared shell's header rhythm.
+- New test `tests/settings-layout.test.tsx` renders the whole page and asserts the section groups exist and outrank the card headings inside them. Writing it is what surfaced the duplicated titles and the flat heading levels.
+- Verification: typecheck clean, lint clean, 512/512 unit tests pass, `pnpm build` compiles (22 static pages).
+
 ### 2026-07-06: Phases 0 and 1 (discovery, scaffold, app shell)
 - Design audit written to `docs/STITCH_AUDIT.md` from the local Stitch exports (no Stitch MCP available in this environment).
 - Scaffolded Next.js 16.2.10 + React 19.2.4 + TypeScript strict + Tailwind v4 + pnpm; added ESLint (flat config), Vitest (+ Testing Library, jsdom), next-themes, Sonner, lucide-react, and a hand-authored shadcn/ui foundation (`components.json`, `cn`, `Button`, `Input`, themed `Toaster`).

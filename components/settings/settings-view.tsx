@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { AutomationCard } from "@/components/settings/automation-card";
+import { SettingsCard, SettingsSection } from "@/components/settings/settings-card";
 import type { AutomationOverview } from "@/app/(app)/settings/automation-actions";
 import type { PeopleOverview } from "@/app/(app)/settings/invite-actions";
 import type { PushOverview } from "@/app/(app)/settings/push-actions";
@@ -91,23 +92,54 @@ export function SettingsView({
   people: PeopleOverview;
 }) {
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
-      <ProfileCard className="lg:col-span-2" name={profile.name} email={profile.email} />
-      <AppearanceCard dbTheme={settings.theme} />
-      <PreferencesCard timezone={settings.timezone} weekStartsOn={settings.weekStartsOn} />
-      <RhythmCard
-        dailyPlanningTime={settings.dailyPlanningTime}
-        eveningReflectionTime={settings.eveningReflectionTime}
-      />
-      <SecurityCard />
-      <AutomationPrefsCard prefs={settings.automation} />
-      {people.isOwner ? <InvitesCard initial={people} className="lg:col-span-2" /> : null}
-      <IphoneConnectionCard initial={pushOverview} className="lg:col-span-2" />
-      {showAdvancedAutomation && automationOverview ? (
-        <AutomationCard initial={automationOverview} className="lg:col-span-2" />
+    <div className="flex flex-col gap-8">
+      <SettingsSection title="Account">
+        <ProfileCard className="lg:col-span-2" name={profile.name} email={profile.email} />
+        <SecurityCard />
+        <AppearanceCard dbTheme={settings.theme} />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Time and rhythm"
+        description="How GoHa decides what today means, and when it expects you."
+      >
+        <PreferencesCard timezone={settings.timezone} weekStartsOn={settings.weekStartsOn} />
+        <RhythmCard
+          dailyPlanningTime={settings.dailyPlanningTime}
+          eveningReflectionTime={settings.eveningReflectionTime}
+        />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Notifications"
+        description="GoHa never sends anything itself. These decide what it hands to the tool that does."
+      >
+        <AutomationPrefsCard prefs={settings.automation} />
+        <IphoneConnectionCard initial={pushOverview} />
+      </SettingsSection>
+
+      {people.isOwner ? (
+        <SettingsSection
+          title="People"
+          description="Who else can use this GoHa. Every account is separate."
+        >
+          <InvitesCard initial={people} className="lg:col-span-2" />
+        </SettingsSection>
       ) : null}
-      <ArchiveCard className="lg:col-span-2" />
-      <DataCard className="lg:col-span-2" />
+
+      {showAdvancedAutomation && automationOverview ? (
+        <SettingsSection
+          title="Developer"
+          description="Direct API access, for building automations against GoHa."
+        >
+          <AutomationCard initial={automationOverview} className="lg:col-span-2" />
+        </SettingsSection>
+      ) : null}
+
+      <SettingsSection title="Your data">
+        <ArchiveCard />
+        <DataCard />
+      </SettingsSection>
     </div>
   );
 }
@@ -454,7 +486,7 @@ function DataCard({ className }: { className?: string }) {
   return (
     <SettingsCard
       icon={<Download className="size-4" />}
-      title="Your data"
+      title="Export and delete"
       description="A readable copy of your main records, as one JSON file."
       className={className}
     >
@@ -474,45 +506,6 @@ function DataCard({ className }: { className?: string }) {
         </Button>
       </div>
     </SettingsCard>
-  );
-}
-
-function SettingsCard({
-  icon,
-  title,
-  description,
-  className,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  description?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
-        className,
-      )}
-    >
-      <div className="mb-6 flex items-start gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
-          aria-hidden
-        >
-          {icon}
-        </span>
-        <div>
-          <h2 className="text-headline text-label">{title}</h2>
-          {description ? (
-            <p className="mt-0.5 text-callout text-label-secondary">{description}</p>
-          ) : null}
-        </div>
-      </div>
-      {children}
-    </section>
   );
 }
 

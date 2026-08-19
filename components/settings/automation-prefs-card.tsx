@@ -8,7 +8,7 @@ import { updateAutomationPrefsAction } from "@/app/(app)/settings/actions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { SettingsCard } from "@/components/settings/settings-card";
 
 export type AutomationPrefs = {
   morningBriefEnabled: boolean;
@@ -115,27 +115,12 @@ export function AutomationPrefsCard({
   }
 
   return (
-    <section
-      className={cn(
-        "rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 lg:p-6",
-        className,
-      )}
+    <SettingsCard
+      className={className}
+      icon={<BellRing className="size-5" />}
+      title="What automations may send"
+      description="Choose which GoHa smart notifications are allowed on your connected devices."
     >
-      <div className="mb-6 flex items-start gap-3">
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-label-secondary"
-          aria-hidden
-        >
-          <BellRing className="size-5" />
-        </span>
-        <div>
-          <h2 className="text-headline text-label">What automations may send</h2>
-          <p className="mt-0.5 text-callout text-label-secondary">
-            Choose which GoHa smart notifications are allowed on your connected devices.
-          </p>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-5">
         <ToggleRow
           id="pref-morning"
@@ -221,6 +206,6 @@ export function AutomationPrefsCard({
           </p>
         </div>
       </div>
-    </section>
+    </SettingsCard>
   );
 }

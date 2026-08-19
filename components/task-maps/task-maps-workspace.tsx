@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import type { TaskMap, TaskMapEdge, TaskMapNode } from "@/db/types";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import {
   archiveTaskMapAction,
@@ -52,6 +53,16 @@ export function TaskMapsWorkspace({
 }) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  /*
+   * Below `lg` the map is view-only.
+   *
+   * Building a map means dragging nodes and drawing edges between them, which
+   * needs a pointer and room to work; on a phone the same gestures fight
+   * panning and zooming. Viewing is the part that genuinely works on a small
+   * screen, so a map made on the desktop stays readable everywhere, and the
+   * editing chrome is hidden rather than offered and frustrating.
+   */
+  const isCompact = useMediaQuery("(max-width: 1023px)");
   const [editMap, setEditMap] = useState<TaskMap | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskMap | null>(null);
   const [pending, startTransition] = useTransition();
@@ -107,11 +118,17 @@ export function TaskMapsWorkspace({
         <EmptyState
           icon={Waypoints}
           title="No task maps yet"
-          description="Task maps let you sketch how tasks and ideas connect. Create your first map to start building a branching flow."
+          description={
+            isCompact
+              ? "Task maps let you sketch how tasks and ideas connect. Building one needs a bigger screen, so make your first map on a computer, then open it here to read it."
+              : "Task maps let you sketch how tasks and ideas connect. Create your first map to start building a branching flow."
+          }
           action={
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="size-4" aria-hidden /> New map
-            </Button>
+            isCompact ? undefined : (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4" aria-hidden /> New map
+              </Button>
+            )
           }
         />
         <CreateMapModal open={createOpen} onClose={() => setCreateOpen(false)} />
@@ -128,14 +145,16 @@ export function TaskMapsWorkspace({
             <span className="text-caption uppercase text-label-secondary">
               Maps
             </span>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              aria-label="New map"
-              className="hit-44 flex size-7 cursor-pointer items-center justify-center rounded-full text-label-secondary transition-colors hover:bg-surface-hover hover:text-blue"
-            >
-              <Plus className="size-4" aria-hidden />
-            </button>
+            {isCompact ? null : (
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                aria-label="New map"
+                className="hit-44 flex size-7 cursor-pointer items-center justify-center rounded-full text-label-secondary transition-colors hover:bg-surface-hover hover:text-blue"
+              >
+                <Plus className="size-4" aria-hidden />
+              </button>
+            )}
           </div>
           <div className="flex-1 space-y-1 overflow-y-auto p-2">
             {active.map((map) => (
@@ -188,6 +207,11 @@ export function TaskMapsWorkspace({
                     </span>
                   ) : null}
                 </div>
+                {isCompact ? (
+                  <span className="rounded-full bg-surface-secondary px-2.5 py-1 text-footnote text-label-secondary">
+                    View only on mobile
+                  </span>
+                ) : (
                 <div className="flex items-center gap-1">
                   {/* An archived map is frozen; renaming it is an edit like any
                       other and the action now refuses it (audit R-12). */}
@@ -217,12 +241,13 @@ export function TaskMapsWorkspace({
                     <Trash2 className="size-4" aria-hidden /> Delete
                   </Button>
                 </div>
+                )}
               </header>
               <div className="grid-pattern relative flex-1">
                 <FlowCanvas
                   key={graph.map.id}
                   taskMapId={graph.map.id}
-                  readOnly={graph.map.isArchived}
+                  readOnly={graph.map.isArchived || isCompact}
                   initialNodes={graph.nodes}
                   initialEdges={graph.edges}
                   initialViewport={graph.map.viewport ?? null}

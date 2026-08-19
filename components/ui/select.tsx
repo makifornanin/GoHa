@@ -180,7 +180,7 @@ export function Select({
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={onKeyDown}
         className={cn(
-          "flex h-8 w-full cursor-pointer items-center justify-between gap-2 rounded-lg bg-fill-tertiary pl-2.5 pr-2 text-left text-body text-label transition-colors duration-150 hover:bg-fill-secondary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary",
+          "flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-lg bg-fill-tertiary pl-3 pr-2.5 text-left text-body text-label sm:h-8 sm:pl-2.5 sm:pr-2 transition-colors duration-150 hover:bg-fill-secondary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary",
           className,
         )}
       >

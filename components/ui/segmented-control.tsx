@@ -61,7 +61,7 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
       className={cn(
-        "inline-flex h-[30px] items-center rounded-full bg-fill-tertiary p-[2px]",
+        "flex h-10 w-full items-center rounded-full bg-fill-tertiary p-[2px] sm:inline-flex sm:h-[30px] sm:w-auto",
         className,
       )}
     >
@@ -76,7 +76,7 @@ export function SegmentedControl<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              "relative h-full cursor-pointer rounded-full px-3 text-[13px]/[18px] font-medium transition-colors duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+              "relative h-full flex-1 cursor-pointer rounded-full px-3 text-[13px]/[18px] font-medium sm:flex-none transition-colors duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
               selected ? "text-label" : "text-label-secondary hover:text-label",
             )}
           >

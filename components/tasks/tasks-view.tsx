@@ -456,7 +456,7 @@ export function TasksView({
       />
 
       {/* One toolbar: how to look at the work, then how to narrow it. */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <SegmentedControl
           value={layout}
           onChange={(v) => setLayout(v as "list" | "calendar")}
@@ -467,13 +467,13 @@ export function TasksView({
           ]}
         />
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:ml-auto sm:flex sm:flex-wrap sm:items-center">
           {layout === "list" ? (
             <Select
               aria-label="Filter by timeframe"
               value={timeframe}
               onChange={(v) => setTimeframe(v as TaskTimeframeKey)}
-              className="w-44"
+              className="w-full sm:w-44"
               options={TIMEFRAMES.map((t) => ({
                 value: t.key,
                 label: label(t.label, timeframeCounts.get(t.key) ?? 0),
@@ -484,7 +484,7 @@ export function TasksView({
             aria-label="Filter by progress"
             value={progress}
             onChange={(v) => setProgress(v as TaskProgressKey)}
-            className="w-44"
+            className="w-full sm:w-44"
             options={PROGRESS.map((p) => ({
               value: p.key,
               label: label(p.label, progressCounts.get(p.key) ?? 0),
@@ -494,7 +494,7 @@ export function TasksView({
             aria-label="Filter by life area"
             value={lifeAreaFilter}
             onChange={setLifeAreaFilter}
-            className="w-40"
+            className="w-full sm:w-40"
             options={[
               { value: "all", label: "All life areas" },
               ...lifeAreas.map((area) => ({ value: area.id, label: area.name })),
@@ -505,7 +505,7 @@ export function TasksView({
               aria-label="Sort tasks"
               value={sort}
               onChange={(v) => setSort(v as SortKey)}
-              className="w-36"
+              className="w-full sm:w-36"
               options={SORTS.map((s) => ({ value: s.key, label: `Sort: ${s.label}` }))}
             />
           ) : null}

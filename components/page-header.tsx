@@ -18,7 +18,11 @@ export function PageHeader({
           <p className="mt-1 max-w-2xl text-callout text-label-secondary">{description}</p>
         ) : null}
       </div>
-      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+      {action ? (
+        <div className="flex w-full items-center gap-2 [&>*]:flex-1 sm:w-auto sm:shrink-0 sm:[&>*]:flex-none">
+          {action}
+        </div>
+      ) : null}
     </div>
   );
 }
