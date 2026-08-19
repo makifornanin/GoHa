@@ -1,0 +1,843 @@
+import "server-only";
+
+import {
+  automationRepo,
+  dailyPrioritiesRepo,
+  focusRepo,
+  goalsRepo,
+  habitsRepo,
+  pushRepo,
+  quotesRepo,
+  reviewsRepo,
+  tasksRepo,
+} from "@/db";
+import * as workerRepo from "@/db/repositories/worker";
+import type { AutomationJob } from "@/db/repositories/worker";
+import { toMorningPayload } from "@/lib/automation/brief";
+import {
+  buildDuePayload,
+  deadlineKey,
+  focusOverrunKey,
+} from "@/lib/automation/due";
+import { workerDeliveryDisposition } from "@/lib/automation/worker-delivery";
+import { toEveningPayload } from "@/lib/automation/evening";
+import { workerErrorName } from "@/lib/automation/worker-auth";
+import {
+  validateWorkerNotification,
+  workerFallbackNotification,
+  type WorkerNotification,
+} from "@/lib/automation/worker-notification";
+import {
+  AUTOMATION_JOB_LEASE_MS,
+  AUTOMATION_JOB_MAX_ATTEMPTS,
+  dueDailySchedule,
+  dueWeeklySchedule,
+  isPushJobKind,
+  isSameJobLocalDate,
+  retryAt,
+} from "@/lib/automation/worker-schedule";
+import {
+  buildGraveyardPayload,
+  countRepeats,
+  graveyardKey,
+} from "@/lib/automation/graveyard";
+import { pickDailyQuote, sourcesFor } from "@/lib/daily-quote";
+import { deriveReviewStats, weekBounds } from "@/lib/review";
+import { addDays, getZonedParts, startOfWeek, zonedToday, type Weekday } from "@/lib/date";
+import { sendNotificationToUser, VapidConfigurationError } from "@/lib/push/web-push";
+import { SABBATH_MESSAGE, sabbathContext } from "@/lib/sabbath";
+import { deriveDaySignal } from "@/lib/today-brain";
+import { getUserSettingsCached } from "@/lib/user-settings";
+
+export const WORKER_CLAIM_LIMIT_MAX = 25;
+
+export { validateWorkerNotification } from "@/lib/automation/worker-notification";
+export type { WorkerNotification } from "@/lib/automation/worker-notification";
+
+export type PreparedWorkerJob =
+  | {
+      state: "ready";
+      job: AutomationJob;
+      payload: unknown;
+      fallbackNotification: WorkerNotification;
+    }
+  | { state: "skip"; job: AutomationJob; reason: string };
+
+export type CompleteWorkerInput =
+  | { outcome: "use_fallback" }
+  | { outcome: "deliver"; notification: WorkerNotification }
+  /** The workflow delivered it itself (email digests). Claim, do not push. */
+  | { outcome: "acknowledge"; taskIds?: string[] };
+
+type CompletionResult = {
+  status: "completed" | "skipped" | "retrying" | "failed" | "conflict";
+  reason?: string;
+  attempted?: number;
+  succeeded?: number;
+  permanentFailures?: number;
+  transientFailures?: number;
+  availableAt?: string;
+};
+
+function fallback(title: string, body: string, url: string): WorkerNotification {
+  return workerFallbackNotification(title, body, url);
+}
+
+function activeSettingsForKind(job: AutomationJob, settings: Awaited<ReturnType<typeof getUserSettingsCached>>) {
+  if (!settings.notificationsEnabled) return false;
+  if (job.kind === "morning_brief" || job.kind === "sabbath") {
+    return settings.morningBriefEnabled;
+  }
+  if (job.kind === "evening_summary") return settings.eveningSummaryEnabled;
+  if (job.kind === "deadline" || job.kind === "focus_overrun") {
+    return settings.deadlineAlertsEnabled;
+  }
+  return false;
+}
+
+/** Materialize all verified job kinds, then lease a bounded batch. */
+export async function materializeAndClaimJobs(
+  requestedLimit: number,
+  now: Date = new Date(),
+): Promise<AutomationJob[]> {
+  const limit = Math.min(WORKER_CLAIM_LIMIT_MAX, Math.max(1, Math.trunc(requestedLimit)));
+  const candidates = await workerRepo.listAutomationCandidates();
+
+  for (const settings of candidates) {
+    try {
+      const subscriptions = await pushRepo.listActiveSubscriptions(settings.userId);
+      const hasDevice = subscriptions.length > 0;
+
+      const localDate = zonedToday(now, settings.timezone);
+      const context = sabbathContext({
+        sabbathDay: settings.sabbathDay,
+        localDate,
+        timezone: settings.timezone,
+      });
+
+      if (settings.morningBriefEnabled && hasDevice) {
+        const scheduledFor = dueDailySchedule({
+          now,
+          date: localDate,
+          time: settings.dailyPlanningTime,
+          timezone: settings.timezone,
+        });
+        if (scheduledFor) {
+          await workerRepo.materializeJob({
+            userId: settings.userId,
+            kind: context.isSabbath ? "sabbath" : "morning_brief",
+            dedupeKey: context.isSabbath
+              ? `sabbath:${localDate}`
+              : `brief:morning:${localDate}`,
+            localDate,
+            timezone: settings.timezone,
+            scheduledFor,
+          });
+        }
+      }
+
+      if (settings.eveningSummaryEnabled && hasDevice && !context.isSabbath) {
+        const scheduledFor = dueDailySchedule({
+          now,
+          date: localDate,
+          time: settings.eveningReflectionTime,
+          timezone: settings.timezone,
+        });
+        if (scheduledFor) {
+          await workerRepo.materializeJob({
+            userId: settings.userId,
+            kind: "evening_summary",
+            dedupeKey: `brief:evening:${localDate}`,
+            localDate,
+            timezone: settings.timezone,
+            scheduledFor,
+          });
+        }
+      }
+
+      if (settings.deadlineAlertsEnabled && hasDevice && !context.isSabbath) {
+        await materializeDueJobs(settings, localDate, now);
+      }
+
+      // Weekly digests. Delivered as email by the workflow, so no device is
+      // required, and skipped on the rest day: the week-scoped dedupe key means
+      // the next working day picks them up untouched.
+      if (!context.isSabbath) {
+        await materializeWeeklyJobs(settings, localDate, now);
+      }
+    } catch (error) {
+      // One bad account or invalid saved zone must not prevent every other
+      // user's due work from being leased. No domain payload or secret is logged.
+      console.error("automation worker could not materialize one account", {
+        errorName: workerErrorName(error),
+      });
+    }
+  }
+
+  return workerRepo.claimDueJobs(limit, now, AUTOMATION_JOB_LEASE_MS);
+}
+
+async function materializeDueJobs(
+  settings: Awaited<ReturnType<typeof workerRepo.listAutomationCandidates>>[number],
+  localDate: string,
+  now: Date,
+): Promise<void> {
+  const [tasks, activeSessions] = await Promise.all([
+    tasksRepo.listTasksForUser(settings.userId),
+    focusRepo.listInProgressSessions(settings.userId),
+  ]);
+  const candidateKeys = [
+    ...tasks.filter((task) => task.dueAt).map((task) => deadlineKey(task)),
+    ...activeSessions.map((session) => focusOverrunKey(session.id)),
+  ];
+  const claimed = await automationRepo.claimedKeys(settings.userId, candidateKeys);
+  const payload = buildDuePayload({
+    tasks,
+    activeSessions,
+    taskTitles: new Map(tasks.map((task) => [task.id, task.title])),
+    habitViews: [], // Disabled until the R-06 schedule semantics are complete.
+    claimed,
+    windowMinutes: settings.deadlineLeadMinutes,
+    evening: false,
+    today: localDate,
+    timeZone: settings.timezone,
+    isSabbath: false,
+    now,
+  });
+
+  for (const item of [...payload.due, ...payload.overdueToday]) {
+    const dueAt = item.dueAt ? new Date(item.dueAt) : now;
+    const scheduledFor = new Date(dueAt.getTime() - settings.deadlineLeadMinutes * 60_000);
+    await workerRepo.materializeJob({
+      userId: settings.userId,
+      kind: "deadline",
+      dedupeKey: item.dedupeKey,
+      localDate,
+      timezone: settings.timezone,
+      entityType: "task",
+      entityId: item.id,
+      scheduledFor,
+      availableAt: now,
+    });
+  }
+
+  for (const item of payload.focusOverrun) {
+    await workerRepo.materializeJob({
+      userId: settings.userId,
+      kind: "focus_overrun",
+      dedupeKey: item.dedupeKey,
+      localDate,
+      timezone: settings.timezone,
+      entityType: "focus_session",
+      entityId: item.sessionId,
+      scheduledFor: now,
+      availableAt: now,
+    });
+  }
+}
+
+/** Build a leased job's data through the existing canonical derivations. */
+export async function prepareWorkerJob(
+  job: AutomationJob,
+  now: Date = new Date(),
+): Promise<PreparedWorkerJob> {
+  const settings = await getUserSettingsCached(job.userId);
+  if (!activeSettingsForKind(job, settings)) return { state: "skip", job, reason: "disabled" };
+  if (settings.timezone !== job.timezone) {
+    return { state: "skip", job, reason: "timezone_changed" };
+  }
+  if (!isSameJobLocalDate(now, job.localDate, settings.timezone)) {
+    return { state: "skip", job, reason: "stale_local_date" };
+  }
+  if (
+    isPushJobKind(job.kind) &&
+    (await pushRepo.listActiveSubscriptions(job.userId)).length === 0
+  ) {
+    return { state: "skip", job, reason: "no_active_subscriptions" };
+  }
+
+  const context = sabbathContext({
+    sabbathDay: settings.sabbathDay,
+    localDate: job.localDate,
+    timezone: settings.timezone,
+  });
+  if (job.kind !== "sabbath" && context.isSabbath) {
+    return { state: "skip", job, reason: "sabbath" };
+  }
+  if (job.kind === "sabbath" && !context.isSabbath) {
+    return { state: "skip", job, reason: "sabbath_changed" };
+  }
+
+  if (job.kind === "sabbath") return prepareSabbath(job);
+  if (job.kind === "morning_brief") return prepareMorning(job, settings, now);
+  if (job.kind === "evening_summary") return prepareEvening(job, settings, now);
+  if (job.kind === "deadline" || job.kind === "focus_overrun") {
+    return prepareDueItem(job, settings, now);
+  }
+  if (job.kind === "graveyard") return prepareGraveyard(job, settings, now);
+  if (job.kind === "review_draft") return prepareReview(job, settings);
+  return { state: "skip", job, reason: "kind_not_active" };
+}
+
+async function prepareSabbath(job: AutomationJob): Promise<PreparedWorkerJob> {
+  const rest = await quotesRepo.listRestQuotes(job.userId);
+  const pool = rest.length > 0 ? rest : await quotesRepo.listActiveQuotes(job.userId, ["verse"]);
+  const quote = pickDailyQuote(pool, job.localDate);
+  const payload = {
+    localDate: job.localDate,
+    timezone: job.timezone,
+    isSabbath: true,
+    message: SABBATH_MESSAGE,
+    quote: quote
+      ? { text: quote.text, attribution: quote.attribution, translation: quote.translation }
+      : null,
+  };
+  return {
+    state: "ready",
+    job,
+    payload,
+    fallbackNotification: fallback("A day to rest", SABBATH_MESSAGE, "/today"),
+  };
+}
+
+async function prepareMorning(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+  now: Date,
+): Promise<PreparedWorkerJob> {
+  const [tasks, goals, priorities, habits, habitEntries, quotes, pinnedQuote, delivered] =
+    await Promise.all([
+      tasksRepo.listTasksForUser(job.userId),
+      goalsRepo.listGoalsWithTaskCounts(job.userId),
+      dailyPrioritiesRepo.listDailyPriorities(job.userId, job.localDate),
+      habitsRepo.listHabitsWithSchedule(job.userId),
+      habitsRepo.listEntriesInRange(job.userId, {
+        from: addDays(job.localDate, -400),
+        to: job.localDate,
+      }),
+      quotesRepo.listActiveQuotes(job.userId, sourcesFor(settings.quoteSourcePref)),
+      quotesRepo.getPinnedQuote(job.userId, job.localDate),
+      automationRepo.getNotification(job.userId, job.dedupeKey),
+    ]);
+
+  const signal = deriveDaySignal({
+    tasks,
+    goals,
+    priorities,
+    habits,
+    habitEntries,
+    today: job.localDate,
+    timeZone: settings.timezone,
+    hour: getZonedParts(now, settings.timezone).hour,
+  });
+  const payload = toMorningPayload({
+    signal,
+    tasks,
+    goals,
+    habits,
+    habitEntries,
+    quote: pinnedQuote ?? pickDailyQuote(quotes, job.localDate),
+    alreadyDelivered: Boolean(delivered),
+    today: job.localDate,
+    timeZone: settings.timezone,
+    weekStartsOn: (settings.weekStartsOn as Weekday) ?? 1,
+    isSabbath: false,
+    now,
+  });
+  if (payload.quiet) return { state: "skip", job, reason: "quiet" };
+  return {
+    state: "ready",
+    job,
+    payload,
+    fallbackNotification: fallback(
+      "Your GoHa morning brief",
+      payload.recommendation || `${payload.counts.totalToday} items are on your day.`,
+      "/today",
+    ),
+  };
+}
+
+async function prepareEvening(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+  now: Date,
+): Promise<PreparedWorkerJob> {
+  const [tasks, goals, priorities, habits, habitEntries, focusSessions, delivered] =
+    await Promise.all([
+      tasksRepo.listTasksForUser(job.userId),
+      goalsRepo.listGoalsWithTaskCounts(job.userId),
+      dailyPrioritiesRepo.listDailyPriorities(job.userId, job.localDate),
+      habitsRepo.listHabitsWithSchedule(job.userId),
+      habitsRepo.listEntriesInRange(job.userId, {
+        from: addDays(job.localDate, -400),
+        to: job.localDate,
+      }),
+      focusRepo.listCompletedSessionsInRange(job.userId, {
+        from: addDays(job.localDate, -6),
+        to: job.localDate,
+      }),
+      automationRepo.getNotification(job.userId, job.dedupeKey),
+    ]);
+  const payload = toEveningPayload({
+    tasks,
+    goals,
+    priorities,
+    habits,
+    habitEntries,
+    focusSessions,
+    today: job.localDate,
+    timeZone: settings.timezone,
+    weekStartsOn: (settings.weekStartsOn as Weekday) ?? 1,
+    isSabbath: false,
+    alreadyDelivered: Boolean(delivered),
+    now,
+  });
+  const quiet =
+    payload.tasksCompleted.length === 0 &&
+    payload.tasksPlannedNotDone.length === 0 &&
+    payload.habitOutcomes.length === 0 &&
+    payload.focusMinutes === 0 &&
+    payload.top3Result.pinned === 0;
+  if (quiet) return { state: "skip", job, reason: "quiet" };
+  return {
+    state: "ready",
+    job,
+    payload,
+    fallbackNotification: fallback(
+      "Your GoHa evening summary",
+      `${payload.tasksCompleted.length} completed | ${payload.tasksPlannedNotDone.length} still open | ${payload.focusMinutes} focus minutes`,
+      "/today",
+    ),
+  };
+}
+
+async function prepareDueItem(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+  now: Date,
+): Promise<PreparedWorkerJob> {
+  const [tasks, activeSessions, existing] = await Promise.all([
+    tasksRepo.listTasksForUser(job.userId),
+    focusRepo.listInProgressSessions(job.userId),
+    automationRepo.getNotification(job.userId, job.dedupeKey),
+  ]);
+  const candidateKeys = [
+    ...tasks.filter((task) => task.dueAt).map((task) => deadlineKey(task)),
+    ...activeSessions.map((session) => focusOverrunKey(session.id)),
+  ];
+  const claimed = await automationRepo.claimedKeys(job.userId, candidateKeys);
+  if (
+    existing?.payload &&
+    (existing.payload as Record<string, unknown>).automationJobId === job.id
+  ) {
+    claimed.delete(job.dedupeKey);
+  }
+  const payload = buildDuePayload({
+    tasks,
+    activeSessions,
+    taskTitles: new Map(tasks.map((task) => [task.id, task.title])),
+    habitViews: [],
+    claimed,
+    windowMinutes: settings.deadlineLeadMinutes,
+    evening: false,
+    today: job.localDate,
+    timeZone: settings.timezone,
+    isSabbath: false,
+    now,
+  });
+
+  if (job.kind === "deadline") {
+    const item = [...payload.due, ...payload.overdueToday].find(
+      (candidate) => candidate.dedupeKey === job.dedupeKey,
+    );
+    if (!item || item.id !== job.entityId) {
+      return { state: "skip", job, reason: "stale_entity" };
+    }
+    const body =
+      item.minutesUntil !== null && item.minutesUntil > 0
+        ? `${item.title} is due in ${item.minutesUntil} minutes.`
+        : `${item.title} is overdue today.`;
+    return {
+      state: "ready",
+      job,
+      payload: { ...item, localDate: job.localDate, timezone: job.timezone },
+      fallbackNotification: fallback("GoHa deadline", body, `/focus?taskId=${item.id}`),
+    };
+  }
+
+  const item = payload.focusOverrun.find((candidate) => candidate.dedupeKey === job.dedupeKey);
+  if (!item || item.sessionId !== job.entityId) {
+    return { state: "skip", job, reason: "stale_entity" };
+  }
+  return {
+    state: "ready",
+    job,
+    payload: { ...item, localDate: job.localDate, timezone: job.timezone },
+    fallbackNotification: fallback(
+      "Focus timer still running",
+      item.taskTitle
+        ? `${item.taskTitle} is ${item.minutesOver} minutes over its plan.`
+        : `Your focus timer is ${item.minutesOver} minutes over its plan.`,
+      "/focus",
+    ),
+  };
+}
+
+export async function completeWorkerJob(
+  job: AutomationJob,
+  leaseId: string,
+  input: CompleteWorkerInput,
+  now: Date = new Date(),
+): Promise<CompletionResult> {
+  const current = await workerRepo.getLeasedJob(job.id, leaseId, now);
+  if (!current) return { status: "conflict", reason: "invalid_or_expired_lease" };
+  const prepared = await prepareWorkerJob(current, now);
+  if (prepared.state === "skip") {
+    const skipped = await workerRepo.skipUndeliveredJob(
+      current.id,
+      leaseId,
+      prepared.reason,
+      now,
+    );
+    if (!skipped) return { status: "conflict", reason: "job_state_changed" };
+    return { status: "skipped", reason: prepared.reason };
+  }
+
+  /*
+   * "acknowledge" is for the digests the workflow delivers itself, by email.
+   *
+   * It still claims the dedupe key, so a repeated weekly run cannot send a
+   * second email, and it still closes the job. What it does not do is push:
+   * there is no phone in this path, and inventing a notification to satisfy
+   * the delivery machinery would put a duplicate on the user's lock screen.
+   */
+  const acknowledgeOnly = input.outcome === "acknowledge";
+  if (acknowledgeOnly && isPushJobKind(current.kind)) {
+    return { status: "conflict", reason: "invalid_notification" };
+  }
+
+  const notification = acknowledgeOnly
+    ? null
+    : input.outcome === "use_fallback"
+      ? prepared.fallbackNotification
+      : validateWorkerNotification(input.notification);
+  if (!acknowledgeOnly && !notification) {
+    return { status: "conflict", reason: "invalid_notification" };
+  }
+
+  const claimed = await automationRepo.claimNotification(current.userId, {
+    kind: current.kind,
+    dedupeKey: current.dedupeKey,
+    localDate: current.localDate,
+    entityType: current.entityType,
+    entityId: current.entityId,
+    payload: {
+      automationJobId: current.id,
+      ...(notification ? { notification } : { deliveredBy: "workflow" }),
+      // Repeat detection reads this back by task id, never by title.
+      ...(current.kind === "graveyard" && input.outcome === "acknowledge" && input.taskIds
+        ? { taskIds: input.taskIds }
+        : {}),
+    },
+  });
+  let notificationId = claimed?.id ?? null;
+  if (!claimed) {
+    const winner = await automationRepo.getNotification(current.userId, current.dedupeKey);
+    const winnerJobId =
+      winner?.payload && (winner.payload as Record<string, unknown>).automationJobId;
+    if (winnerJobId !== current.id || current.deliveryStartedAt) {
+      const skipped = await workerRepo.skipUndeliveredJob(
+        current.id,
+        leaseId,
+        "duplicate",
+        now,
+      );
+      if (!skipped) return { status: "conflict", reason: "job_state_changed" };
+      return { status: "skipped", reason: "duplicate" };
+    }
+    notificationId = winner?.id ?? null;
+  }
+  if (!notificationId) {
+    await workerRepo.failUndeliveredJob(
+      current.id,
+      leaseId,
+      "notification_claim_missing",
+      now,
+    );
+    return { status: "failed", reason: "notification_claim_missing" };
+  }
+
+  if (!(await workerRepo.markDeliveryStarted(current.id, leaseId, now))) {
+    return { status: "conflict", reason: "invalid_or_expired_lease" };
+  }
+
+  if (acknowledgeOnly) {
+    if (!(await workerRepo.completeJob(current.id, leaseId, now))) {
+      return { status: "conflict", reason: "job_state_changed" };
+    }
+    return { status: "completed", attempted: 0, succeeded: 0, permanentFailures: 0, transientFailures: 0 };
+  }
+
+  let result: Awaited<ReturnType<typeof sendNotificationToUser>>;
+  try {
+    result = await sendNotificationToUser({
+      userId: current.userId,
+      notificationId,
+      payload: { ...notification!, tag: `${current.kind}:${current.id}` },
+    });
+  } catch (error) {
+    if (error instanceof VapidConfigurationError) {
+      if (
+        current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
+        isSameJobLocalDate(now, current.localDate, current.timezone)
+      ) {
+        const availableAt = retryAt(now, current.attemptCount);
+        await workerRepo.retryJob(current.id, leaseId, "push_not_configured", availableAt);
+        return {
+          status: "retrying",
+          reason: "push_not_configured",
+          availableAt: availableAt.toISOString(),
+        };
+      }
+      await workerRepo.failJob(current.id, leaseId, "push_not_configured", now);
+      return { status: "failed", reason: "push_not_configured" };
+    }
+    console.error("automation worker push delivery failed ambiguously", {
+      errorName: workerErrorName(error),
+    });
+    await workerRepo.failJob(current.id, leaseId, "ambiguous_push_error", now);
+    return { status: "failed", reason: "ambiguous_push_error" };
+  }
+
+  const deliveryCounts = {
+    attempted: result.attempted,
+    succeeded: result.succeeded,
+    permanentFailures: result.permanentFailures,
+    transientFailures: result.transientFailures,
+  };
+
+  const disposition = workerDeliveryDisposition(
+    deliveryCounts,
+    current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
+      isSameJobLocalDate(now, current.localDate, current.timezone),
+  );
+  if (disposition.action === "complete") {
+    if (!(await workerRepo.completeJob(current.id, leaseId, now))) {
+      return { status: "conflict", reason: "job_state_changed" };
+    }
+    return { status: "completed", ...deliveryCounts };
+  }
+  if (disposition.action === "skip") {
+    await workerRepo.skipJob(current.id, leaseId, disposition.reason, now);
+    return { status: "skipped", reason: disposition.reason, ...deliveryCounts };
+  }
+  if (disposition.action === "retry") {
+    const availableAt = retryAt(now, current.attemptCount);
+    await workerRepo.retryJob(current.id, leaseId, disposition.reason, availableAt);
+    return {
+      status: "retrying",
+      reason: disposition.reason,
+      availableAt: availableAt.toISOString(),
+      ...deliveryCounts,
+    };
+  }
+  await workerRepo.failJob(current.id, leaseId, disposition.reason, now);
+  return { status: "failed", reason: disposition.reason, ...deliveryCounts };
+}
+
+export async function failWorkerJob(
+  job: AutomationJob,
+  leaseId: string,
+  code: string,
+  now: Date = new Date(),
+): Promise<CompletionResult> {
+  const current = await workerRepo.getLeasedJob(job.id, leaseId, now);
+  if (!current) return { status: "conflict", reason: "invalid_or_expired_lease" };
+  const safeCode = /^[a-z0-9][a-z0-9_:-]{0,63}$/.test(code) ? code : "worker_failure";
+  if (
+    current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
+    isSameJobLocalDate(now, current.localDate, current.timezone)
+  ) {
+    const availableAt = retryAt(now, current.attemptCount);
+    const retried = await workerRepo.retryUndeliveredJob(
+      current.id,
+      leaseId,
+      safeCode,
+      availableAt,
+    );
+    if (!retried) return { status: "conflict", reason: "job_state_changed" };
+    return { status: "retrying", reason: safeCode, availableAt: availableAt.toISOString() };
+  }
+  const failed = await workerRepo.failUndeliveredJob(current.id, leaseId, safeCode, now);
+  if (!failed) return { status: "conflict", reason: "job_state_changed" };
+  return { status: "failed", reason: safeCode };
+}
+
+/**
+ * The weekly digests: graveyard and review pre-fill.
+ *
+ * Both are keyed to the week (`graveyard:{isoWeek}`, `review:{weekStart}`), so
+ * materializing is idempotent across every poll of that week and the Sabbath
+ * skip in the caller becomes a deferral rather than a lost run.
+ */
+async function materializeWeeklyJobs(
+  settings: Awaited<ReturnType<typeof workerRepo.listAutomationCandidates>>[number],
+  localDate: string,
+  now: Date,
+): Promise<void> {
+  const weekStartsOn = (settings.weekStartsOn as Weekday) ?? 1;
+  const weekStart = startOfWeek(localDate, weekStartsOn);
+  // The last day of the user's own week, so the sweep and the review land when
+  // the week is actually over rather than on a weekday chosen for them.
+  const anchor = addDays(weekStart, 6);
+
+  const graveyardAt = dueWeeklySchedule({
+    now,
+    localDate,
+    anchor,
+    time: settings.dailyPlanningTime,
+    timezone: settings.timezone,
+  });
+  if (graveyardAt) {
+    await workerRepo.materializeJob({
+      userId: settings.userId,
+      kind: "graveyard",
+      dedupeKey: graveyardKey(localDate),
+      localDate,
+      timezone: settings.timezone,
+      scheduledFor: graveyardAt,
+    });
+  }
+
+  const reviewAt = dueWeeklySchedule({
+    now,
+    localDate,
+    anchor,
+    time: settings.eveningReflectionTime,
+    timezone: settings.timezone,
+  });
+  if (reviewAt) {
+    await workerRepo.materializeJob({
+      userId: settings.userId,
+      kind: "review_draft",
+      dedupeKey: `review:${weekStart}`,
+      localDate,
+      // The week being reviewed, which is not the day the job runs on. This is
+      // the column that keeps a catch-up run pointed at the right week.
+      targetDate: weekStart,
+      timezone: settings.timezone,
+      scheduledFor: reviewAt,
+    });
+  }
+}
+
+/** Stale work, for the weekly email digest. */
+async function prepareGraveyard(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+  now: Date,
+): Promise<PreparedWorkerJob> {
+  const [tasks, goals, priorDigests] = await Promise.all([
+    tasksRepo.listTasksForUser(job.userId),
+    goalsRepo.listGoals(job.userId),
+    automationRepo.listNotificationsByKind(job.userId, "graveyard", 12),
+  ]);
+
+  const payload = buildGraveyardPayload({
+    tasks,
+    goalTitles: new Map(goals.map((goal) => [goal.id, goal.title])),
+    repeats: countRepeats(priorDigests.map((entry) => entry.payload)),
+    today: job.localDate,
+    timeZone: settings.timezone,
+    isSabbath: false,
+    now,
+  });
+
+  // A clean backlog sends nothing at all. No "all clear" email.
+  if (payload.total === 0) return { state: "skip", job, reason: "quiet" };
+
+  return {
+    state: "ready",
+    job,
+    payload,
+    fallbackNotification: fallback(
+      `${payload.total} task${payload.total === 1 ? "" : "s"} need a decision`,
+      `${payload.stuck.totalCount} stuck | ${payload.longOverdue.totalCount} long overdue | ${payload.zombieInbox.totalCount} rotting in the inbox`,
+      "/tasks",
+    ),
+  };
+}
+
+/** The week's numbers, for the AI review draft. */
+async function prepareReview(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+): Promise<PreparedWorkerJob> {
+  const weekStartsOn = (settings.weekStartsOn as Weekday) ?? 1;
+  // The week this job was created for, never "the week it happens to run in".
+  const weekStart = job.targetDate ?? startOfWeek(job.localDate, weekStartsOn);
+  const bounds = weekBounds(weekStart);
+
+  const [tasks, goals, habits, entries, sessions, review] = await Promise.all([
+    tasksRepo.listTasksForUser(job.userId),
+    goalsRepo.listGoals(job.userId),
+    habitsRepo.listHabitsWithSchedule(job.userId),
+    habitsRepo.listEntriesInRange(job.userId, {
+      from: addDays(weekStart, -14),
+      to: bounds.end,
+    }),
+    focusRepo.listCompletedSessionsInRange(job.userId, {
+      from: addDays(weekStart, -7),
+      to: bounds.end,
+    }),
+    reviewsRepo.getWeeklyReview(job.userId, weekStart),
+  ]);
+
+  // A finished review is the owner's own words. Never draft over it.
+  if (review?.completedAt) return { state: "skip", job, reason: "review_complete" };
+
+  const alreadyWritten =
+    Boolean(review?.wins) && Boolean(review?.challenges) && Boolean(review?.focusNextWeek);
+  if (alreadyWritten) return { state: "skip", job, reason: "review_complete" };
+
+  const stats = deriveReviewStats({
+    week: bounds,
+    tasks,
+    habits,
+    habitEntries: entries,
+    sessions,
+    goals,
+    today: job.localDate,
+    weekStartsOn,
+    timeZone: settings.timezone,
+  });
+
+  // An AI essay about a week where nothing happened is noise.
+  if (stats.completed.length === 0 && stats.slipped.length === 0) {
+    return { state: "skip", job, reason: "quiet" };
+  }
+
+  return {
+    state: "ready",
+    job,
+    payload: {
+      localDate: job.localDate,
+      timezone: settings.timezone,
+      isSabbath: false,
+      weekStart,
+      weekEnd: bounds.end,
+      stats,
+      review: {
+        exists: Boolean(review),
+        hasWins: Boolean(review?.wins),
+        hasChallenges: Boolean(review?.challenges),
+        hasNextWeekFocus: Boolean(review?.focusNextWeek),
+      },
+    },
+    fallbackNotification: fallback(
+      "Your weekly review is ready to write",
+      `${stats.completed.length} completed and ${stats.slipped.length} slipped last week.`,
+      "/review",
+    ),
+  };
+}

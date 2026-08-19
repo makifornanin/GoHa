@@ -1,6 +1,7 @@
 import type { DailyPriority, FocusSession, HabitEntry, Task } from "@/db";
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
+import { hasDaySpecificAutomationCadence } from "@/lib/automation/habits";
 import { toZonedDate, type IsoDate, type Weekday } from "@/lib/date";
 import { buildHabitViews } from "@/lib/habit-view";
 import { toNumberOrNull } from "@/lib/habits";
@@ -130,7 +131,7 @@ export function toEveningPayload(params: {
   const streaksBroken: string[] = [];
 
   for (const view of views) {
-    if (!view.scheduledToday) continue;
+    if (!view.scheduledToday || !hasDaySpecificAutomationCadence(view.schedule)) continue;
     // Habit NAMES survive counts mode: they are the owner's own words but they
     // carry no third-party detail, and a summary that cannot say which habit
     // slipped is not a summary.

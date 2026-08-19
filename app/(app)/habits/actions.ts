@@ -188,6 +188,13 @@ export async function logHabitEntryAction(
 
   const habit = await habitsRepo.getHabit(user.id, idResult.data);
   if (!habit) return { ok: false, error: "That habit could not be found." };
+  if (
+    habit.type === "numeric" &&
+    logResult.data.status === "done" &&
+    logResult.data.value == null
+  ) {
+    return { ok: false, error: "Enter a value before marking this habit done." };
+  }
 
   try {
     const entry = await habitsRepo.logHabitEntry(user.id, idResult.data, dateResult.data, {

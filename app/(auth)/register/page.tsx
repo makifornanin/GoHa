@@ -47,7 +47,7 @@ export default async function RegisterPage({
 
   // Open sign-up: the form is the whole story, no invitation needed.
   if (mode === "open" && !code) {
-    return <AuthForm mode="register" redirectTo="/today" />;
+    return <AuthForm mode="register" redirectTo="/today" canBootstrap={false} />;
   }
 
   if (!code) {
@@ -87,6 +87,7 @@ export default async function RegisterPage({
     <AuthForm
       mode="register"
       redirectTo="/today"
+      canBootstrap={false}
       inviteCode={code}
       // A locked invitation fills the address in and holds it, so the person
       // cannot accidentally sign up with a different one and be refused after

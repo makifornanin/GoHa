@@ -99,10 +99,17 @@ export async function reopenWeeklyReviewAction(
   const parsed = z.iso.date().safeParse(weekStart);
   if (!parsed.success) return { ok: false, error: "That week could not be found." };
 
+  const { weekStartsOn } = await getUserDatePrefs(user.id);
+  if (startOfWeek(parsed.data, weekStartsOn) !== parsed.data) {
+    return {
+      ok: false,
+      error: "That is not the start of a week. Reload the page and try again.",
+    };
+  }
+
   try {
-    const review = await reviewsRepo.upsertWeeklyReview(user.id, parsed.data, {
-      completedAt: null,
-    });
+    const review = await reviewsRepo.reopenWeeklyReview(user.id, parsed.data);
+    if (!review) return { ok: false, error: "That completed review could not be found." };
     revalidatePath("/review");
     return { ok: true, data: review };
   } catch (error) {

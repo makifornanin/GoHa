@@ -76,46 +76,34 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const existing = await reviewsRepo.getWeeklyReview(auth.userId, weekStart);
-    if (existing?.completedAt) {
+    const requested = {
+      wins: parsed.data.wins ? `${DRAFT_PREFIX}${parsed.data.wins.trim()}` : null,
+      challenges: parsed.data.challenges
+        ? `${DRAFT_PREFIX}${parsed.data.challenges.trim()}`
+        : null,
+      // The guide calls this nextWeekFocus; the column has always been
+      // focusNextWeek. Mapped here so the published contract stays the guide's.
+      focusNextWeek: parsed.data.nextWeekFocus
+        ? `${DRAFT_PREFIX}${parsed.data.nextWeekFocus.trim()}`
+        : null,
+    };
+
+    const result = await reviewsRepo.fillEmptyReviewDraft(auth.userId, weekStart, requested);
+    const written = result?.written ?? [];
+    const allFields = ["wins", "challenges", "focusNextWeek"] as const;
+    const skipped = allFields.filter((field) => !written.includes(field));
+
+    if (result?.review.completedAt) {
       return await finishAutomation(
         auth,
         ROUTE,
         automationJson({
           weekStart,
           written: [],
-          skipped: ["wins", "challenges", "focusNextWeek"],
+          skipped: allFields,
           reason: "That week's review is already complete.",
         }),
       );
-    }
-
-    const written: string[] = [];
-    const skipped: string[] = [];
-    const updates: Record<string, string> = {};
-
-    const consider = (field: "wins" | "challenges" | "focusNextWeek", value?: string | null) => {
-      const current = existing?.[field];
-      if (current && current.trim().length > 0) {
-        skipped.push(field);
-        return;
-      }
-      if (!value || value.trim().length === 0) {
-        skipped.push(field);
-        return;
-      }
-      updates[field] = `${DRAFT_PREFIX}${value.trim()}`;
-      written.push(field);
-    };
-
-    consider("wins", parsed.data.wins);
-    consider("challenges", parsed.data.challenges);
-    // The guide calls this nextWeekFocus; the column has always been
-    // focusNextWeek. Mapped here so the published contract stays the guide's.
-    consider("focusNextWeek", parsed.data.nextWeekFocus);
-
-    if (written.length > 0) {
-      await reviewsRepo.upsertWeeklyReview(auth.userId, weekStart, updates);
     }
 
     return await finishAutomation(

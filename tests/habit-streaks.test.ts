@@ -20,15 +20,19 @@ const numHabit = (target: number, higherIsBetter = true): HabitLike => ({
 const daily = (startDate: string): ScheduleLike => ({
   frequency: "daily",
   daysOfWeek: null,
+  daysOfMonth: null,
   timesPerPeriod: null,
   startDate,
+  endDate: null,
 });
 // Mon/Wed/Fri (0=Sun..6=Sat).
 const mwf = (startDate: string): ScheduleLike => ({
   frequency: "weekly",
   daysOfWeek: [1, 3, 5],
+  daysOfMonth: null,
   timesPerPeriod: null,
   startDate,
+  endDate: null,
 });
 
 function e(entryDate: string, status: EntryLike["status"] = "done", value: number | null = null): EntryLike {
@@ -135,8 +139,10 @@ describe("computeHabitStreaks - X times per week", () => {
   const schedule: ScheduleLike = {
     frequency: "weekly",
     daysOfWeek: null,
+    daysOfMonth: null,
     timesPerPeriod: 3,
     startDate: "2026-06-29", // Monday
+    endDate: null,
   };
 
   it("counts consecutive weeks that hit the target; current week pending is neutral", () => {

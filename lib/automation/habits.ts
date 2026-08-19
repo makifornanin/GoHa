@@ -1,5 +1,6 @@
 import type { IsoDate } from "@/lib/date";
 import type { HabitView } from "@/lib/habit-view";
+import type { ScheduleLike } from "@/lib/habit-streaks";
 
 /**
  * The habit half of the automation surface: what is still open today, and which
@@ -17,6 +18,21 @@ import type { HabitView } from "@/lib/habit-view";
 
 /** A streak worth interrupting an evening for. Below this, silence is better. */
 export const STREAK_AT_RISK_MINIMUM = 3;
+
+/**
+ * Cadences whose expectation is unambiguous on a particular day.
+ *
+ * Flexible "X times per week/month" habits have a period denominator, not a
+ * named due day. Until that period policy is shared across every consumer, an
+ * automation must omit them instead of turning X into seven daily reminders.
+ */
+export function hasDaySpecificAutomationCadence(schedule: ScheduleLike): boolean {
+  if (schedule.frequency === "daily") return true;
+  if (schedule.frequency === "weekly") {
+    return Boolean(schedule.daysOfWeek && schedule.daysOfWeek.length > 0);
+  }
+  return Boolean(schedule.daysOfMonth && schedule.daysOfMonth.length > 0);
+}
 
 export type HabitDue = {
   id: string;
@@ -50,7 +66,9 @@ export function toHabitsDuePayload(params: {
   streakMinimum?: number;
 }): HabitsDuePayload {
   const minimum = params.streakMinimum ?? STREAK_AT_RISK_MINIMUM;
-  const scheduled = params.views.filter((view) => view.scheduledToday);
+  const scheduled = params.views.filter(
+    (view) => view.scheduledToday && hasDaySpecificAutomationCadence(view.schedule),
+  );
 
   const due: HabitDue[] = [];
   let doneToday = 0;

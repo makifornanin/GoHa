@@ -3,6 +3,7 @@ import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { IsoDate, Weekday } from "@/lib/date";
 import { calculateGoalProgress } from "@/lib/goal-progress";
+import { hasDaySpecificAutomationCadence } from "@/lib/automation/habits";
 import { buildHabitViews } from "@/lib/habit-view";
 import { taskEffectiveDate } from "@/lib/task-buckets";
 import { daysLate, type DaySignal, type ScoredTask } from "@/lib/today-brain";
@@ -154,7 +155,9 @@ export function toMorningPayload(params: {
   });
 
   const habitsToday: BriefHabit[] = views
-    .filter((view) => view.scheduledToday)
+    .filter(
+      (view) => view.scheduledToday && hasDaySpecificAutomationCadence(view.schedule),
+    )
     .map((view) => ({
       id: view.habit.id,
       name: view.habit.name,

@@ -54,13 +54,15 @@ export type HabitView = {
  * with a wall of red and a broken streak it never had a chance to keep. A habit
  * cannot be missed before it exists.
  */
-function toScheduleLike(habit: HabitWithSchedule, timeZone: string): ScheduleLike {
+export function toScheduleLike(habit: HabitWithSchedule, timeZone: string): ScheduleLike {
   const s = habit.schedule;
   return {
     frequency: s?.frequency ?? "daily",
     daysOfWeek: s?.daysOfWeek ?? null,
+    daysOfMonth: s?.daysOfMonth ?? null,
     timesPerPeriod: s?.timesPerPeriod ?? null,
     startDate: s?.startDate ?? toZonedDate(habit.createdAt, timeZone),
+    endDate: s?.endDate ?? null,
   };
 }
 

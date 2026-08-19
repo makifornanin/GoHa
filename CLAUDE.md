@@ -1,4 +1,4 @@
-# CLAUDE.md — GoHa Project Constitution
+# CLAUDE.md - GoHa Project Constitution
 
 This file is read automatically at the start of every Claude Code session. It holds the durable rules for the project. Individual session prompts stay short and reference these rules instead of repeating them.
 
@@ -6,11 +6,11 @@ This file is read automatically at the start of every Claude Code session. It ho
 
 ## 1. What GoHa is
 
-GoHa (Goals, Habits, and ACTION) is a private personal execution system for one owner. Its conceptual chain is:
+GoHa (Goals, Habits, and ACTION) is a private, account-scoped personal execution system. Its conceptual chain is:
 
 Life Area → Goal → Sub-goal → Task / Habit → Today → Focus → Complete → Reflect
 
-It is not a to-do app, a habit calendar, a goal list, or a timer on their own. It connects them. The database stays user-scoped so multi-user support is possible later, even though V1 is single-owner.
+It is not a to-do app, a habit calendar, a goal list, or a timer on their own. It connects them. Every account is isolated through session-derived user scoping. The installation supports multiple accounts through controlled signup and invitations.
 
 ---
 
@@ -32,7 +32,7 @@ Expansion (V1b), add each as its own later slice, no re-architecture:
 - Task Maps (React Flow)
 - Settings polish
 
-Out of scope for the app itself (do not add these into GoHa): AI assistant or recommendations, Make.com, n8n, Telegram, email automation, push notification infrastructure, calendar sync, team or social features, billing, complex gamification. External automations can be layered on top later as separate integrations, never baked into V1.
+Out of scope for the app itself: a browser-side AI assistant, direct Gemini calls, a native iOS app, calendar sync, team/social features, billing, and complex gamification. GoHa may expose server-owned automation jobs and deliver standards-based Web Push, while n8n/Gemini remain external and never become sources of truth for user identity, dates, calculations, dedupe, or Sabbath.
 
 ---
 
@@ -57,7 +57,7 @@ Forbidden: Supabase, Firebase, Prisma. Do not turn the app into a default shadcn
 
 - Server Components by default. Add "use client" only for interactive forms, timers, drag and drop, React Flow, browser APIs, or genuine local interaction. Never at a whole page or layout boundary without reason.
 - Database reads and initial page data: server side.
-- Mutations: Server Actions by default. Route Handlers only when justified (Better Auth handler, future external integrations).
+- Mutations: Server Actions by default. Route Handlers only when justified (Better Auth, public pairing exchange, personal-token APIs, health, or the authenticated internal worker surface).
 - Data access goes through a single repository layer under `db/` (the seam). UI and components never import Drizzle directly. This is what lets the schema, the mock phase, and the live database swap cleanly.
 - `DATABASE_URL` is server only. Never `NEXT_PUBLIC_*`. Never queried from client components.
 
@@ -73,9 +73,9 @@ Forbidden: Supabase, Firebase, Prisma. Do not turn the app into a default shadcn
 
 ---
 
-## 6. Timezone rules (Asia/Manila)
+## 6. Timezone rules
 
-- Primary user timezone: Asia/Manila.
+- Default timezone: Asia/Manila. Every account can save another valid IANA timezone, and new date-sensitive code must use that saved value.
 - Audit timestamps (`created_at`, `updated_at`): `TIMESTAMPTZ`, real instants.
 - Date-bucketed business concepts (a local calendar date): a proper `DATE` column.
 - Habit entries carry both: `entry_date DATE` and `created_at TIMESTAMPTZ`. A habit done at 12:30 AM Manila belongs to that local date, not the UTC date.

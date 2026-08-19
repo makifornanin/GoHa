@@ -8,6 +8,28 @@ Stack: Neon Serverless Postgres, Drizzle ORM, Drizzle Kit. Identity, connection,
 and validation rules live in `CLAUDE.md` (sections 4 to 8). This file does not
 repeat them; it records the concrete shape they produced.
 
+## 2026-08-19 automation and multi-account update
+
+The final migration chain is multi-account. Migration 0011 temporarily created
+`user_single_owner_uq`; migration 0014 explicitly drops it and adds the current
+invitation/signup structures. The read-only production diagnostic confirmed the
+index is absent and multiple user rows already exist.
+
+Migration `0016_famous_joseph.sql` is generated and reviewed but not applied by
+the implementation handoff. It adds:
+
+| Table | Purpose | Core invariant |
+| --- | --- | --- |
+| `push_subscriptions` | One Web Push endpoint/device owned by an account | Endpoint globally unique; user cascade; active-user indexes |
+| `push_pairing_sessions` | Hash-only ten-minute QR setup intent | One row per user; secret hash unique; one-time consumption |
+| `push_deliveries` | Per-logical-notification, per-endpoint retry state | Unique notification/endpoint hash; leased attempts; terminal-state checks |
+| `automation_jobs` | Durable server-owned work for the central n8n worker | Unique user/dedupe key; leased lifecycle; completion constraints |
+
+It also adds `automation_job_status` and the `test` value to
+`notification_kind`. All four tables use UUID keys and user-scoped cascading
+foreign keys. `push_deliveries.subscription_id` uses `ON DELETE SET NULL` so
+terminal delivery evidence survives removal of a dead endpoint.
+
 ## Conventions
 
 - **Primary keys:** every table has `id uuid primary key default gen_random_uuid()`.
@@ -153,10 +175,10 @@ database, so the loser of a race gets a constraint violation instead of a
 duplicate. `lib/db-errors.ts` classifies those violations and the callers turn
 them into ordinary answers rather than errors.
 
-- `user_single_owner_uq`: a unique index on a constant expression, so `"user"`
-  can hold exactly one row. Backs the single-owner hook in `lib/auth.ts`.
-  Multi-user later is a `DROP INDEX` and nothing else, since every table is
-  already user-scoped.
+- Historical only: `user_single_owner_uq` was a unique index on a constant
+  expression in migration 0011. Migration 0014 drops it. The current schema and
+  final 0015 snapshot contain no singleton index; owner identity is determined
+  by installation ownership logic while normal accounts remain user-scoped.
 - `focus_sessions_one_active_per_user_uq`: partial unique on `(user_id) WHERE
   status = 'in_progress'`. At most one running session, so a double start cannot
   leave two open and double count. `startFocusSessionAction` answers a conflict
@@ -191,20 +213,20 @@ targeted indexes back the actual views:
 - `task_maps` / nodes / edges: by `user_id`, `task_map_id`, and `task_id`.
 - Auth: `session.user_id`, `account.user_id`, `verification.identifier`.
 
-## Timezone rules (Asia/Manila)
+## Timezone rules
 
 Centralized in `lib/date.ts` (CLAUDE.md section 6), with boundary tests in
 `tests/date.test.ts`.
 
 - Audit columns and `due_at` / `started_at` / `ended_at` are real instants
   (`timestamptz`).
-- Business dates are `date` columns holding the **Manila local calendar date**.
+- Business dates are `date` columns holding the **account's saved local calendar date**.
   `habit_entries` and `focus_sessions` carry both a `date` and a `timestamptz`:
   a habit logged at 12:30 AM Manila belongs to that local date, not the earlier
   UTC date.
-- Local dates are never derived by truncating a UTC timestamp. `toManilaDate`
-  resolves the calendar date through the IANA zone; date -> instant conversion
-  uses Manila's constant +08:00 offset (no DST since 1978), asserted by tests.
+- Local dates are never derived by truncating a UTC timestamp. Generic `zoned*`
+  helpers resolve the saved IANA zone, including DST. Manila-specific wrappers
+  remain compatibility helpers for the default zone.
 - Date-derived buckets (Today/Week/Month/Quarter/Year) are computed as half-open
   local-date ranges (`start <= date < endExclusive`) by `manilaBucketRange`, and
   compared directly against `date` columns. There is no stored `bucket` field.

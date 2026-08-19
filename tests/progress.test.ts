@@ -289,6 +289,20 @@ describe("habitHeatmap", () => {
       expect(habitCompletionRate(cells)).toBe(100);
     });
 
+    it("keeps an explicit skip neutral in the completion denominator", () => {
+      const skipped = { ...entry("2026-08-11"), status: "skipped" } as HabitEntry;
+      const cells = habitHeatmap({
+        habits: [habit],
+        entries: [skipped],
+        from: "2026-08-11",
+        to: "2026-08-11",
+        today: "2026-08-12",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      expect(cells[0]).toMatchObject({ scheduled: 0, done: 0, level: 0 });
+    });
+
     it("respects a lower-is-better target", () => {
       const ceiling = {
         ...numeric,
@@ -338,6 +352,32 @@ describe("habitHeatmap", () => {
         timeZone: TZ,
       });
       expect(cells.every((c) => c.scheduled === 0)).toBe(true);
+    });
+
+    it("respects monthly days and an ended schedule", () => {
+      const monthly = {
+        ...habit,
+        id: "h-monthly",
+        schedule: {
+          ...habit.schedule,
+          id: "s-monthly",
+          habitId: "h-monthly",
+          frequency: "monthly",
+          daysOfMonth: [15],
+          endDate: "2026-08-15",
+        },
+      } as HabitWithSchedule;
+
+      const cells = habitHeatmap({
+        habits: [monthly],
+        entries: [],
+        from: "2026-08-14",
+        to: "2026-08-16",
+        today: "2026-08-17",
+        weekStartsOn: 1,
+        timeZone: TZ,
+      });
+      expect(cells.map((cell) => cell.scheduled)).toEqual([0, 1, 0]);
     });
 
     it("does not treat a times-per-week habit as due every day", () => {

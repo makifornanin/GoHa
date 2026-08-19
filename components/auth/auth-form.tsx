@@ -195,7 +195,7 @@ export function AuthForm({
             autoComplete="email"
             placeholder="you@example.com"
             required
-            disabled={pending || Boolean(lockedEmail)}
+            disabled={pending}
             defaultValue={lockedEmail ?? undefined}
             // A locked address is part of the invitation, so it is submitted
             // even though the field cannot be edited.

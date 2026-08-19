@@ -13,7 +13,7 @@ import type { NextConfig } from "next";
  * `connect-src 'self'` is the line that matters most for this app: nothing here
  * is supposed to talk to a third party, and the automation surface is
  * inbound-only. `frame-ancestors 'none'` and `form-action 'self'` close the
- * clickjacking and form-relay routes to a single-owner app's session.
+ * clickjacking and form-relay routes to authenticated app sessions.
  */
 const CSP = [
   "default-src 'self'",
@@ -55,6 +55,16 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: SECURITY_HEADERS,
+      },
+      {
+        // A root-scoped worker controls every GoHa page. It must be fetched as
+        // JavaScript and revalidated instead of being stranded in an HTTP cache
+        // after a deployment.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
       },
       {
         // The automation surface is machine-to-machine and must never be

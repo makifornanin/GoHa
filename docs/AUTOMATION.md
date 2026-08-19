@@ -1,13 +1,22 @@
-# AUTOMATION.md — the surface GoHa exposes
+# AUTOMATION.md - the surfaces GoHa exposes
 
-GoHa contains no notification infrastructure, no scheduler, and no third-party
-integrations. That is in the project constitution (CLAUDE.md section 2) and does
-not change here. What follows is the small, token-authenticated surface that
-lets something **outside** GoHa read your day and say something about it: n8n,
-Apple Shortcuts, a Scriptable widget.
+GoHa now has two deliberately separate automation surfaces:
 
-This file is the app side. The eight `GoHa-Guide-*.pdf` documents in this folder
-are the other side of the wire: the workflows, the prompts, the Shortcuts.
+1. The existing personal bearer-token API documented below. It remains useful
+   for the owner, developer tools, and optional power-user integrations.
+2. A central service-authenticated job API that discovers eligible accounts,
+   owns timezone/date/dedupe decisions, and delivers through account-owned Web
+   Push subscriptions. See `docs/n8n-web-push-contracts.md`.
+
+Ordinary iPhone onboarding no longer creates an automation token. It uses a
+short-lived pairing intent, normal account authentication, a Home Screen PWA,
+and an explicit notification-permission tap. See
+`docs/PWA_WEB_PUSH_AUTOMATION_REVISION.md`.
+
+The claimed revised eight `GoHa-Guide-00..07` files are not tracked in this
+repository. Only the older combined `docs/GoHa-Automation-Guide.pdf` is present,
+so its Shortcut/Pushcut delivery sections are historical rather than the current
+ordinary-user setup.
 
 ---
 
@@ -26,14 +35,16 @@ through these endpoints, where Zod validation and ownership checks live.
 
 ---
 
-## Getting a token
+## Getting a personal integration token
 
-**Settings → Automations → New token.**
+The advanced owner interface at **Settings -> Automations -> New token** remains
+available to `milcamark7@gmail.com`.
 
 - The secret appears **once**. Only its SHA-256 hash is stored, so there is no
   copy to come back for.
-- A **QR code** is shown with it, carrying `{ url, token }`. Point your phone's
-  camera at the screen instead of typing 45 characters.
+- The advanced token dialog may show its one-time credential QR for an explicit
+  integration. This is not the consumer **Connect your iPhone** QR and is never
+  used as a push-subscription credential.
 - Scope in plain terms: read only, or read plus writes. Neither can create,
   complete, or reschedule anything.
 - Revoke stops it immediately and keeps its history. Delete removes the row.

@@ -19,13 +19,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * does the real lookup and redirects an genuinely-authenticated user itself.
  */
 const AUTH_PATHS = ["/login", "/register"];
+const EXACT_PUBLIC_PATHS = ["/iphone/setup", "/api/push/pairing/stage"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAuthPath = AUTH_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
-  if (isAuthPath) return NextResponse.next();
+  const isPublicPath =
+    EXACT_PUBLIC_PATHS.includes(pathname) ||
+    AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  if (isPublicPath) return NextResponse.next();
 
   if (!getSessionCookie(request)) {
     const url = new URL("/login", request.url);
@@ -50,6 +51,6 @@ export const config = {
    * answer with a status rather than a redirect to a sign-in page.
    */
   matcher: [
-    "/((?!api/auth|api/automation|api/health|_next/static|_next/image|favicon.ico|.*\\.).*)",
+    "/((?!api/auth|api/automation|api/internal/automation|api/health|_next/static|_next/image|favicon.ico|.*\\.).*)",
   ],
 };

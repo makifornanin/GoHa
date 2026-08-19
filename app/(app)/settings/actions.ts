@@ -58,9 +58,8 @@ export async function updateThemeAction(theme: ThemeValue): Promise<ActionResult
 /**
  * Persist the daily rhythm times.
  *
- * The app does not deliver anything from these (push and email are out of
- * scope, CLAUDE.md section 2). They are stated intentions the app reflects back
- * on Today, and a stable place an external automation can read from.
+ * These remain visible intentions in Today and are also the saved local wall
+ * times used by the central automation worker. Null means no scheduled run.
  */
 export async function updateRhythmAction(input: RhythmInput): Promise<ActionResult> {
   const user = await requireUser();

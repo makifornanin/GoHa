@@ -104,6 +104,13 @@ async function guardSignUp(request: Request): Promise<Response | null> {
     return json({ message: "That invitation is not valid." }, 403);
   }
 
+  // Invitations are an install-wide owner capability. Older builds allowed
+  // any signed-in account to create one, so fail closed for any legacy row
+  // whose issuer is not the current owner.
+  if (!(await appSettingsRepo.isOwner(invite.invitedBy))) {
+    return json({ message: "That invitation is not valid." }, 403);
+  }
+
   const state = inviteState(invite);
   if (state !== "usable") {
     // Named states, because "invalid" would send someone hunting for a typo in

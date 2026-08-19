@@ -144,7 +144,7 @@ export function AutomationPrefsCard({
         <div>
           <h2 className="text-headline text-label">What automations may send</h2>
           <p className="mt-0.5 text-callout text-label-secondary">
-            GoHa never sends anything itself. These decide what it will hand to the tool that does.
+            Choose which GoHa smart notifications are allowed on your connected devices.
           </p>
         </div>
       </div>
@@ -168,8 +168,8 @@ export function AutomationPrefsCard({
         />
         <Toggle
           id="pref-deadline"
-          label="Deadline and streak alerts"
-          hint="Due soon, overdue today, a focus timer left running, a streak about to break."
+          label="Deadline and focus alerts"
+          hint="Due soon, overdue today, or a focus timer left running."
           checked={value.deadlineAlertsEnabled}
           disabled={pending}
           onChange={(next) => persist({ ...value, deadlineAlertsEnabled: next })}

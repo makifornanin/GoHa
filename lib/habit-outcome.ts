@@ -93,14 +93,17 @@ export function loggedEntryOutcome(habit: HabitMeasure, entry: LoggedEntry): Log
   if (entry.status === "missed") return "missed";
   // status === "done": for a numeric habit the value decides whether the
   // logged day actually met the target.
-  if (habit.type === "numeric" && habit.targetValue !== null && entry.value !== null) {
+  if (habit.type === "numeric" && habit.targetValue !== null) {
+    // A numeric completion without a recorded number cannot prove the target
+    // was met. Treat legacy/crafted null values conservatively as partial.
+    if (entry.value === null) return "partial";
     const met = habit.higherIsBetter
       ? entry.value >= habit.targetValue
       : entry.value <= habit.targetValue;
     return met ? "done" : "partial";
   }
-  // A boolean habit, or a numeric habit with no target or no recorded value:
-  // there is nothing to compare against, so the log stands as a completion.
+  // A boolean habit, or a numeric habit with no target: there is nothing to
+  // compare against, so the log stands as a completion.
   return "done";
 }
 

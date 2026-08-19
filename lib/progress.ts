@@ -1,7 +1,11 @@
 import type { FocusSession, HabitEntry, Task } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { addDays, startOfWeek, toZonedDate, type IsoDate, type Weekday } from "@/lib/date";
-import { habitOutcome, isCompleteOutcome } from "@/lib/habit-outcome";
+import {
+  countsTowardExpected,
+  habitOutcome,
+  isCompleteOutcome,
+} from "@/lib/habit-outcome";
 import { isDayScheduled } from "@/lib/habit-streaks";
 import { buildHabitViews } from "@/lib/habit-view";
 import { toNumberOrNull } from "@/lib/habits";
@@ -167,16 +171,17 @@ export function habitHeatmap(params: {
     let done = 0;
     let scheduled = 0;
     for (const { id, schedule, measure } of measures) {
-      if (!isDayScheduled(schedule, date)) continue;
-      scheduled += 1;
       const entry = entryByKey.get(`${id}|${date}`);
+      const scheduledForDate = isDayScheduled(schedule, date);
       const outcome = habitOutcome({
         habit: measure,
         entry: entry ? { status: entry.status, value: toNumberOrNull(entry.value) } : null,
-        scheduled: true,
+        scheduled: scheduledForDate,
         date,
         today: params.today,
       });
+      if (!countsTowardExpected(outcome)) continue;
+      scheduled += 1;
       if (isCompleteOutcome(outcome)) done += 1;
     }
 

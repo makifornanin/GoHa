@@ -119,8 +119,10 @@ describe("habitOutcome: tolerated nulls", () => {
     expect(resolve({ habit, entry: { status: "done", value: 3 } })).toBe("done");
   });
 
-  it("a numeric habit with a target but no recorded value treats a log as done", () => {
-    expect(resolve({ habit: MORE_IS_BETTER, entry: { status: "done", value: null } })).toBe("done");
+  it("does not infer that a numeric target was met when the value is missing", () => {
+    expect(resolve({ habit: MORE_IS_BETTER, entry: { status: "done", value: null } })).toBe(
+      "partial",
+    );
   });
 });
 

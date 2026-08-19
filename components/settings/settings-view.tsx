@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { AutomationCard } from "@/components/settings/automation-card";
 import type { AutomationOverview } from "@/app/(app)/settings/automation-actions";
 import type { PeopleOverview } from "@/app/(app)/settings/invite-actions";
+import type { PushOverview } from "@/app/(app)/settings/push-actions";
 import { IphoneConnectionCard } from "@/components/settings/iphone-connection-card";
 import { InvitesCard } from "@/components/settings/invites-card";
 import {
@@ -75,12 +76,14 @@ export function SettingsView({
   profile,
   settings,
   automationOverview,
+  pushOverview,
   showAdvancedAutomation,
   people,
 }: {
   profile: { name: string; email: string };
   settings: SettingsData;
-  automationOverview: AutomationOverview;
+  automationOverview: AutomationOverview | null;
+  pushOverview: PushOverview;
   showAdvancedAutomation: boolean;
   people: PeopleOverview;
 }) {
@@ -95,12 +98,11 @@ export function SettingsView({
       />
       <SecurityCard />
       <AutomationPrefsCard prefs={settings.automation} />
-      <InvitesCard initial={people} className="lg:col-span-2" />
-      {showAdvancedAutomation ? (
+      {people.isOwner ? <InvitesCard initial={people} className="lg:col-span-2" /> : null}
+      <IphoneConnectionCard initial={pushOverview} className="lg:col-span-2" />
+      {showAdvancedAutomation && automationOverview ? (
         <AutomationCard initial={automationOverview} className="lg:col-span-2" />
-      ) : (
-        <IphoneConnectionCard initial={automationOverview} className="lg:col-span-2" />
-      )}
+      ) : null}
       <ArchiveCard className="lg:col-span-2" />
       <DataCard className="lg:col-span-2" />
     </div>
@@ -110,10 +112,9 @@ export function SettingsView({
 /**
  * The daily rhythm: when you mean to plan, and when you mean to look back.
  *
- * The app does NOT deliver anything from these. Push and email infrastructure
- * are out of scope (CLAUDE.md section 2), so promising a reminder here would be
- * a lie. They are stated intentions, and a stable place an external automation
- * can read from without the app growing a notification system.
+ * These times are also the user's explicit scheduling preferences for the
+ * central automation worker. Empty times remain disabled rather than inheriting
+ * a surprise server default.
  */
 function RhythmCard({
   dailyPlanningTime,
@@ -177,8 +178,9 @@ function RhythmCard({
           />
         </div>
         <p className="text-footnote text-label-tertiary">
-          GoHa does not send notifications. These are your stated intentions, and the times an
-          external automation can read if you set one up.
+          When notifications are enabled, GoHa uses these times in your saved timezone for the
+          morning brief and evening summary. Leave a time empty to keep that scheduled message
+          off.
         </p>
       </div>
     </SettingsCard>

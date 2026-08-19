@@ -34,8 +34,10 @@ export type HabitLike = HabitMeasure;
 export type ScheduleLike = {
   frequency: "daily" | "weekly" | "monthly";
   daysOfWeek: number[] | null;
+  daysOfMonth: number[] | null;
   timesPerPeriod: number | null;
   startDate: IsoDate | null;
+  endDate: IsoDate | null;
 };
 
 export type EntryLike = LoggedEntry & { entryDate: IsoDate };
@@ -80,8 +82,21 @@ export function scheduledWeekdays(schedule: ScheduleLike): Set<Weekday> | null {
 /** Whether a habit is due (eligible) on a local date. */
 export function isDayScheduled(schedule: ScheduleLike, date: IsoDate): boolean {
   if (schedule.startDate && date < schedule.startDate) return false;
+  if (schedule.endDate && date > schedule.endDate) return false;
+
+  if (
+    schedule.frequency === "monthly" &&
+    schedule.daysOfMonth &&
+    schedule.daysOfMonth.length > 0
+  ) {
+    const dayOfMonth = Number(date.slice(8, 10));
+    return schedule.daysOfMonth.includes(dayOfMonth);
+  }
+
   const weekdays = scheduledWeekdays(schedule);
-  if (!weekdays) return true; // times-per-week: every day is eligible
+  // Flexible X-per-period schedules have no named due day. Each day is
+  // eligible, while period-level progress/streak code owns the X denominator.
+  if (!weekdays) return true;
   return weekdays.has(weekdayOf(date));
 }
 

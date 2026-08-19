@@ -18,4 +18,6 @@ export * as reviewsRepo from "./reviews";
 export * as settingsRepo from "./settings";
 export * as appSettingsRepo from "./app-settings";
 export * as automationRepo from "./automation";
+export * as pushRepo from "./push";
+export * as workerRepo from "./worker";
 export * as quotesRepo from "./quotes";

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { MotionProvider } from "@/components/motion-config";
+import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -30,6 +31,15 @@ export const metadata: Metadata = {
   description:
     "GoHa: a personal execution system that connects your life areas, goals, habits, and daily action.",
   applicationName: "GoHa",
+  icons: {
+    icon: [
+      { url: "/icons/goha-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/goha-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/goha-apple-180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 // Browser-chrome color only (metadata, not styling): mirrors --canvas.
@@ -50,6 +60,7 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} h-full`}
     >
       <body className="min-h-full bg-canvas text-label">
+        <ServiceWorkerRegistrar />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

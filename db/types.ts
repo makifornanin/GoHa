@@ -6,9 +6,13 @@
 import type {
   account,
   automationRequests,
+  automationJobs,
   automationTokens,
   dailyQuotes,
   notificationLog,
+  pushDeliveries,
+  pushPairingSessions,
+  pushSubscriptions,
   brainDumpItems,
   dailyPriorities,
   focusSessions,
@@ -81,6 +85,14 @@ export type AutomationRequest = typeof automationRequests.$inferSelect;
 export type NewAutomationRequest = typeof automationRequests.$inferInsert;
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type NewNotificationLogEntry = typeof notificationLog.$inferInsert;
+export type AutomationJob = typeof automationJobs.$inferSelect;
+export type NewAutomationJob = typeof automationJobs.$inferInsert;
+export type PushSubscriptionRecord = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscriptionRecord = typeof pushSubscriptions.$inferInsert;
+export type PushPairingSession = typeof pushPairingSessions.$inferSelect;
+export type NewPushPairingSession = typeof pushPairingSessions.$inferInsert;
+export type PushDelivery = typeof pushDeliveries.$inferSelect;
+export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
 export type DailyQuote = typeof dailyQuotes.$inferSelect;
 export type NewDailyQuote = typeof dailyQuotes.$inferInsert;
 

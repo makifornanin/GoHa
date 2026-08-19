@@ -95,11 +95,11 @@ export type PeopleOverview = {
 
 export async function listInvitesAction(): Promise<PeopleOverview> {
   const user = await requireUser();
-  const [rows, signupMode, owner] = await Promise.all([
-    invitesRepo.listInvites(user.id),
+  const [signupMode, owner] = await Promise.all([
     appSettingsRepo.getSignupMode(),
     appSettingsRepo.isOwner(user.id),
   ]);
+  const rows = owner ? await invitesRepo.listInvites(user.id) : [];
   return { invites: rows.map(toSummary), signupMode, isOwner: owner };
 }
 
@@ -142,6 +142,10 @@ export async function createInviteAction(input: {
   expiresInDays?: number | null;
 }): Promise<ActionResult<{ invite: InviteSummary; link: string; code: string; qrSvg: string | null }>> {
   const user = await requireUser();
+
+  if (!(await appSettingsRepo.isOwner(user.id))) {
+    return { ok: false, error: "Only the owner of this GoHa can create invitations." };
+  }
 
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) {
@@ -193,6 +197,9 @@ export async function createInviteAction(input: {
 /** Withdraw an unused invitation. An accepted one is history, not a switch. */
 export async function revokeInviteAction(id: string): Promise<ActionResult<{ id: string }>> {
   const user = await requireUser();
+  if (!(await appSettingsRepo.isOwner(user.id))) {
+    return { ok: false, error: "Only the owner of this GoHa can manage invitations." };
+  }
   const parsed = idSchema.safeParse(id);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
@@ -211,6 +218,9 @@ export async function revokeInviteAction(id: string): Promise<ActionResult<{ id:
 
 export async function deleteInviteAction(id: string): Promise<ActionResult<{ id: string }>> {
   const user = await requireUser();
+  if (!(await appSettingsRepo.isOwner(user.id))) {
+    return { ok: false, error: "Only the owner of this GoHa can manage invitations." };
+  }
   const parsed = idSchema.safeParse(id);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 

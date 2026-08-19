@@ -13,9 +13,9 @@ import { loggedEntryOutcome, toDayCellState } from "@/lib/habit-outcome";
  * became a thin wrapper would make it compare the new code against itself and
  * assert nothing.
  *
- * As written, this pins the new definition against the historical one across
- * the whole input space. If someone later changes what `partial` means, or flips
- * a comparison, this fails and names the exact combination that moved.
+ * This pins the new definition against the historical one across the whole
+ * input space, with one explicit safety correction: a numeric `done` row with
+ * a target but no value can no longer prove completion and is `partial`.
  *
  * The one intentional difference is scope: the legacy function only ever saw a
  * logged entry, so this compares the logged path only. The unlogged rules
@@ -35,6 +35,18 @@ function legacyEntryOutcome(habit: HabitLike, entry: EntryLike): StreakOutcome {
   return "done";
 }
 
+function expectedEntryOutcome(habit: HabitLike, entry: EntryLike): StreakOutcome {
+  if (
+    habit.type === "numeric" &&
+    habit.targetValue !== null &&
+    entry.status === "done" &&
+    entry.value === null
+  ) {
+    return "partial";
+  }
+  return legacyEntryOutcome(habit, entry);
+}
+
 /** Every habit shape that can reach the outcome logic. */
 const HABITS: { label: string; habit: HabitLike }[] = [
   { label: "boolean", habit: { type: "boolean", targetValue: null, higherIsBetter: true } },
@@ -51,7 +63,7 @@ const HABITS: { label: string; habit: HabitLike }[] = [
 const STATUSES = ["done", "missed", "skipped"] as const;
 const VALUES = [null, -1, 0, 1, 1.5, 2, 3, 5, 7.999, 8, 8.001, 12] as const;
 
-describe("R-06 parity: shared outcome matches the behaviour it replaced", () => {
+describe("R-06 parity: shared outcome preserves legacy rules plus the null-value fix", () => {
   it("agrees on every habit shape, status and value combination", () => {
     const mismatches: string[] = [];
     let compared = 0;
@@ -61,15 +73,15 @@ describe("R-06 parity: shared outcome matches the behaviour it replaced", () => 
         for (const value of VALUES) {
           const entry: EntryLike = { entryDate: "2026-08-17", status, value };
 
-          const legacy = legacyEntryOutcome(habit, entry);
+          const expected = expectedEntryOutcome(habit, entry);
           const shared = toDayCellState(
             loggedEntryOutcome(habit, { status: entry.status, value: entry.value }),
           );
 
           compared += 1;
-          if (legacy !== shared) {
+          if (expected !== shared) {
             mismatches.push(
-              `${label} / status=${status} / value=${String(value)}: legacy=${legacy} shared=${shared}`,
+              `${label} / status=${status} / value=${String(value)}: expected=${expected} shared=${shared}`,
             );
           }
         }
@@ -82,7 +94,7 @@ describe("R-06 parity: shared outcome matches the behaviour it replaced", () => 
     expect(compared).toBe(252);
   });
 
-  it("the live entryOutcome wrapper still matches the frozen legacy behaviour", () => {
+  it("the live entryOutcome wrapper delegates the corrected semantics", () => {
     // Separate from the parity sweep above: this one CAN become a tautology as
     // the wrapper thins out, and that is fine. Its job is to catch a wrapper
     // that stops delegating correctly, not to define the semantics.
@@ -90,7 +102,7 @@ describe("R-06 parity: shared outcome matches the behaviour it replaced", () => 
       for (const status of STATUSES) {
         for (const value of VALUES) {
           const entry: EntryLike = { entryDate: "2026-08-17", status, value };
-          expect(entryOutcome(habit, entry)).toBe(legacyEntryOutcome(habit, entry));
+          expect(entryOutcome(habit, entry)).toBe(expectedEntryOutcome(habit, entry));
         }
       }
     }

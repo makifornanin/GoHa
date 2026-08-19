@@ -1,101 +1,149 @@
-# DEPLOY.md — putting GoHa on Vercel
+# DEPLOY.md - GoHa on Vercel
 
-Written to be followed once. Everything the app can prepare is prepared; what
-remains needs your account, and is listed here in order.
+This is the current deployment sequence for the multi-account PWA/Web Push
+architecture. It does not apply migrations automatically and never uses the
+owner database for destructive tests.
 
----
+## Current database state
 
-## Before you deploy
+The 2026-08-18 read-only diagnostic verified the configured Neon target as
+`neondb` under the owner role, with three user rows and migrations `0000` through
+`0015` applied. Migration `0014_bent_shiver_man.sql` already dropped the old
+`user_single_owner_uq` index. The final schema supports multiple accounts.
 
-**1. Settle the second account.** `e2e.harness@goha.test` exists on the
-production database alongside your own. It blocks migration 0011 (the
-single-owner index), and deploying with it live puts a second account, whose
-password is in this repository, on the public internet.
+The new additive migration is:
 
-```sql
--- What each account owns, before you decide.
-SELECT u.email, count(t.id) AS tasks
-FROM "user" u LEFT JOIN tasks t ON t.user_id = u.id
-GROUP BY u.email;
+```text
+db/migrations/0016_famous_joseph.sql
 ```
 
-Then either delete the harness account (its rows cascade) or keep it and skip
-the singleton index. Do not deploy with it live.
+It creates push subscriptions, pairing sessions, per-device delivery state,
+durable worker jobs, and their enums/indexes/constraints. It has been generated,
+reviewed, and checked, but was intentionally not applied by the implementation
+session.
 
-**2. Apply the migrations.** Both are generated, read, and committed; neither
-has been applied.
+Before applying it:
 
-```bash
-pnpm db:backup      # first, always
-# run the five preflight queries in DATABASE.md, each must return no rows
-pnpm db:migrate     # applies 0011 then 0012
-pnpm db:diagnose    # confirms both landed
+```powershell
+pnpm db:diagnose
+pnpm db:backup
+pnpm db:migrate
+pnpm db:diagnose
 ```
 
----
+Read the diagnostic target before continuing. Do not use `pnpm db:push`, do not
+rewrite an older migration, and do not point Playwright/account-reset commands at
+the owner database.
 
-## Deploying
+## Required server environment
 
-1. **Import the repository** at vercel.com/new. The framework is detected;
-   `vercel.json` pins the region to Singapore (`sin1`), which is where the Neon
-   database lives. A different region means every query crosses an ocean twice.
+Set these for local development in `.env.local` and in Vercel for Production:
 
-2. **Set Node to 22.x** in Project Settings → General, matching `.nvmrc`.
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Neon owner connection used by the app and migrations |
+| `BETTER_AUTH_SECRET` | Better Auth session signing secret |
+| `BETTER_AUTH_URL` | Exact public application origin |
+| `VAPID_PUBLIC_KEY` | Stable Web Push public key |
+| `VAPID_PRIVATE_KEY` | Stable server-only Web Push private key |
+| `VAPID_SUBJECT` | `mailto:` or HTTPS operations contact |
+| `AUTOMATION_WORKER_SECRET` | High-entropy central n8n service credential |
 
-3. **Environment variables**, Production scope only:
+Never use `NEXT_PUBLIC_` for a private value. Do not deploy
+`E2E_DATABASE_URL`. Keep the worker secret in n8n's encrypted credential store,
+not in workflow JSON or a node body.
 
-   | Variable | Value |
-   | --- | --- |
-   | `DATABASE_URL` | The `neondb_owner` connection string, same database |
-   | `BETTER_AUTH_SECRET` | Your existing value, or `openssl rand -base64 32` |
-   | `BETTER_AUTH_URL` | The production origin, e.g. `https://goha.vercel.app` |
+Generate VAPID keys locally if needed:
 
-   Do **not** add `E2E_DATABASE_URL`. It exists to point destructive tooling at
-   a throwaway database and has no business on a server.
+```powershell
+pnpm exec web-push generate-vapid-keys --json
+```
 
-4. **Deploy**, then sign in and confirm `/api/health` returns
-   `{"status":"ok"}`.
+Copy the values directly into secret stores. Do not paste real values into docs,
+source, screenshots, issue trackers, or chat.
 
----
+## Vercel deployment
 
-## Two things that will bite otherwise
+1. Import the repository in Vercel.
+2. Use Node 22.x, matching `.nvmrc`.
+3. Configure the seven Production variables above.
+4. Keep `BETTER_AUTH_URL` equal to the final HTTPS origin. Better Auth rejects a
+   mismatched preview origin by design.
+5. Deploy only after migration 0016 is applied to the intended database.
+6. Confirm bare `GET /api/health` returns `200 {"status":"ok"}`.
+7. Sign in as `milcamark7@gmail.com` and confirm Settings shows both
+   **Connect your iPhone** and the existing advanced **Automations** card.
+8. Sign in as a normal account and confirm it sees only the consumer connection
+   experience, not token scopes/history.
 
-**`BETTER_AUTH_URL` and preview deployments.** Better Auth validates the request
-Origin against it, so every preview URL rejects sign-in. Set the variable for
-Production only and expect previews to fail at login. That is it working, not a
-bug.
+The repository security headers explicitly serve `/sw.js` as JavaScript with
+no-cache headers. The manifest and static icons are public assets; the
+authenticated application remains protected.
 
-**Your password is now the only lock.** Registration is closed and (after 0011)
-the database refuses a second account, but `/login` is public. Use a real
-password. Vercel's deployment protection is one toggle if you want a second
-layer.
+## iPhone device verification
 
----
+Web Push cannot be fully verified in jsdom or on an ordinary desktop tab. Use a
+supported real iPhone/iPad and the deployed HTTPS origin:
 
-## After deploying
+1. Open GoHa in Safari.
+2. Use Share -> Add to Home Screen and keep **Open as Web App** enabled.
+3. Open GoHa from the new Home Screen icon.
+4. Sign in if iOS did not carry the Safari session into the installed app.
+5. Open Settings -> Connect your iPhone.
+6. Tap **Enable Notifications**, then tap **Allow** in the system prompt.
+7. Confirm Settings reports the current device as connected.
+8. Tap **Send Test Notification** and verify the visible notification opens
+   `/today`.
+9. Disconnect the current device and verify other connected devices remain.
 
-1. **Settings → Automations → New token.** The QR code carries the production
-   URL, because the page reads it from the request rather than an env var. A
-   token created locally shows a `localhost` address and the card says so.
-2. Point n8n at the production origin and store the token as a Header Auth
-   credential.
-3. Turn on the automations you want in **Settings → What automations may send**.
-   All three ship off, and the API enforces them.
-4. Set your **Sabbath day** in the same card if you keep one.
-5. Seed the quote pool if you want the card and the brief to carry one:
-   create `content/daily-quotes.json`, then `pnpm db:seed-quotes`.
+For the desktop-to-phone flow, create the QR on the desktop, scan it with the
+iPhone Camera, authenticate with the same GoHa account, install/open the Home
+Screen app, and explicitly enable notifications. Scanning alone is not a
+connection.
 
----
+## n8n deployment
 
-## What runs where
+n8n is central and server-driven. A phone no longer calls n8n and ordinary users
+do not configure their own workflows or tokens.
 
-| | Where | Notes |
-| --- | --- | --- |
-| GoHa | Vercel | Serverless; the Neon HTTP driver suits it |
-| Database | Neon | Unchanged; same project, same connection string |
-| n8n | Yours to host | Must be reachable **from your phone**, since Shortcuts POST to its webhooks |
-| Shortcuts | iPhone | Pull only; iOS may defer a timed automation under Low Power Mode |
-| AI, Gmail | n8n credentials | Never in GoHa; nothing here calls a model |
+Implement the contract in `docs/n8n-web-push-contracts.md`:
 
-CI runs typecheck, lint, unit tests, a production build, and a migration-drift
-check on every push. It holds no credentials and never touches a database.
+```text
+n8n schedule
+  -> POST /api/internal/automation/jobs/claim
+  -> GET the leased payload
+  -> optional Gemini narration
+  -> POST complete (or deterministic fallback)
+  -> GoHa Web Push fan-out
+```
+
+Start with `outcome: "use_fallback"` before adding Gemini. Keep user IDs, local
+dates, timezones, dedupe keys, deep links, and push endpoints under GoHa control.
+
+Active central kinds are morning, evening, deadline, focus overrun, and the
+morning Sabbath rest message. Streak, graveyard, and review materialization must
+remain disabled until the limitations in
+`docs/PWA_WEB_PUSH_AUTOMATION_REVISION.md` are resolved.
+
+## Validation before scheduled delivery
+
+1. Test two accounts and at least two subscriptions.
+2. Prove one account's test push cannot reach the other.
+3. Save explicit planning/reflection times; null means the related daily job is
+   intentionally unscheduled.
+4. Poll claim and complete one fallback notification.
+5. Poll again and verify the completed key is not reproduced.
+6. Verify a non-Manila timezone and a DST boundary.
+7. Verify Sabbath suppresses evening/deadline/focus and produces at most one
+   enabled morning rest message.
+8. Keep infrastructure health alerts on the existing email path.
+
+## Operational notes
+
+- Keep the VAPID key pair stable. Replacing it can require resubscription.
+- A provider 404/410 removes only that dead subscription.
+- Per-device ledgers avoid resending to devices already accepted during a
+  partial retry, but Web Push cannot promise transactional exactly-once receipt.
+- The service worker is push-only; there is no offline cache.
+- Existing personal automation tokens and APIs remain available for explicit
+  developer integrations. They are not PWA device credentials.

@@ -105,6 +105,7 @@ export const notificationKind = pgEnum("notification_kind", [
   "review_draft",
   "health",
   "sabbath",
+  "test",
 ]);
 
 /** Where a daily quote comes from: a quote, or a scripture verse. */

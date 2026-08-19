@@ -1,6 +1,6 @@
 # GoHa
 
-**Goals, Habits, and ACTION.** A private, single-owner execution system.
+**Goals, Habits, and ACTION.** A private, account-scoped execution system.
 
 Its whole point is the chain, not the parts:
 
@@ -24,8 +24,9 @@ pnpm db:migrate                # apply the schema
 pnpm dev                       # http://localhost:3000
 ```
 
-`/register` is a one-time bootstrap: it creates the single owner and then
-closes. There is no second account, and the database refuses one.
+The first registration bootstraps the installation owner. Later accounts follow
+the saved signup mode or an owner-created invitation. Every domain row remains
+scoped to the authenticated account.
 
 ### Scripts
 
@@ -50,7 +51,7 @@ closes. There is no second account, and the database refuses one.
 | --- | --- |
 | Framework | Next.js 16 (App Router), React 19, TypeScript strict |
 | Data | Neon Serverless Postgres, Drizzle ORM, Drizzle Kit migrations |
-| Auth | Better Auth, email/password, single owner |
+| Auth | Better Auth, email/password, owner-managed multi-account signup |
 | UI | Tailwind CSS 4, a small hand-built component set, lucide-react, Sonner |
 | Validation | Zod at every server boundary |
 | Tests | Vitest for logic and components, Playwright for flows |
@@ -73,17 +74,20 @@ boundary tests, and take the timezone saved in Settings.
 
 ---
 
-## Automations
+## Automations and iPhone notifications
 
-GoHa sends nothing. It has no scheduler, no push infrastructure, and no
-third-party integrations, by constitution.
+GoHa is installable as a Home Screen PWA and stores standards-based Web Push
+subscriptions per authenticated account/device. A central n8n installation can
+claim server-owned automation jobs; GoHa still owns user selection, timezone,
+dates, calculations, dedupe, Sabbath, and final push delivery.
 
-What it does have is a small token-authenticated read surface, so something you
-run elsewhere (n8n, Make, Shortcuts) can ask it what to say. The brief it
-returns is the same judgement the Today screen shows, produced by the same code.
+The existing personal automation-token API remains available to the owner and
+power-user integrations. Ordinary users do not need a token, Shortcut, webhook,
+or their own n8n instance.
 
-See **[docs/AUTOMATION.md](docs/AUTOMATION.md)**. Tokens are managed in
-Settings -> Automations.
+See **[docs/AUTOMATION.md](docs/AUTOMATION.md)**,
+**[docs/n8n-web-push-contracts.md](docs/n8n-web-push-contracts.md)**, and
+**[docs/PWA_WEB_PUSH_AUTOMATION_REVISION.md](docs/PWA_WEB_PUSH_AUTOMATION_REVISION.md)**.
 
 ---
 
@@ -96,6 +100,8 @@ Settings -> Automations.
 | `docs/DATABASE.md` | Schema reference: tables, relations, constraints, invariants, migrations. |
 | `docs/GOHA_DESIGN_SPEC.md` | The visual source of truth. |
 | `docs/AUTOMATION.md` | The automation surface. |
+| `docs/n8n-web-push-contracts.md` | The central worker request/response and retry contract. |
+| `docs/PWA_WEB_PUSH_AUTOMATION_REVISION.md` | What the Web Push revision preserves and supersedes. |
 | `docs/GoHa-Automation-Guide.pdf` | Building the automations themselves, outside the app. |
 
 ---
