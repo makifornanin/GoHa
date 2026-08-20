@@ -833,6 +833,12 @@ async function prepareReview(
     return { state: "skip", job, reason: "quiet" };
   }
 
+  const email = await usersRepo.getUserEmailById(job.userId);
+
+  if (!email) {
+    throw new Error("Review email recipient not found.");
+  }
+
   return {
     state: "ready",
     job,
@@ -849,6 +855,10 @@ async function prepareReview(
         hasChallenges: Boolean(review?.challenges),
         hasNextWeekFocus: Boolean(review?.focusNextWeek),
       },
+    },
+    delivery: {
+      channel: "email",
+      email,
     },
     fallbackNotification: fallback(
       "Your weekly review is ready to write",
