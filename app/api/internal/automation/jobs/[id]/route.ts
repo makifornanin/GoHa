@@ -52,6 +52,7 @@ export async function GET(
       },
       action: "process",
       payload: prepared.payload,
+      ...(prepared.delivery ? { delivery: prepared.delivery } : {}),
       fallbackNotification: prepared.fallbackNotification,
     });
   } catch (error) {

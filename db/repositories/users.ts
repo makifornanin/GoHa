@@ -1,5 +1,7 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
+
 import { db } from "../client";
 import { user } from "../schema";
 
@@ -14,4 +16,15 @@ import { user } from "../schema";
 export async function hasAnyUser(): Promise<boolean> {
   const [row] = await db.select({ id: user.id }).from(user).limit(1);
   return Boolean(row);
+}
+
+/** Resolve only the email address for a trusted server-side user ID. */
+export async function getUserEmailById(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  return row?.email ?? null;
 }

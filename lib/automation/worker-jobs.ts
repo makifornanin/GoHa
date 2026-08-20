@@ -12,6 +12,7 @@ import {
   tasksRepo,
 } from "@/db";
 import * as workerRepo from "@/db/repositories/worker";
+import * as usersRepo from "@/db/repositories/users";
 import type { AutomationJob } from "@/db/repositories/worker";
 import { toMorningPayload } from "@/lib/automation/brief";
 import {
@@ -54,11 +55,17 @@ export const WORKER_CLAIM_LIMIT_MAX = 25;
 export { validateWorkerNotification } from "@/lib/automation/worker-notification";
 export type { WorkerNotification } from "@/lib/automation/worker-notification";
 
+type WorkerEmailDelivery = {
+  channel: "email";
+  email: string;
+};
+
 export type PreparedWorkerJob =
   | {
       state: "ready";
       job: AutomationJob;
       payload: unknown;
+      delivery?: WorkerEmailDelivery;
       fallbackNotification: WorkerNotification;
     }
   | { state: "skip"; job: AutomationJob; reason: string };
@@ -737,11 +744,16 @@ async function prepareGraveyard(
   settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
   now: Date,
 ): Promise<PreparedWorkerJob> {
-  const [tasks, goals, priorDigests] = await Promise.all([
+  const [tasks, goals, priorDigests, email] = await Promise.all([
     tasksRepo.listTasksForUser(job.userId),
     goalsRepo.listGoals(job.userId),
     automationRepo.listNotificationsByKind(job.userId, "graveyard", 12),
+    usersRepo.getUserEmailById(job.userId),
   ]);
+
+  if (!email) {
+    throw new Error("Graveyard email recipient not found.");
+  }
 
   const payload = buildGraveyardPayload({
     tasks,
@@ -760,6 +772,10 @@ async function prepareGraveyard(
     state: "ready",
     job,
     payload,
+    delivery: {
+      channel: "email",
+      email,
+    },
     fallbackNotification: fallback(
       `${payload.total} task${payload.total === 1 ? "" : "s"} need a decision`,
       `${payload.stuck.totalCount} stuck | ${payload.longOverdue.totalCount} long overdue | ${payload.zombieInbox.totalCount} rotting in the inbox`,
