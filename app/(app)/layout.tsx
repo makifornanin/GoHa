@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/shell/app-sidebar";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { MobileBottomNav } from "@/components/shell/mobile-bottom-nav";
 import { MobileHeader } from "@/components/shell/mobile-header";
+import { WelcomeOnboarding } from "@/components/onboarding/welcome-onboarding";
 import { ThemeSync } from "@/components/theme-sync";
 import { requireUser } from "@/lib/session";
 import { getUserSettingsCached } from "@/lib/user-settings";
@@ -22,6 +23,10 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen bg-canvas">
       <ThemeSync dbTheme={settings.theme} />
+      {/* Null means this account has never been through it. Established
+          accounts were backfilled in migration 0018 so the tour does not
+          ambush people who have been using GoHa for months. */}
+      {settings.onboardingCompletedAt ? null : <WelcomeOnboarding name={user.name} />}
       <AppSidebar className="hidden md:flex" user={navUser} />
       <div className="flex min-h-screen flex-col md:pl-[260px]">
         <MobileHeader className="md:hidden" user={navUser} />

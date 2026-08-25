@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 
 import { db, schema } from "@/db";
+import { emailEventSender } from "@/lib/email-automation/n8n-email-events";
 
 /**
  * Where this app answers from.
@@ -56,6 +57,9 @@ function trustedOrigins(): string[] {
  * handler (`app/api/auth/[...all]/route.ts`), which is the only path any
  * sign-up request can take, including a direct call to the raw endpoint.
  */
+/** One hour. Long enough to find the mail, short enough to be worth stealing less. */
+export const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
+
 export const auth = betterAuth({
   baseURL: BASE_URL,
   secret: process.env.BETTER_AUTH_SECRET,
@@ -75,6 +79,50 @@ export const auth = betterAuth({
     autoSignIn: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
+    /**
+     * Password reset is Better Auth's own, not a reimplementation.
+     *
+     * The library already issues a cryptographically random token, stores it in
+     * `verification` keyed `reset-password:<token>`, enforces the expiry below,
+     * consumes it on use so it cannot be replayed, and answers
+     * `/request-password-reset` with the SAME generic message whether or not
+     * the address belongs to an account (it even performs a dummy lookup so the
+     * timing matches). Hand-rolling any of that could only make it weaker.
+     *
+     * GoHa's part is delivery: hand the event to n8n, which owns presentation
+     * and Gmail. `url` is Better Auth's own callback endpoint, which validates
+     * the token and then redirects to /reset-password with it.
+     */
+    resetPasswordTokenExpiresIn: PASSWORD_RESET_TTL_SECONDS,
+    sendResetPassword: async ({ user, url }) => {
+      const sender = emailEventSender();
+      /*
+       * Never rethrows.
+       *
+       * Better Auth swallows and logs whatever this callback throws, so a
+       * failure here would already not reach the browser, but relying on that
+       * would make the security of the endpoint depend on an implementation
+       * detail of a dependency. The sender returns failure as a value; an n8n
+       * outage means no email was sent, and the caller still sees the same
+       * generic sentence as everyone else.
+       */
+      await sender.send(
+        sender.buildPasswordResetEvent({
+          recipientEmail: user.email,
+          displayName: user.name?.trim() ? user.name : null,
+          resetUrl: url,
+          expiresInMinutes: PASSWORD_RESET_TTL_SECONDS / 60,
+        }),
+      );
+    },
+    /**
+     * A password reset ends every other session.
+     *
+     * Someone resetting a password may be doing it because another party has
+     * the old one. Leaving that party's session alive would make the reset
+     * cosmetic.
+     */
+    revokeSessionsOnPasswordReset: true,
   },
   advanced: {
     database: {

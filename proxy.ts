@@ -18,7 +18,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * (ERR_TOO_MANY_REDIRECTS), leaving no way to sign in again. The /login page
  * does the real lookup and redirects an genuinely-authenticated user itself.
  */
-const AUTH_PATHS = ["/login", "/register"];
+/*
+ * Reachable without a session, by definition: someone resetting a password
+ * cannot sign in, so redirecting these to /login would make the reset link in
+ * the email bounce straight back to the screen the reader is locked out of.
+ */
+const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 const EXACT_PUBLIC_PATHS = ["/iphone/setup", "/api/push/pairing/stage"];
 
 export function proxy(request: NextRequest) {

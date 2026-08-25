@@ -47,7 +47,20 @@ export function Input({
       type={type}
       data-slot="input"
       className={cn(
-        "flex h-8 w-full rounded-lg bg-fill-tertiary px-2.5 text-body text-label transition-colors duration-150 placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary",
+        /*
+         * Two sizes, like Button and Select.
+         *
+         * 32px is the documented desktop density (spec section 8) but is under
+         * the 44px tap target section 7 mandates, so the phone gets its own
+         * height.
+         *
+         * The 16px font on mobile is not a style choice: iOS Safari ZOOMS the
+         * whole page when a focused input's text is smaller than 16px, and
+         * `--text-body` is 14px. Every field in GoHa was jumping the viewport
+         * on tap. `sm:text-body` restores the intended 14px on desktop, where
+         * no such behaviour exists.
+         */
+        "flex h-11 w-full rounded-lg bg-fill-tertiary px-3 text-[16px] text-label transition-colors duration-150 placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary sm:h-8 sm:px-2.5 sm:text-body",
         // Native date and time controls need the extra work; nothing else does.
         (type === "date" || type === "datetime-local" || type === "time") && DATE_LIKE,
         className,

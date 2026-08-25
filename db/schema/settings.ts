@@ -29,6 +29,19 @@ export const userSettings = pgTable(
     eveningReflectionTime: time(),
     notificationsEnabled: boolean().notNull().default(true),
     onboardingCompletedAt: timestamp({ withTimezone: true }),
+    /**
+     * When the welcome email event was handed to n8n, and the idempotency key
+     * for sending it.
+     *
+     * A nullable timestamp rather than a boolean, matching every other
+     * once-only milestone here (`invites.claimedAt`, `push_subscriptions
+     * .disabledAt`). It is claimed by a conditional upsert that only writes
+     * where the column is still null, so two concurrent sign-up retries cannot
+     * both win and the user cannot be welcomed twice. Set when the event is
+     * ACCEPTED for delivery, not when Gmail delivers: GoHa does not send mail
+     * and cannot observe the latter.
+     */
+    welcomeEmailSentAt: timestamp({ withTimezone: true }),
     preferences: jsonb().$type<Record<string, unknown>>(),
 
     /*

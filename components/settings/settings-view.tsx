@@ -111,6 +111,7 @@ export function SettingsView({
       </SettingsSection>
 
       <SettingsSection
+        id="notifications"
         title="Notifications"
         description="GoHa never sends anything itself. These decide what it hands to the tool that does."
       >

@@ -64,16 +64,21 @@ export function SettingsCard({
  * you touch once a year.
  */
 export function SettingsSection({
+  id,
   title,
   description,
   children,
 }: {
+  /** Anchor target, so a link elsewhere can land on this group. */
+  id?: string;
   title: string;
   description?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-3">
+    /* `scroll-mt` keeps the heading clear of the sticky top bar when an anchor
+       jumps here, instead of parking it underneath. */
+    <section id={id} className="flex scroll-mt-20 flex-col gap-3">
       <div className="px-1">
         <h2 className="text-caption font-semibold uppercase tracking-wide text-label-secondary">
           {title}

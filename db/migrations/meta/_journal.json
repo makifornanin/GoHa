@@ -127,6 +127,13 @@
       "when": 1787127143178,
       "tag": "0017_fluffy_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787379003072,
+      "tag": "0018_soft_sway",
+      "breakpoints": true
     }
   ]
 }

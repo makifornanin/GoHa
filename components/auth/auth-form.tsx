@@ -220,6 +220,18 @@ export function AuthForm({
           {isLogin ? null : <PasswordMeter value={password} />}
         </Field>
 
+        {/* Under the password, where someone looks after it has been refused. */}
+        {isLogin ? (
+          <p className="-mt-2 text-right">
+            <Link
+              className="text-footnote font-medium text-blue hover:underline"
+              href="/forgot-password"
+            >
+              Forgot password?
+            </Link>
+          </p>
+        ) : null}
+
         {error ? (
           <p
             role="alert"

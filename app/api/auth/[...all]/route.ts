@@ -1,7 +1,8 @@
 import { toNextJsHandler } from "better-auth/next-js";
 
-import { appSettingsRepo, invitesRepo, usersRepo } from "@/db";
+import { appSettingsRepo, invitesRepo, settingsRepo, usersRepo } from "@/db";
 import { auth } from "@/lib/auth";
+import { emailEventSender } from "@/lib/email-automation/n8n-email-events";
 import {
   hashInviteCode,
   inviteCodePrefix,
@@ -173,6 +174,50 @@ async function settleClaim(request: Request, response: Response): Promise<void> 
   }
 }
 
+/**
+ * Hand a welcome email to n8n, once per genuinely new account.
+ *
+ * This runs HERE rather than on sign-in or session creation because this is the
+ * only place that knows an account was CREATED: a successful POST to
+ * /sign-up/email that returned a user. A hook on session creation would send
+ * one on every login and on every new device.
+ *
+ * The claim is taken first and released if the handoff fails, so a retried
+ * sign-up cannot produce two emails and a failed handoff does not permanently
+ * mark someone as welcomed.
+ *
+ * Nothing here can fail the request. The account already exists by this point;
+ * refusing the response because a workflow is unreachable would leave the user
+ * with an account they were told they did not get.
+ */
+async function sendWelcomeEmail(response: Response): Promise<void> {
+  try {
+    if (!response.ok) return;
+    const created = await response.clone().json().catch(() => null);
+    const user = created?.user;
+    const userId = typeof user?.id === "string" ? user.id : null;
+    const email = typeof user?.email === "string" ? user.email : null;
+    if (!userId || !email) return;
+
+    const claimedAt = new Date();
+    if (!(await settingsRepo.claimWelcomeEmail(userId, claimedAt))) return;
+
+    const sender = emailEventSender();
+    const result = await sender.send(
+      sender.buildWelcomeEmailEvent({
+        recipientEmail: email,
+        displayName: typeof user?.name === "string" && user.name.trim() ? user.name : null,
+      }),
+    );
+    if (!result.delivered) {
+      await settingsRepo.releaseWelcomeEmailClaim(userId, claimedAt);
+    }
+  } catch (error) {
+    // A welcome email is not worth breaking a sign-up over.
+    console.error("welcome email dispatch failed", error);
+  }
+}
+
 export async function GET(request: Request): Promise<Response> {
   return handlers.GET(request);
 }
@@ -195,6 +240,9 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  if (isSignUp) await settleClaim(request, response);
+  if (isSignUp) {
+    await settleClaim(request, response);
+    await sendWelcomeEmail(response);
+  }
   return response;
 }
