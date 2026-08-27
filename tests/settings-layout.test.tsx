@@ -48,6 +48,7 @@ describe("settings layout", () => {
           dailyPlanningTime: "06:00", eveningReflectionTime: "21:00",
           automation: {
             morningBriefEnabled: true, eveningSummaryEnabled: true, deadlineAlertsEnabled: true,
+      smartRemindersEnabled: false,
             deadlineLeadMinutes: 60, quoteSourcePref: "both", sabbathDay: null,
           },
         }}

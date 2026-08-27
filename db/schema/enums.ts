@@ -100,6 +100,15 @@ export const notificationKind = pgEnum("notification_kind", [
   "evening_summary",
   "deadline",
   "focus_overrun",
+  /*
+   * A contextual nudge about work still sitting on Today.
+   *
+   * Distinct from `deadline`, which says a task is actually due, and from
+   * `focus_overrun`, which is about a session running long. This one only ever
+   * claims that something the user put on today is not finished, which is the
+   * only thing GoHa can say without guessing at their day.
+   */
+  "smart_task_reminder",
   "streak_risk",
   "graveyard",
   "review_draft",

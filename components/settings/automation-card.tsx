@@ -59,11 +59,12 @@ const ENDPOINTS = [
 ];
 
 /** Plain names for the notification kinds the log stores. */
-const KIND_LABEL: Record<string, string> = {
+export const KIND_LABEL: Record<string, string> = {
   morning_brief: "Morning brief",
   evening_summary: "Evening summary",
   deadline: "Deadline alert",
   focus_overrun: "Focus overrun",
+  smart_task_reminder: "Smart task reminder",
   streak_risk: "Streak at risk",
   graveyard: "Graveyard sweep",
   review_draft: "Review draft",

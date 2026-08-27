@@ -132,6 +132,9 @@ export const PUSH_JOB_KINDS = new Set([
   "evening_summary",
   "deadline",
   "focus_overrun",
+  // Push-only by design: a contextual midday nudge is worth a phone buzz and
+  // is not worth an email, which would land four times a day in an inbox.
+  "smart_task_reminder",
 ]);
 
 export function isPushJobKind(kind: string): boolean {

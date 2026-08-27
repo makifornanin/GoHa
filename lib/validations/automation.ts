@@ -26,6 +26,7 @@ export const notificationKindSchema = z.enum([
   "evening_summary",
   "deadline",
   "focus_overrun",
+  "smart_task_reminder",
   "streak_risk",
   "graveyard",
   "review_draft",

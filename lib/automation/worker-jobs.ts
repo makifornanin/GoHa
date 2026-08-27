@@ -50,6 +50,17 @@ import { deriveReviewStats, weekBounds } from "@/lib/review";
 import { addDays, getZonedParts, startOfWeek, zonedToday, type Weekday } from "@/lib/date";
 import { sendNotificationToUser, VapidConfigurationError } from "@/lib/push/web-push";
 import { SABBATH_MESSAGE, sabbathContext } from "@/lib/sabbath";
+import {
+  SMART_REMINDER_COOLDOWN_KINDS,
+  SMART_REMINDER_COOLDOWN_MINUTES,
+  selectAnchorTask,
+  smartReminderFallback,
+  smartReminderInstants,
+  smartReminderKey,
+  smartReminderStage,
+  toSmartReminderPayload,
+} from "@/lib/automation/smart-reminder";
+import { deriveTodayData } from "@/lib/today";
 import { deriveDaySignal } from "@/lib/today-brain";
 import { getUserSettingsCached } from "@/lib/user-settings";
 
@@ -102,6 +113,7 @@ function activeSettingsForKind(job: AutomationJob, settings: Awaited<ReturnType<
   if (job.kind === "deadline" || job.kind === "focus_overrun") {
     return settings.deadlineAlertsEnabled;
   }
+  if (job.kind === "smart_task_reminder") return settings.smartRemindersEnabled;
   return false;
 }
 
@@ -167,6 +179,10 @@ export async function materializeAndClaimJobs(
 
       if (settings.deadlineAlertsEnabled && hasDevice && !context.isSabbath) {
         await materializeDueJobs(settings, localDate, now);
+      }
+
+      if (settings.smartRemindersEnabled && hasDevice && !context.isSabbath) {
+        await materializeSmartReminders(settings, localDate, now);
       }
 
       // Weekly digests. Delivered as email by the workflow, so no device is
@@ -246,6 +262,48 @@ async function materializeDueJobs(
   }
 }
 
+/**
+ * Queue any smart reminder slot whose time has arrived today.
+ *
+ * The four times are recomputed here rather than read back, so a redeploy
+ * between two slots cannot shift the remaining ones. Each slot claims its own
+ * dedupe key, which is what stops the five-minute poll from queueing the same
+ * opportunity twelve times: the first materialize wins the unique index and
+ * every later one is a no-op.
+ *
+ * Eligibility is checked again at prepare time, deliberately. What is true when
+ * a job is queued may not be true a few minutes later when it is leased, and
+ * the last word on "is there still anything to nudge about" has to belong to
+ * the moment of sending.
+ */
+async function materializeSmartReminders(
+  settings: Awaited<ReturnType<typeof workerRepo.listAutomationCandidates>>[number],
+  localDate: string,
+  now: Date,
+): Promise<void> {
+  const instants = smartReminderInstants({
+    userId: settings.userId,
+    localDate,
+    timezone: settings.timezone,
+    morningTime: settings.dailyPlanningTime,
+    eveningTime: settings.eveningReflectionTime,
+  });
+
+  for (const slot of instants) {
+    // Not yet due. Tomorrow's slots are never queued today.
+    if (slot.at.getTime() > now.getTime()) continue;
+    await workerRepo.materializeJob({
+      userId: settings.userId,
+      kind: "smart_task_reminder",
+      dedupeKey: smartReminderKey(localDate, slot.slotIndex),
+      localDate,
+      timezone: settings.timezone,
+      scheduledFor: slot.at,
+      availableAt: slot.at,
+    });
+  }
+}
+
 /** Build a leased job's data through the existing canonical derivations. */
 export async function prepareWorkerJob(
   job: AutomationJob,
@@ -284,6 +342,7 @@ export async function prepareWorkerJob(
   if (job.kind === "deadline" || job.kind === "focus_overrun") {
     return prepareDueItem(job, settings, now);
   }
+  if (job.kind === "smart_task_reminder") return prepareSmartReminder(job, settings, now);
   if (job.kind === "graveyard") return prepareGraveyard(job, settings, now);
   if (job.kind === "review_draft") return prepareReview(job, settings);
   return { state: "skip", job, reason: "kind_not_active" };
@@ -769,6 +828,128 @@ async function materializeWeeklyJobs(
 }
 
 /** Stale work, for the weekly email digest. */
+/**
+ * Decide whether this slot still deserves to interrupt someone, and about what.
+ *
+ * Every gate here is re-evaluated now rather than trusted from materialize
+ * time. A slot queued at 14:00 might be leased at 14:04, and in those four
+ * minutes the user may have finished the last task, been sent a deadline alert,
+ * or turned the whole feature off. Sending anyway would be GoHa reporting a
+ * state that no longer exists.
+ *
+ * The Sabbath gate, the enabled gate, the timezone gate and the stale-date gate
+ * all ran in `prepareWorkerJob` before this was called, so they are not
+ * repeated here.
+ */
+async function prepareSmartReminder(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+  now: Date,
+): Promise<PreparedWorkerJob> {
+  const slotIndex = Number(job.dedupeKey.split(":")[2]);
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) {
+    return { state: "skip", job, reason: "invalid_slot" };
+  }
+
+  /*
+   * Do not stack on a louder message.
+   *
+   * A deadline alert or a focus nudge in the last ninety minutes has already
+   * pointed the user at their work. Following it with "this is still on your
+   * list" adds no information and reads as nagging, which is the failure mode
+   * that gets a notification permission revoked.
+   */
+  const cooldownSince = new Date(now.getTime() - SMART_REMINDER_COOLDOWN_MINUTES * 60_000);
+  const [tasks, goals, priorities, recentlyInterrupted, priorReminders, userName] =
+    await Promise.all([
+      tasksRepo.listTasksForUser(job.userId),
+      goalsRepo.listGoalsWithTaskCounts(job.userId),
+      dailyPrioritiesRepo.listDailyPriorities(job.userId, job.localDate),
+      automationRepo.hasRecentNotificationOfKinds(
+        job.userId,
+        SMART_REMINDER_COOLDOWN_KINDS,
+        cooldownSince,
+      ),
+      automationRepo.listNotificationsByKind(job.userId, "smart_task_reminder", 8),
+      usersRepo.getUserDisplayNameById(job.userId),
+    ]);
+
+  if (recentlyInterrupted) return { state: "skip", job, reason: "recent_alert_cooldown" };
+
+  /*
+   * The same Today the user sees, through the same derivation.
+   *
+   * Not a bespoke query: if this counted "today" its own way it would eventually
+   * disagree with the Today page, and a notification about a task the user
+   * cannot find on their list is worse than silence (CLAUDE.md section 7).
+   */
+  const today = deriveTodayData({
+    today: job.localDate,
+    tasks,
+    goals,
+    priorities,
+    timeZone: settings.timezone,
+  });
+
+  const open = today.todayTasks.filter(
+    (task) => task.status === "todo" || task.status === "in_progress",
+  );
+  // Nothing left to nudge about. A finished day gets its silence.
+  if (open.length === 0) return { state: "skip", job, reason: "nothing_open" };
+
+  /*
+   * Avoid naming the same task twice running, when there is anything else to
+   * name. Read from the delivery log rather than kept in memory, because the
+   * worker is stateless between polls and may not be the same process.
+   */
+  const previousAnchorId =
+    priorReminders.find((entry) => entry.localDate === job.localDate)?.entityId ?? null;
+
+  const anchor = selectAnchorTask(open, previousAnchorId);
+  if (!anchor) return { state: "skip", job, reason: "nothing_open" };
+
+  const goalTitle = anchor.goalId
+    ? (goals.find((goal) => goal.id === anchor.goalId)?.title ?? null)
+    : null;
+
+  const payload = toSmartReminderPayload({
+    localDate: job.localDate,
+    timezone: job.timezone,
+    slotIndex,
+    userName,
+    anchor,
+    goalTitle,
+    remainingCount: open.length,
+    completedToday: today.completedToday,
+    totalToday: today.totalToday,
+    overdueCount: today.overdueTasks.length,
+  });
+
+  /*
+   * Record the subject on the job, so the delivery log carries it and the next
+   * reminder can see what this one named. Best effort: a lease that expired
+   * between the read above and here means this job is no longer ours to send,
+   * and the completion path will reject it on the same grounds. Losing the
+   * anti-repeat hint is not worth failing a notification over.
+   */
+  if (job.leaseId) {
+    await workerRepo.setJobEntity(job.id, job.leaseId, "task", anchor.id);
+  }
+
+  const text = smartReminderFallback({
+    anchorTitle: anchor.title,
+    remainingCount: open.length,
+    stage: smartReminderStage(slotIndex),
+  });
+
+  return {
+    state: "ready",
+    job,
+    payload,
+    fallbackNotification: fallback(text.title, text.body, text.url),
+  };
+}
+
 async function prepareGraveyard(
   job: AutomationJob,
   settings: Awaited<ReturnType<typeof getUserSettingsCached>>,

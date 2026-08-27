@@ -30,6 +30,7 @@ const settings = {
     morningBriefEnabled: false,
     eveningSummaryEnabled: false,
     deadlineAlertsEnabled: false,
+      smartRemindersEnabled: false,
     deadlineLeadMinutes: 60,
     quoteSourcePref: "both" as const,
     sabbathDay: null,

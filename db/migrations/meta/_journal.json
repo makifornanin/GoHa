@@ -141,6 +141,13 @@
       "when": 1787760127501,
       "tag": "0019_common_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787831378961,
+      "tag": "0020_whole_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

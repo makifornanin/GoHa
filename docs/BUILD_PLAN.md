@@ -1379,3 +1379,116 @@ Two migrations are generated, read, committed, and deliberately NOT applied
 Until 0012 is applied, the automation endpoints answer `503` and the Settings
 Automations card cannot list tokens. That is the designed answer for "the
 tables are not there yet", not a bug.
+
+
+## Smart Notifications V1: the `smart_task_reminder` job
+
+Status: **built and verified locally, NOT enabled and NOT migrated.**
+
+A fifth push kind. Up to four contextual nudges a day about work still open on
+Today, at times GoHa derives per user per local date, spread between the morning
+brief and the evening summary.
+
+### What was built
+
+- `lib/automation/smart-reminder.ts`, pure and database-free: the window, the
+  four slot times, the stage names, the dedupe keys, the anchor choice, the
+  payload shape, and the deterministic fallback text.
+- `materializeSmartReminders` in `lib/automation/worker-jobs.ts`: queues only
+  slots whose time has passed, one dedupe key each.
+- `prepareSmartReminder` in the same file: re-checks every gate at lease time.
+- `automationRepo.hasRecentNotificationOfKinds`, the cooldown query, answered by
+  the existing `(user_id, sent_at)` index.
+- `workerRepo.setJobEntity`, which stamps the chosen task on the job so the
+  delivery log records it and the next reminder can avoid repeating it.
+- `usersRepo.getUserDisplayNameById`, kept separate from the email lookup so a
+  payload builder cannot reach for the wrong one.
+- A `smartRemindersEnabled` toggle in Settings, defaulting to false.
+
+### The times are derived, not stored
+
+Each slot time comes from an FNV-1a hash of `userId + localDate`. That survives
+a worker restart, a redeploy and every five-minute poll for free: there is no
+row to migrate, nothing to backfill, and no way for two processes to disagree.
+Persisting them would have meant a table whose only job is to remember a number
+the function can always recompute.
+
+Jitter is capped at half the slack above the 90-minute target rather than at a
+fixed fraction of each slot's share. At a third of a share, a nine-hour window
+produced gaps of 47 minutes; a test caught it before it shipped. When the window
+is too narrow to hold the target at all, the slots fall back to a small jitter
+around an even spread, staying inside Morning+2h and Evening-2h.
+
+### What GoHa asserts, and what it refuses to
+
+The payload says these tasks are on today's list and are not ticked. It does not
+say the user has been idle, has done nothing, or is behind, because GoHa cannot
+observe any of that, and the contract doc tells n8n it may not add them. A test
+asserts the fallback body contains none of those claims.
+
+### Gates, all server side and all re-checked at lease time
+
+Off by default; notifications enabled; at least one active device; not the rest
+day; a rhythm wide enough for a window; something actually open on Today; and no
+`deadline` or `focus_overrun` delivered in the last 90 minutes.
+
+The materialize-time gate is not the only defence: settings can change between
+queueing a slot and leasing it, so `prepareSmartReminder` asks again. Tests
+cover both moments.
+
+### Verification
+
+`pnpm typecheck`, `pnpm lint` (including the consistency sweep), `pnpm test`
+(835 passing, 62 of them new across `tests/smart-reminder.test.ts` and
+`tests/smart-reminder-worker.test.ts`) and `pnpm build` all pass.
+
+### Migration 0020, generated and NOT applied
+
+`0020_whole_yellow_claw.sql` is additive, and only PARTLY reversible. An earlier
+version of this note called it "additive and reversible", which was wrong about
+the first statement:
+
+- `ALTER TYPE notification_kind ADD VALUE 'smart_task_reminder'` (NOT reversible)
+- `ALTER TABLE user_settings ADD COLUMN smart_reminders_enabled boolean NOT NULL DEFAULT false` (reversible)
+
+**The enum value cannot be dropped.** PostgreSQL has no
+`ALTER TYPE ... DROP VALUE`, in any version through 18. Undoing it means
+recreating the type: a replacement without the value, converting BOTH dependent
+columns (`notification_log.kind` and `automation_jobs.kind`) with
+`ALTER COLUMN ... TYPE ... USING`, dropping the old type and renaming. That
+takes an ACCESS EXCLUSIVE lock on both tables and fails outright while any row
+still holds `smart_task_reminder`, so those rows must be purged first. Once the
+migration commits, treat the value as permanent.
+
+**Rolling back the feature does not require removing it.** Set
+`smart_reminders_enabled` to false, or drop the column:
+
+```sql
+ALTER TABLE user_settings DROP COLUMN smart_reminders_enabled;
+```
+
+An unused enum value costs nothing: no storage, no query breakage, and migration
+0016 already added `test` the same way. The lock-taking type surgery buys only
+tidiness and is not worth it.
+
+Postgres also forbids USING a newly added enum value inside the transaction that
+added it. Nothing in this migration uses the value, so it applies cleanly, and
+the first job row is written by a later transaction.
+
+Apply with `pnpm db:migrate`. Until then the feature is invisible: the column
+does not exist, so no account can have the toggle on.
+
+### The window gate, stated precisely
+
+The gate refuses a window in exactly two cases: a rhythm time is unset, or
+`Evening - 2h` does not come strictly after `Morning + 2h`. Being too narrow for
+the 90-minute target is NOT one of them. Every positive window, down to a single
+minute, still produces reminders; spacing shrinks to whatever the day allows.
+
+A verification pass found one real defect at the extreme. Rounding four centres
+into a 1-minute window collapsed them onto two clock minutes (10:00, 10:00,
+10:01, 10:01), which would have fired two pairs of push notifications
+simultaneously. Each slot is now floored to the minute after its predecessor, so
+a window that cannot hold four distinct minutes places as many as it genuinely
+can instead of inventing duplicates. Windows of three minutes and wider are
+byte-identical to before.

@@ -49,6 +49,7 @@ export default async function SettingsPage() {
             morningBriefEnabled: settings.morningBriefEnabled,
             eveningSummaryEnabled: settings.eveningSummaryEnabled,
             deadlineAlertsEnabled: settings.deadlineAlertsEnabled,
+            smartRemindersEnabled: settings.smartRemindersEnabled,
             deadlineLeadMinutes: settings.deadlineLeadMinutes,
             quoteSourcePref: settings.quoteSourcePref,
             sabbathDay: settings.sabbathDay,

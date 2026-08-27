@@ -78,6 +78,7 @@ export const automationPrefsSchema = z.object({
   morningBriefEnabled: z.boolean(),
   eveningSummaryEnabled: z.boolean(),
   deadlineAlertsEnabled: z.boolean(),
+  smartRemindersEnabled: z.boolean(),
   deadlineLeadMinutes: deadlineLeadSchema,
   quoteSourcePref: quoteSourcePrefSchema,
   sabbathDay: sabbathDaySchema,

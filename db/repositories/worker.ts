@@ -206,6 +206,32 @@ export async function markDeliveryStarted(
   return row ?? null;
 }
 
+/**
+ * Record which entity a job turned out to be about.
+ *
+ * Most kinds know their subject when they are queued: a deadline job is created
+ * because one specific task is due. A smart reminder does not, because the task
+ * worth naming is whatever is still open at the moment it is sent, which is not
+ * knowable hours earlier when the slot is materialized.
+ *
+ * Stamping it here means the delivery log records the real subject, which is
+ * what lets the next reminder avoid repeating it. Guarded on the live lease, so
+ * a job whose lease has expired cannot rewrite its own subject.
+ */
+export async function setJobEntity(
+  id: string,
+  leaseId: string,
+  entityType: string,
+  entityId: string,
+): Promise<AutomationJob | null> {
+  const [row] = await db
+    .update(automationJobs)
+    .set({ entityType, entityId })
+    .where(leasedJobBeforeDelivery(id, leaseId))
+    .returning();
+  return row ?? null;
+}
+
 export async function completeJob(
   id: string,
   leaseId: string,

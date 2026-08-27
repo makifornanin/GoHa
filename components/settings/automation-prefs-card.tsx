@@ -14,6 +14,7 @@ export type AutomationPrefs = {
   morningBriefEnabled: boolean;
   eveningSummaryEnabled: boolean;
   deadlineAlertsEnabled: boolean;
+  smartRemindersEnabled: boolean;
   deadlineLeadMinutes: number;
   quoteSourcePref: "quote" | "verse" | "both";
   sabbathDay: number | null;
@@ -170,6 +171,15 @@ export function AutomationPrefsCard({
             </div>
           </div>
         ) : null}
+
+        <ToggleRow
+          id="pref-smart"
+          label="Smart task reminders"
+          hint="Up to four nudges a day about work still open, spread between your morning and evening times."
+          checked={value.smartRemindersEnabled}
+          disabled={pending}
+          onChange={(next) => persist({ ...value, smartRemindersEnabled: next })}
+        />
 
         <div className="space-y-1.5">
           <label htmlFor="pref-quote" className="text-subhead text-label-secondary">

@@ -56,6 +56,16 @@ export const userSettings = pgTable(
     morningBriefEnabled: boolean().notNull().default(false),
     eveningSummaryEnabled: boolean().notNull().default(false),
     deadlineAlertsEnabled: boolean().notNull().default(false),
+    /**
+     * Contextual midday task nudges, up to four a day.
+     *
+     * Its own switch rather than a rider on `deadlineAlertsEnabled`, because
+     * the two make different promises: deadline alerts fire about work the user
+     * dated themselves, and this one fires because GoHa decided the moment was
+     * a reasonable one. Someone can very reasonably want the first and not the
+     * second, and off is how it ships.
+     */
+    smartRemindersEnabled: boolean().notNull().default(false),
     /** How far ahead /due looks by default, in minutes. */
     deadlineLeadMinutes: smallint().notNull().default(60),
     quoteSourcePref: quoteSourcePref().notNull().default("both"),

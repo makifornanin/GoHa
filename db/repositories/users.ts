@@ -28,3 +28,22 @@ export async function getUserEmailById(userId: string): Promise<string | null> {
 
   return row?.email ?? null;
 }
+
+/**
+ * The account's display name, for a notification that greets someone.
+ *
+ * Separate from the email lookup on purpose: a name is safe to put in a push
+ * body and an email address is not, and keeping them apart means a payload
+ * builder cannot reach for the wrong one. Returns null for a blank name so the
+ * caller writes an un-greeted message rather than "Hi ,".
+ */
+export async function getUserDisplayNameById(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ name: user.name })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  const name = row?.name?.trim();
+  return name ? name : null;
+}

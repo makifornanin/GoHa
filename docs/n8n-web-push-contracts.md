@@ -199,6 +199,57 @@ not have expired.
   duration data, `minutesOver`, `dedupeKey`, `localDate`, and `timezone`.
 - `sabbath`: `localDate`, `timezone`, `isSabbath: true`, the canonical rest `message`, and an
   optional deterministic quote.
+- `smart_task_reminder`: `localDate`, `timezone`, `slotIndex`, `stage`, `userName`, `anchorTask`,
+  `remainingCount`, `completedToday`, `totalToday`, `overdueCount`, and `url`. See below.
+
+### `smart_task_reminder`
+
+A contextual nudge about work still open on the user's Today list. Up to four a day, at times
+GoHa derives per user per date, spread between the morning brief and the evening summary.
+
+```json
+{
+  "localDate": "2026-08-26",
+  "timezone": "Asia/Manila",
+  "slotIndex": 2,
+  "stage": "midday",
+  "userName": "Mark",
+  "anchorTask": {
+    "id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "title": "Draft the proposal",
+    "priority": "high",
+    "goalTitle": "Ship the V1 release"
+  },
+  "remainingCount": 3,
+  "completedToday": 2,
+  "totalToday": 5,
+  "overdueCount": 1,
+  "url": "/today"
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `slotIndex` | 1 to 4, the opportunity's position in the day. |
+| `stage` | `early`, `midday`, `late`, or `final`, derived from `slotIndex`. Use it to set tone; do not recompute it from the clock. |
+| `userName` | The account's display name, or `null`. Never an email address. Write an un-greeted message when it is null. |
+| `anchorTask` | The ONE task this message is about. GoHa has already chosen it by priority and has already avoided repeating the task the previous reminder named. Do not substitute another task and do not list the rest. |
+| `remainingCount` | Open tasks left on today, including the anchor. Always at least 1. |
+| `overdueCount` | Active tasks dated before today. Context only. |
+
+**What this payload does and does not assert.** It says these tasks are on today's list and are
+not ticked. It does NOT say the user has been idle, has done nothing, is behind, or has broken
+anything, and GoHa cannot observe any of those. n8n and Gemini must not add them. A reminder that
+assumes the worst about a day it cannot see is the thing that gets notification permission
+revoked.
+
+**Scheduling and gates are GoHa's.** The four times, the Sabbath silence, the 90-minute cooldown
+after a `deadline` or `focus_overrun` delivery, the "nothing open, stay quiet" rule and the
+per-slot dedupe key (`smart:{localDate}:{slotIndex}`) are all decided server side and re-checked
+at lease time. The workflow phrases the message; it never decides whether to send one.
+
+Off by default. Requires `smartRemindersEnabled` on the account, notifications enabled, and at
+least one active device.
 
 ### `dailyInspiration` on `morning_brief`
 

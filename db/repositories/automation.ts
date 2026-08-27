@@ -233,3 +233,33 @@ export async function listRecentNotifications(
     .orderBy(desc(notificationLog.sentAt))
     .limit(limit);
 }
+
+/**
+ * Whether any of `kinds` was delivered to this user since `since`.
+ *
+ * Existence, not a list: the smart reminder only needs to know whether it would
+ * be landing on top of a louder message, and asking for a single row lets the
+ * `(user_id, sent_at)` index answer without reading a history back.
+ *
+ * `sentAt` is the right column rather than `createdAt`, because a claim that
+ * never reached a device did not interrupt anyone.
+ */
+export async function hasRecentNotificationOfKinds(
+  userId: string,
+  kinds: readonly NotificationKind[],
+  since: Date,
+): Promise<boolean> {
+  if (kinds.length === 0) return false;
+  const [row] = await db
+    .select({ id: notificationLog.id })
+    .from(notificationLog)
+    .where(
+      and(
+        eq(notificationLog.userId, userId),
+        inArray(notificationLog.kind, [...kinds]),
+        gte(notificationLog.sentAt, since),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}

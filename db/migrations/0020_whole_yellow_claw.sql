@@ -1,0 +1,31 @@
+-- Smart Notifications V1.
+--
+-- ROLLBACK CHARACTERISTICS: this migration is ADDITIVE but only PARTLY
+-- REVERSIBLE. The two statements differ, and the difference matters.
+--
+--   1. The enum value is NOT practically reversible.
+--      PostgreSQL has no ALTER TYPE ... DROP VALUE, in any version through 18.
+--      Undoing it means recreating the whole type: create a replacement without
+--      the value, convert BOTH dependent columns (notification_log.kind and
+--      automation_jobs.kind) with ALTER COLUMN ... TYPE ... USING, drop the old
+--      type and rename. That takes an ACCESS EXCLUSIVE lock on both tables and
+--      fails outright if any surviving row still holds 'smart_task_reminder',
+--      so the rows must be purged or rewritten first.
+--
+--      Once this commits, treat the value as permanent.
+--
+--   2. The column IS trivially reversible:
+--      ALTER TABLE user_settings DROP COLUMN smart_reminders_enabled;
+--
+-- TO ROLL BACK THE FEATURE, do NOT attempt to remove the enum value. Set
+-- smart_reminders_enabled to false (or drop the column). An unused enum value
+-- costs nothing: it occupies no storage, breaks no query, and migration 0016
+-- already added 'test' the same way. The expensive, lock-taking type surgery
+-- above buys nothing but tidiness.
+--
+-- APPLY NOTE: PostgreSQL forbids USING a newly added enum value inside the same
+-- transaction that adds it. Nothing here uses it, so this applies cleanly; the
+-- first row carrying the value is written by a later transaction.
+
+ALTER TYPE "public"."notification_kind" ADD VALUE 'smart_task_reminder' BEFORE 'streak_risk';--> statement-breakpoint
+ALTER TABLE "user_settings" ADD COLUMN "smart_reminders_enabled" boolean DEFAULT false NOT NULL;

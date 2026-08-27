@@ -108,6 +108,7 @@ export const automationRequests = pgTable(
  *   morning_brief     brief:morning:{localDate}
  *   deadline          deadline:{taskId}:{dueAtIso}     re-arms when rescheduled
  *   focus_overrun     focus:{sessionId}:overrun        one nudge per session
+ *   smart_task_reminder  smart:{localDate}:{slotIndex}  slotIndex is 1..4
  *   streak_risk       streak:{habitId}:{localDate}
  *   graveyard         graveyard:{isoWeek}
  *
