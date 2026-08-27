@@ -189,6 +189,13 @@ Status: [x] Completed (2026-07-08)
 
 ## Change log
 
+### 2026-08-27: Daily Rhythm time field, inline instead of a dropdown
+- The three-column popover is gone. The native `<input type="time">` had the right SHAPE all along, segments you type straight into with nothing to open for a value you already know; what was wrong was the rendering, which was the browser's own spinner. So this is the same interaction drawn properly.
+- Segments are UNCONTROLLED and digits are handled directly, both for reasons found only in a browser. Driving them from React state meant every keystroke rewrote the DOM value, and the save that followed refreshed the server tree and reset the field mid-word: typing 45 measured as 8:04 at both sizes. Then, with selection alone, arriving at a full two-character segment left nothing selected, because the browser sets the caret AFTER the click handler runs, and `maxLength` silently swallowed every digit: clicking a minute reading 40 and typing 15 left 40. Handling digit keys directly, with a "first digit replaces, second appends" rule, is what the native segments do and what finally behaves.
+- Typing reports nothing upward; blur does. Blur is also when a half-typed value stops being half-typed, so it is the honest moment to clamp 19 to 12 and pad 5 to 05 rather than correcting someone between two keystrokes. Discrete actions (the meridiem toggle, arrow keys, clear) save immediately.
+- One blur for the whole field: moving from hour to minute is not leaving, and treating it as such fires the save that refreshes the page halfway through typing.
+- Verification: typecheck clean, lint clean, 759/759 unit tests pass, `pnpm build` compiles. Browser-verified at 900x800 and 390x844 against the QA account: zero native time inputs, 0px horizontal overflow, and 6:05 AM, 9:30 PM, 10:45 PM and 12:00 AM each surviving a reload.
+
 ### 2026-08-27: Designed time picker for Daily Rhythm
 - `components/ui/time-field.tsx` replaces the native `<input type="time">` in Daily Rhythm. The native control rendered the browser's own spinner, a stack of unstyled blue blocks that ignored every token in GoHa and looked different in every browser. Same shape as `DateField`, so the two controls in a form now read as a pair: hour, minute in five-minute steps, and AM/PM, each column scrolling on its own so the popover stays one size.
 - The value leaving the control is ALWAYS 24-hour "HH:MM", which is what the column stores and what the automation schedule reads. Twelve-hour text is presentation only. Tests pin the two conversions that go wrong most: 12 AM is 00 and 12 PM is 12, not the other way round.
