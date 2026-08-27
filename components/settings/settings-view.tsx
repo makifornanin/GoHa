@@ -32,6 +32,7 @@ import {
 } from "@/components/settings/automation-prefs-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimeField } from "@/components/ui/time-field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -197,32 +198,33 @@ function RhythmCard({
             <label htmlFor="settings-planning" className="text-subhead text-label-secondary">
               Plan the day
             </label>
-            <Input
+            <TimeField
               id="settings-planning"
-              type="time"
-              className="max-w-[11rem]"
+              ariaLabel="Plan the day"
               value={planning}
               disabled={pending}
-              onChange={(e) => setPlanning(e.target.value)}
-              onBlur={() =>
-                persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
-              }
+              // Commits on choose rather than on blur: a popover has no blur to
+              // wait for, and leaving the value unsaved until focus moved was
+              // how a picked time could be lost by navigating away.
+              onChange={(next) => {
+                setPlanning(next);
+                persist({ dailyPlanningTime: next, eveningReflectionTime: reflection });
+              }}
             />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="settings-reflection" className="text-subhead text-label-secondary">
               Look back
             </label>
-            <Input
+            <TimeField
               id="settings-reflection"
-              type="time"
-              className="max-w-[11rem]"
+              ariaLabel="Look back"
               value={reflection}
               disabled={pending}
-              onChange={(e) => setReflection(e.target.value)}
-              onBlur={() =>
-                persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
-              }
+              onChange={(next) => {
+                setReflection(next);
+                persist({ dailyPlanningTime: planning, eveningReflectionTime: next });
+              }}
             />
           </div>
         </div>

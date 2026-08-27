@@ -189,6 +189,14 @@ Status: [x] Completed (2026-07-08)
 
 ## Change log
 
+### 2026-08-27: Designed time picker for Daily Rhythm
+- `components/ui/time-field.tsx` replaces the native `<input type="time">` in Daily Rhythm. The native control rendered the browser's own spinner, a stack of unstyled blue blocks that ignored every token in GoHa and looked different in every browser. Same shape as `DateField`, so the two controls in a form now read as a pair: hour, minute in five-minute steps, and AM/PM, each column scrolling on its own so the popover stays one size.
+- The value leaving the control is ALWAYS 24-hour "HH:MM", which is what the column stores and what the automation schedule reads. Twelve-hour text is presentation only. Tests pin the two conversions that go wrong most: 12 AM is 00 and 12 PM is 12, not the other way round.
+- Commits on choose rather than on blur. A popover has no blur to wait for, and leaving the value unsaved until focus moved was how a picked time could be lost by navigating away.
+- Clearing is kept, because an empty time is meaningful here: it turns that scheduled message off.
+- Full width on a phone. Capped at 176px the field left most of the card empty and read as a stray chip rather than a control. Measured: 316x44 in a 358px card at 390px wide, against 242x32 on desktop.
+- Verification: typecheck clean, lint clean, 753/753 unit tests pass, `pnpm build` compiles. Browser-verified at 1440x900 and 390x844: zero native time inputs, the popover fully on screen at both sizes with 0px horizontal overflow, a picked time persisting through a reload, and changing one of the two times leaving the other intact.
+
 ### 2026-08-27: Task detail panel, dates and editable subtasks
 - The detail panel still had the native `<input type="date">`, `type="time">` and `type="datetime-local">` controls: the earlier date work replaced them in the create/edit MODAL only, and this second editor was missed. Both rows now use the same `DateField`, so planning is dates everywhere. The start-time input is gone; `dueAt` is still stored as an instant because deadline automation keys on it, with the hour preserved for a task that has one and end of local day for a task given a due date for the first time.
 - The task name moved into the panel header, on the same row as the close button (measured: both at y=17). It used to be the first thing in the scrolling body, so it slid out of sight the moment you looked at the subtasks and you lost track of which task you were editing.
