@@ -10,11 +10,17 @@ import {
   Pencil,
   RotateCcw,
   Trash2,
+  Target,
 } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Task } from "@/db";
-import { formatClockLabel, formatIsoDateMedium, formatZonedDateTimeMedium, MANILA_TZ } from "@/lib/date";
+import { formatClockLabel, MANILA_TZ,
+  zonedToday,
+  toZonedDate,
+  instantToZonedDateTimeInput,
+} from "@/lib/date";
+import { describeDate } from "@/components/ui/date-field";
 import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { taskPriorityConfig, taskStatusConfig } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
@@ -23,8 +29,8 @@ export type TaskLifeAreaRef = { id: string; name: string; color: string | null; 
 
 /**
  * A task card: circular checkbox (fills with the task's Life Area system
- * color), title + status, footnote meta chips, mono dates, and a
- * hover-revealed action row. Solid surface, radius 12 (inner-card scale).
+ * color), a leading title, and ONE quiet secondary line of meta beneath it.
+ * Actions are hover-revealed. Solid surface, radius 12 (inner-card scale).
  */
 export function TaskCard({
   task,
@@ -53,19 +59,37 @@ export function TaskCard({
   onEditNote: (task: Task) => void;
 }) {
   const priority = taskPriorityConfig[task.priority];
+  const isElevated = task.priority === "high" || task.priority === "urgent";
   const status = taskStatusConfig[task.status];
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
   const areaColor = lifeArea
     ? lifeAreaColorConfig[resolveColorKey(lifeArea.color, lifeArea.id)]
     : null;
-  const scheduledDate = formatIsoDateMedium(task.scheduledFor);
-  // "Aug 19, 2026 at 2:30 PM" when a start time is set, the date alone when not.
-  const scheduledLabel =
-    scheduledDate && task.scheduledTime
-      ? `${scheduledDate} at ${formatClockLabel(task.scheduledTime)}`
-      : scheduledDate;
-  const dueLabel = formatZonedDateTimeMedium(task.dueAt, timeZone);
+  /*
+   * Dates read as language, not as data.
+   *
+   * "Today" and "Tomorrow" are how people actually hold a schedule, and they
+   * are the two that matter most in a list you are working from. Everything
+   * else falls back to a real date. The old row rendered these in `font-mono`
+   * with a full year, which is why they scanned as raw metadata rather than as
+   * information.
+   */
+  const today = zonedToday(new Date(), timeZone);
+  const scheduledLabel = task.scheduledFor ? describeDate(task.scheduledFor, today) : null;
+
+  const dueDate = task.dueAt ? toZonedDate(task.dueAt, timeZone) : null;
+  const dueClock = task.dueAt ? instantToZonedDateTimeInput(task.dueAt, timeZone).slice(11, 16) : "";
+  // The hour is shown only when it carries meaning. A due date given through the
+  // date picker lands on end of day, and "at 11:59 PM" on every row is noise.
+  const dueLabel = dueDate
+    ? dueClock && dueClock !== "23:59"
+      ? `${describeDate(dueDate, today)}, ${formatClockLabel(`${dueClock}:00`)}`
+      : describeDate(dueDate, today)
+    : null;
+  // Overdue is the one date worth colouring: it is the only one that is a
+  // problem rather than a plan.
+  const isOverdue = Boolean(dueDate && dueDate < today && !isCompleted && !isCancelled);
 
   return (
     <div
@@ -124,9 +148,13 @@ export function TaskCard({
                 {task.title}
               </h3>
             )}
-            <span className={cn("shrink-0 rounded-sm px-1.5 py-0.5 text-footnote", status.badge)}>
-              {status.label}
-            </span>
+            {/* Only a status worth reporting. Every open task being labelled
+                "To Do" told the reader nothing and competed with the title. */}
+            {task.status === "todo" ? null : (
+              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-caption font-medium", status.badge)}>
+                {status.label}
+              </span>
+            )}
           </div>
 
           {task.description ? (
@@ -135,52 +163,78 @@ export function TaskCard({
             </p>
           ) : null}
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-footnote",
-                priority.badge,
-              )}
-            >
-              <Flag className="size-3" aria-hidden />
-              {priority.label}
-            </span>
+          {/*
+            One quiet line under the title.       
+            Every item used to be a pill at the same size and weight, so nothing
+            led and the row read as a wall of badges. Now the title leads, the
+            life-area colour is already on the leading edge, and this line is
+            secondary text with only two things allowed to raise their voice:
+            a priority that is actually high, and a due date that has passed.
+          */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-label-secondary">
+            {/* Low and medium say nothing worth saying: most work is medium, so
+                labelling it every time is noise. Only urgency speaks. */}
+            {isElevated ? (
+              <span className={cn("inline-flex items-center gap-1 font-medium", priority.text)}>
+                <Flag className="size-3" aria-hidden />
+                {priority.label}
+              </span>
+            ) : null}
 
             {goalTitle ? (
-              <span className="inline-flex items-center gap-1 rounded-sm bg-indigo/12 px-1.5 py-0.5 text-footnote text-indigo">
-                <Flag className="size-3" aria-hidden />
+              /* Its own icon. Goal and priority both used a flag before, which
+                 made two different things look like the same thing. */
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Target className="size-3 shrink-0" aria-hidden />
                 <span className="max-w-48 truncate">{goalTitle}</span>
               </span>
             ) : null}
 
-            {lifeArea && areaColor ? (
-              <span className="inline-flex items-center gap-1.5 text-footnote text-label-secondary">
-                <span className={cn("size-2 rounded-full", areaColor.dot)} aria-hidden />
+            {lifeArea ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                {areaColor ? (
+                  <span className={cn("size-1.5 shrink-0 rounded-full", areaColor.dot)} aria-hidden />
+                ) : null}
                 <span className="max-w-40 truncate">{lifeArea.name}</span>
               </span>
             ) : null}
 
             {scheduledLabel ? (
-              <span className="inline-flex items-center gap-1 font-mono text-footnote tabular-nums text-label-secondary">
-                <CalendarDays className="size-3" aria-hidden />
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="size-3 shrink-0" aria-hidden />
                 {scheduledLabel}
               </span>
             ) : null}
 
             {dueLabel ? (
-              <span className="inline-flex items-center gap-1 font-mono text-footnote tabular-nums text-label-secondary">
-                <CalendarClock className="size-3" aria-hidden />
-                Due {dueLabel}
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  isOverdue && "font-medium text-red",
+                )}
+              >
+                <CalendarClock className="size-3 shrink-0" aria-hidden />
+                {isOverdue ? `Overdue ${dueLabel}` : `Due ${dueLabel}`}
               </span>
             ) : null}
 
             {subtaskCount && subtaskCount.total > 0 ? (
+              /* A bar, not a fraction. "2/5" makes you do the arithmetic; a
+                 filled track shows how far along the task is at a glance. */
               <span
-                className="inline-flex items-center gap-1 font-mono text-footnote tabular-nums text-label-secondary"
+                className="inline-flex items-center gap-1.5"
                 title={`${subtaskCount.done} of ${subtaskCount.total} steps done`}
               >
-                <ListChecks className="size-3" aria-hidden />
-                {subtaskCount.done}/{subtaskCount.total}
+                <ListChecks className="size-3 shrink-0" aria-hidden />
+                <span className="h-1 w-10 overflow-hidden rounded-full bg-fill-tertiary" aria-hidden>
+                  <span
+                    className="block h-full rounded-full bg-blue transition-[width] duration-200"
+                    style={{ width: `${(subtaskCount.done / subtaskCount.total) * 100}%` }}
+                  />
+                </span>
+                <span className="tabular-nums">
+                  {subtaskCount.done}/{subtaskCount.total}
+                </span>
               </span>
             ) : null}
           </div>

@@ -134,6 +134,13 @@
       "when": 1787379003072,
       "tag": "0018_soft_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787760127501,
+      "tag": "0019_common_prowler",
+      "breakpoints": true
     }
   ]
 }

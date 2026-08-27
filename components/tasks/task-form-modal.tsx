@@ -6,11 +6,12 @@ import type { ActionResult } from "@/app/(app)/tasks/actions";
 import type { Task } from "@/db";
 import type { Priority, TaskStatus } from "@/db/schema/enums";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { instantToZonedDateTimeInput, MANILA_TZ } from "@/lib/date";
+import { instantToZonedDateTimeInput, MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
 import {
   TASK_DESCRIPTION_MAX,
   TASK_PRIORITY_ORDER,
@@ -25,6 +26,15 @@ import {
   type TaskFieldErrors,
   type TaskFormInput,
 } from "@/lib/validations/task";
+
+/**
+ * The hour a newly given due date lands on, in the user's own zone.
+ *
+ * "Due on the 29th" means by the end of the 29th, not 00:00 as it starts. The
+ * form no longer asks for a time, so this is the assumption it makes, and it is
+ * only ever applied to a task that had no due instant before.
+ */
+const DEFAULT_DUE_CLOCK = "23:59";
 
 export type TaskGoalOption = { id: string; title: string };
 export type TaskLifeAreaOption = { id: string; name: string };
@@ -56,6 +66,8 @@ type FormProps = {
   defaultGoalId?: string;
   /** The user's saved timezone: due-at wall-clock times are shown/read in it. */
   timeZone?: string;
+  /** Their saved week start, so the date picker's week matches theirs. */
+  weekStartsOn?: Weekday;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
   onClose: () => void;
   titleRef: React.RefObject<HTMLInputElement | null>;
@@ -69,10 +81,14 @@ function TaskFormFields({
   defaultScheduledFor,
   defaultGoalId,
   timeZone = MANILA_TZ,
+  weekStartsOn = 1,
   onSubmit,
   onClose,
   titleRef,
 }: FormProps) {
+  // Resolved from the saved zone, not the browser's: at 23:30 in Manila the
+  // browser of someone travelling would already say tomorrow.
+  const today = zonedToday(new Date(), timeZone);
   const [title, setTitle] = useState(() => task?.title ?? "");
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [goalId, setGoalId] = useState(() => task?.goalId ?? defaultGoalId ?? "");
@@ -82,11 +98,26 @@ function TaskFormFields({
   const [scheduledFor, setScheduledFor] = useState(
     () => task?.scheduledFor ?? defaultScheduledFor ?? "",
   );
-  const [scheduledTime, setScheduledTime] = useState(
-    // A `time` column returns "HH:MM:SS"; the input wants "HH:MM".
-    () => (task?.scheduledTime ? task.scheduledTime.slice(0, 5) : ""),
-  );
-  const [dueAt, setDueAt] = useState(() => instantToZonedDateTimeInput(task?.dueAt, timeZone));
+  /*
+   * Read, never edited. Planning is dates now, so the start-time control is
+   * gone, but a task that already carries one keeps it: removing the input must
+   * not silently erase data entered under an earlier build. The column and the
+   * value both stay; only the control went away.
+   */
+  const scheduledTime = task?.scheduledTime ? task.scheduledTime.slice(0, 5) : "";
+  /*
+   * Due is chosen as a DATE, but stored as an instant.
+   *
+   * `dueAt` is a real timestamp that deadline automation depends on: the dedupe
+   * key is `deadline:{taskId}:{dueAtIso}` and the reminder computes
+   * `minutesUntil` from it. So the time of day is kept rather than shown. An
+   * existing task keeps whatever hour it already had, and a task given a due
+   * date for the first time gets end of local day, which is what "due on the
+   * 29th" means to a person.
+   */
+  const existingDue = instantToZonedDateTimeInput(task?.dueAt, timeZone);
+  const [dueDate, setDueDate] = useState(() => existingDue.slice(0, 10));
+  const [dueClock] = useState(() => (existingDue ? existingDue.slice(11, 16) : DEFAULT_DUE_CLOCK));
 
   const [fieldErrors, setFieldErrors] = useState<TaskFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -101,9 +132,14 @@ function TaskFormFields({
       status,
       priority,
       scheduledFor,
-      // A time without a day cannot be shown anywhere, so it never leaves here.
+      /*
+       * Planning is dates now, so this form no longer offers a start time. The
+       * COLUMN is untouched and any value a task already has is sent straight
+       * back: dropping the control must not quietly wipe data that earlier
+       * builds let people enter.
+       */
       scheduledTime: scheduledFor ? scheduledTime : "",
-      dueAt,
+      dueAt: dueDate ? `${dueDate}T${dueClock}` : "",
     };
   }
 
@@ -234,42 +270,31 @@ function TaskFormFields({
           <Label htmlFor="task-scheduled">
             Start <span className="text-outline">(optional)</span>
           </Label>
-          {/* Date and time together, the same shape the Due field has. The time
-              is optional on its own: a day with no hour is a normal way to plan,
-              and it is cleared automatically if the date is removed. */}
-          <div className="flex items-center gap-2">
-            <Input
-              id="task-scheduled"
-              type="date"
-              className="flex-1"
-              value={scheduledFor}
-              onChange={(e) => {
-                setScheduledFor(e.target.value);
-                if (!e.target.value) setScheduledTime("");
-              }}
-              disabled={submitting}
-            />
-            <Input
-              id="task-scheduled-time"
-              type="time"
-              aria-label="Start time"
-              className="w-[7.5rem] shrink-0"
-              value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
-              disabled={submitting || !scheduledFor}
-            />
-          </div>
+          <DateField
+            id="task-scheduled"
+            value={scheduledFor}
+            onChange={setScheduledFor}
+            today={today}
+            weekStartsOn={weekStartsOn}
+            placeholder="No start date"
+            disabled={submitting}
+            ariaDescribedBy="task-scheduled-error"
+          />
           <FieldError id="task-scheduled-error" message={fieldErrors.scheduledFor} />
-          <FieldError id="task-scheduled-time-error" message={fieldErrors.scheduledTime} />
         </div>
         <div>
-          <Label htmlFor="task-due">Due <span className="text-outline">(optional)</span></Label>
-          <Input
+          <Label htmlFor="task-due">
+            Due <span className="text-outline">(optional)</span>
+          </Label>
+          <DateField
             id="task-due"
-            type="datetime-local"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
+            value={dueDate}
+            onChange={setDueDate}
+            today={today}
+            weekStartsOn={weekStartsOn}
+            placeholder="No due date"
             disabled={submitting}
+            ariaDescribedBy="task-due-error"
           />
           <FieldError id="task-due-error" message={fieldErrors.dueAt} />
         </div>
@@ -297,6 +322,7 @@ export function TaskFormModal({
   defaultScheduledFor,
   defaultGoalId,
   timeZone,
+  weekStartsOn,
   onSubmit,
   onClose,
 }: {
@@ -309,6 +335,8 @@ export function TaskFormModal({
   /** Preselected goal for a new task (e.g. "Add task" from a goal's details). */
   defaultGoalId?: string;
   timeZone?: string;
+  /** The user's saved week start, so the picker's week matches theirs. */
+  weekStartsOn?: Weekday;
   onSubmit: (values: TaskFormInput) => Promise<ActionResult<Task>>;
   onClose: () => void;
 }) {
@@ -333,6 +361,7 @@ export function TaskFormModal({
         defaultScheduledFor={defaultScheduledFor}
         defaultGoalId={defaultGoalId}
         timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onSubmit={onSubmit}
         onClose={onClose}
         titleRef={titleRef}

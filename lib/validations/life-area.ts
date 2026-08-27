@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   DEFAULT_COLOR_KEY,
   DEFAULT_ICON_KEY,
+  isHexColor,
+  normalizeHex,
   LIFE_AREA_COLOR_KEYS,
   LIFE_AREA_DESCRIPTION_MAX,
   LIFE_AREA_ICON_KEYS,
@@ -33,8 +35,23 @@ export const lifeAreaFormSchema = z.object({
     .optional()
     // Normalize empty/whitespace to null so the DB stores an absent description.
     .transform((value) => (value && value.length > 0 ? value : null)),
-  color: z.enum(LIFE_AREA_COLOR_KEYS).default(DEFAULT_COLOR_KEY),
-  icon: z.enum(LIFE_AREA_ICON_KEYS).default(DEFAULT_ICON_KEY),
+  /*
+   * One of the six original keys, or a custom `#rrggbb`.
+   *
+   * Still a closed set, not free text: a value that is neither is rejected at
+   * the boundary rather than stored and rendered as nothing. Widening this is
+   * what let custom colours reuse the existing column instead of needing a
+   * migration, and the legacy keys keep validating exactly as before.
+   */
+  color: z
+    .string()
+    .default(DEFAULT_COLOR_KEY)
+    .refine(
+      (value) => LIFE_AREA_COLOR_KEYS.includes(value as never) || isHexColor(value),
+      "Choose a colour from the palette, or enter one like #4a7ab5.",
+    )
+    .transform((value) => normalizeHex(value) ?? value),
+  icon: z.enum(LIFE_AREA_ICON_KEYS as unknown as [string, ...string[]]).default(DEFAULT_ICON_KEY),
   weight: z.coerce
     .number()
     .int("Importance must be a whole number.")

@@ -6,8 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import type { LifeAreaWithCounts } from "@/db/repositories/life-areas";
 import {
   LIFE_AREA_WEIGHT_MAX,
-  lifeAreaColorConfig,
-  resolveColorKey,
+  resolveAreaColor,
 } from "@/lib/life-areas";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +45,19 @@ export function LifeAreaCard({
   onArchive: (area: LifeAreaWithCounts) => void;
   pending?: boolean;
 }) {
-  const color = lifeAreaColorConfig[resolveColorKey(area.color, area.id)];
+  /*
+   * A preset key or a custom hex, resolved to one answer.
+   *
+   * Preset colours keep their Tailwind classes so nothing about an existing
+   * area changes. A custom colour has no class to apply, so those slots fall
+   * back to an inline style built from the same `fill`.
+   */
+  const resolved = resolveAreaColor(area.color, area.id);
+  /** Class when the colour is a preset, inline style when it is custom. */
+  const paint = (className: string | null) =>
+    resolved.kind === "preset"
+      ? { className: className ?? undefined, style: undefined }
+      : { className: undefined, style: { backgroundColor: resolved.fill } };
   const taskTotal = area.openTasks + area.completedTasks;
   const donePercent = taskTotal === 0 ? 0 : Math.round((area.completedTasks / taskTotal) * 100);
   const isEmpty = area.activeGoals + taskTotal + area.activeHabits === 0;
@@ -62,11 +73,18 @@ export function LifeAreaCard({
       )}
     >
       {/* The area's colour, stated once and strongly, at the card's edge. */}
-      <span className={cn("absolute inset-x-0 top-0 h-1", color.dot)} aria-hidden />
+      <span className={cn("absolute inset-x-0 top-0 h-1", paint(resolved.dot).className)} style={paint(resolved.dot).style} aria-hidden />
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", color.tile)}>
+          <div
+            className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", resolved.tile)}
+            style={
+              resolved.kind === "custom"
+                ? { backgroundColor: `${resolved.fill}26`, color: resolved.fill }
+                : undefined
+            }
+          >
             <LifeAreaIcon iconKey={area.icon} className="size-4" />
           </div>
           <h3 className="truncate text-headline text-label">{area.name}</h3>
@@ -116,8 +134,8 @@ export function LifeAreaCard({
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-fill-tertiary">
             <div
-              className={cn("h-full rounded-full transition-[width] duration-300", color.dot)}
-              style={{ width: `${donePercent}%` }}
+              className={cn("h-full rounded-full transition-[width] duration-300", paint(resolved.dot).className)}
+              style={{ ...paint(resolved.dot).style, width: `${donePercent}%` }}
             />
           </div>
         </div>
@@ -138,7 +156,7 @@ export function LifeAreaCard({
               key={i}
               className={cn(
                 "size-2 rounded-full transition-colors",
-                i < area.weight ? color.dot : "bg-fill-tertiary",
+                i < area.weight ? paint(resolved.dot).className : "bg-fill-tertiary",
               )}
               aria-hidden
             />

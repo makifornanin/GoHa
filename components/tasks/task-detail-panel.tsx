@@ -121,6 +121,14 @@ function TaskDetailBody({
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [newSubtask, setNewSubtask] = useState("");
+  /*
+   * The composer is revealed, not permanently parked at the bottom of the list.
+   *
+   * An always-open input with its own Add button reads as an unfinished row and
+   * competes with the real steps above it. Behind "+ Add subtask" the checklist
+   * is just the checklist until you want to extend it.
+   */
+  const [composing, setComposing] = useState(false);
   const [addingSubtask, startAddSubtask] = useTransition();
   const subtaskInputRef = useRef<HTMLInputElement>(null);
 
@@ -150,12 +158,26 @@ function TaskDetailBody({
     startAddSubtask(async () => {
       const result = await handlers.onAddSubtask(task.id, value);
       if (result.ok) {
+        // Cleared but still open and focused: breaking a task down means typing
+        // several steps in a row, and re-opening the composer each time would
+        // put a click between every one of them.
         setNewSubtask("");
         subtaskInputRef.current?.focus();
       } else {
         toast.error(result.error ?? "Could not add that step.");
       }
     });
+  }
+
+  function openComposer() {
+    setComposing(true);
+    // The input mounts in the same commit, so focus waits a frame for it.
+    requestAnimationFrame(() => subtaskInputRef.current?.focus());
+  }
+
+  function cancelComposer() {
+    setNewSubtask("");
+    setComposing(false);
   }
 
   return (
@@ -371,31 +393,55 @@ function TaskDetailBody({
           </AnimatePresence>
         </ul>
 
-        <div className="mt-2 flex items-center gap-2">
-          <Plus className="size-4 shrink-0 text-label-tertiary" aria-hidden />
-          <Input
-            ref={subtaskInputRef}
-            value={newSubtask}
-            onChange={(e) => setNewSubtask(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addSubtask();
-              }
-            }}
-            placeholder="Add a step..."
-            aria-label="Add a subtask"
-            disabled={addingSubtask}
-          />
-          <Button
-            size="sm"
-            onClick={addSubtask}
-            disabled={newSubtask.trim().length === 0}
-            loading={addingSubtask}
+        {composing ? (
+          <div className="mt-2 flex items-center gap-2">
+            <Plus className="size-4 shrink-0 text-label-tertiary" aria-hidden />
+            <Input
+              ref={subtaskInputRef}
+              value={newSubtask}
+              onChange={(e) => setNewSubtask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addSubtask();
+                  return;
+                }
+                if (e.key === "Escape") {
+                  // Stopped here so the key does not travel on and close the
+                  // whole panel: cancelling a step is not cancelling the task.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  cancelComposer();
+                }
+              }}
+              onBlur={() => {
+                // Clicking away from an empty composer means "never mind".
+                // A typed-but-unsaved value is kept rather than thrown away.
+                if (!newSubtask.trim()) setComposing(false);
+              }}
+              placeholder="What is the next step?"
+              aria-label="Add a subtask"
+              disabled={addingSubtask}
+            />
+            <Button
+              size="sm"
+              onClick={addSubtask}
+              disabled={newSubtask.trim().length === 0}
+              loading={addingSubtask}
+            >
+              Add
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={openComposer}
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg px-1.5 text-left text-callout text-label-secondary transition-colors hover:bg-surface-hover hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 sm:min-h-9"
           >
-            Add
-          </Button>
-        </div>
+            <Plus className="size-4 shrink-0" aria-hidden />
+            Add subtask
+          </button>
+        )}
       </section>
 
       {/* Reflection, once there is something to reflect on. */}

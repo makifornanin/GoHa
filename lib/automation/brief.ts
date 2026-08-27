@@ -1,4 +1,5 @@
 import type { DailyQuote, HabitEntry, Task } from "@/db";
+import type { DailyInspirationPayload } from "@/lib/inspiration/resolve";
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import type { IsoDate, Weekday } from "@/lib/date";
@@ -59,6 +60,19 @@ export type MorningBriefPayload = {
   isSabbath: boolean;
   generatedAt: string;
   quote: { text: string; attribution: string | null; translation: string | null } | null;
+  /**
+   * The canonical Daily Inspiration for this user and local date.
+   *
+   * The SAME stored record the Today card renders, not a second lookup: n8n and
+   * the app cannot show different things on one morning. Structured data only;
+   * GoHa does not compose the sentence around it, which stays Gemini's job in
+   * the workflow.
+   *
+   * Null only when the day could not be resolved at all. `quote` above is the
+   * older curated-pool pick and is kept so the existing workflow does not break
+   * the moment this ships.
+   */
+  dailyInspiration: DailyInspirationPayload | null;
   recommendation: string;
   reason: string;
   state: DaySignal["state"];
@@ -107,6 +121,8 @@ export function toMorningPayload(params: {
   habits: HabitWithSchedule[];
   habitEntries: HabitEntry[];
   quote: DailyQuote | null;
+  /** Already resolved and persisted by the caller; passed through verbatim. */
+  dailyInspiration?: DailyInspirationPayload | null;
   alreadyDelivered: boolean;
   today: IsoDate;
   timeZone: string;
@@ -201,6 +217,7 @@ export function toMorningPayload(params: {
           translation: params.quote.translation,
         }
       : null,
+    dailyInspiration: params.dailyInspiration ?? null,
     recommendation: signal.headline,
     reason: signal.detail,
     state: signal.state,

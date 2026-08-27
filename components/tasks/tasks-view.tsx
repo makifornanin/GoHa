@@ -2,7 +2,8 @@
 
 import { ListTodo, Plus } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -133,6 +134,48 @@ export function TasksView({
   const [formOpen, setFormOpen] = useState(openCreateOnMount);
   const [editing, setEditing] = useState<Task | null>(null);
   const [createDate, setCreateDate] = useState<string | undefined>(undefined);
+
+  /*
+   * Reopen the create form when the URL asks again.
+   *
+   * `useState(openCreateOnMount)` is an INITIALIZER: it runs once. The shell's
+   * "Add Task", the mobile "+" and the command palette all navigate to
+   * `/tasks?new=1`, and when you are ALREADY on /tasks that is a soft
+   * navigation, so the component re-renders with the prop still true and the
+   * form never opens. The button silently did nothing on the one page you are
+   * most likely to press it from.
+   *
+   * Adjusting state during render is React's documented answer to "a prop
+   * changed and some state should follow it". An effect here would render the
+   * closed form first and reopen it a frame later, which flickers.
+   */
+  const router = useRouter();
+
+  /*
+   * Spend the `?new=1` signal once it has been honoured.
+   *
+   * Without this the parameter sits in the URL, so pressing "Add Task" again
+   * pushes the identical address, the prop never changes, and the transition
+   * above never fires a second time. Only `new` is removed; `goalId` is left
+   * alone so "Add task" from a goal keeps its preselection.
+   */
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("new");
+    const query = params.toString();
+    router.replace(query ? `/tasks?${query}` : "/tasks", { scroll: false });
+  }, [openCreateOnMount, router]);
+
+  const [lastCreateSignal, setLastCreateSignal] = useState(openCreateOnMount);
+  if (openCreateOnMount !== lastCreateSignal) {
+    setLastCreateSignal(openCreateOnMount);
+    if (openCreateOnMount) {
+      setEditing(null);
+      setCreateDate(undefined);
+      setFormOpen(true);
+    }
+  }
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -394,6 +437,7 @@ export function TasksView({
         }
         defaultGoalId={editing ? undefined : defaultGoalId}
         timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />

@@ -222,14 +222,21 @@ export function AuthForm({
 
         {/* Under the password, where someone looks after it has been refused. */}
         {isLogin ? (
-          <p className="-mt-2 text-right">
+          <div className="-mt-1 flex justify-end">
+            {/*
+              Was an 11px link in a 14px-tall box: under the 44px target the
+              design spec mandates, and easy to miss entirely next to a red
+              error. Now callout-sized with real padding, so it is a comfortable
+              tap. Still plainly secondary to Sign in, which is a full-width
+              filled button directly beneath it.
+            */}
             <Link
-              className="text-footnote font-medium text-blue hover:underline"
+              className="-mr-2 inline-flex min-h-11 items-center rounded-lg px-3 text-callout font-medium text-blue transition-colors hover:bg-blue/10 hover:underline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
               href="/forgot-password"
             >
               Forgot password?
             </Link>
-          </p>
+          </div>
         ) : null}
 
         {error ? (

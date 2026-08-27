@@ -50,7 +50,23 @@ import type { TaskFormInput } from "@/lib/validations/task";
 
 import { ActiveGoalsCard } from "./active-goals-card";
 import { BrainCard } from "./brain-card";
-import { DailyQuoteCard, type DailyQuote } from "./daily-quote-card";
+import {
+  DailyInspirationCard,
+  type DailyInspirationView,
+} from "./daily-inspiration-card";
+
+/**
+ * The rest-day quote shown inside SabbathBanner.
+ *
+ * Still drawn from the curated `daily_quotes` pool rather than the Daily
+ * Inspiration ledger: the Sabbath message is rest-themed by design, and that
+ * pool is what carries the theme.
+ */
+export type SabbathQuote = {
+  text: string;
+  attribution: string | null;
+  translation: string | null;
+};
 import { MomentumCard, type MomentumData } from "./momentum-card";
 import { QuickAddTask } from "./quick-add-task";
 import { TaskChecklistItem } from "./task-checklist-item";
@@ -86,6 +102,7 @@ export function TodayView({
   allHabitEntries = [],
   weekStartsOn = 1,
   quote = null,
+  inspiration = null,
   sabbath = null,
 }: {
   userName: string;
@@ -108,7 +125,12 @@ export function TodayView({
   allHabitEntries?: HabitEntry[];
   weekStartsOn?: Weekday;
   /** Today's quote, already picked on the server. Null when the pool is empty. */
-  quote?: DailyQuote | null;
+  quote?: SabbathQuote | null;
+  /**
+   * The canonical Daily Inspiration for this user's local date, resolved and
+   * persisted server-side. The Morning Brief payload carries this same record.
+   */
+  inspiration?: DailyInspirationView | null;
   /** Set on the owner's rest day (Guide 07, phase 4). */
   sabbath?: { message: string } | null;
 }) {
@@ -451,10 +473,11 @@ export function TodayView({
 
               <MomentumCard data={momentum} />
 
-              {/* Under Momentum, per automation Guide 01 phase 1.5. Empty until
-                  the quote pool exists; the slot is settled now so filling it
-                  later moves nothing else on this page. */}
-              {sabbath ? null : <DailyQuoteCard quote={quote ?? null} />}
+              {/* Under Momentum, per automation Guide 01 phase 1.5. On the rest
+                  day the SabbathBanner above already carries a rest-themed line,
+                  so showing this too would put two pieces of inspiration on one
+                  screen. */}
+              {sabbath ? null : <DailyInspirationCard inspiration={inspiration} />}
 
               <ActiveGoalsCard goals={data.activeGoals} />
 
@@ -531,7 +554,7 @@ function EmptyDay() {
  * The message is a fixed sentence, deliberately not generated. A rest reminder
  * should be the same calm words every week.
  */
-function SabbathBanner({ message, quote }: { message: string; quote: DailyQuote | null }) {
+function SabbathBanner({ message, quote }: { message: string; quote: SabbathQuote | null }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 py-5">

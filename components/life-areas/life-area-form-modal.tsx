@@ -9,16 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  LIFE_AREA_COLOR_KEYS,
   LIFE_AREA_DESCRIPTION_MAX,
-  LIFE_AREA_ICON_KEYS,
   LIFE_AREA_NAME_MAX,
   LIFE_AREA_WEIGHT_MAX,
-  lifeAreaColorConfig,
   nextUnusedColorKey,
   toColorKey,
   toIconKey,
-  type LifeAreaColorKey,
   type LifeAreaIconKey,
 } from "@/lib/life-areas";
 import {
@@ -27,9 +23,10 @@ import {
   type LifeAreaFieldErrors,
   type LifeAreaFormInput,
 } from "@/lib/validations/life-area";
+import { ColorPicker } from "@/components/ui/color-picker";
+import { IconPicker } from "@/components/ui/icon-picker";
 import { cn } from "@/lib/utils";
 
-import { lifeAreaIconMap } from "./icon";
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -57,7 +54,7 @@ type FormProps = {
 function LifeAreaFormFields({ mode, area, usedColors, onSubmit, onClose, nameRef }: FormProps) {
   const [name, setName] = useState(() => area?.name ?? "");
   const [description, setDescription] = useState(() => area?.description ?? "");
-  const [color, setColor] = useState<LifeAreaColorKey>(() =>
+  const [color, setColor] = useState<string>(() =>
     area ? toColorKey(area.color) : nextUnusedColorKey(usedColors ?? []),
   );
   const [icon, setIcon] = useState<LifeAreaIconKey>(() => toIconKey(area?.icon));
@@ -140,57 +137,18 @@ function LifeAreaFormFields({ mode, area, usedColors, onSubmit, onClose, nameRef
       </div>
 
       <fieldset disabled={submitting}>
-        <legend className="mb-2 text-label-md text-on-surface-variant">Color</legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Color">
-          {LIFE_AREA_COLOR_KEYS.map((key) => {
-            const config = lifeAreaColorConfig[key];
-            const selected = color === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={config.label}
-                onClick={() => setColor(key)}
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-full ring-2 ring-offset-2 ring-offset-surface-container-lowest transition-all",
-                  selected ? "ring-on-surface" : "ring-transparent hover:ring-outline-variant",
-                )}
-              >
-                <span className={cn("size-6 rounded-full", config.swatch)} aria-hidden />
-              </button>
-            );
-          })}
-        </div>
+        <legend className="mb-2 text-label-md text-on-surface-variant">Colour</legend>
+        <ColorPicker
+          value={color}
+          onChange={setColor}
+          entityId={area?.id ?? "new"}
+          disabled={submitting}
+        />
       </fieldset>
 
       <fieldset disabled={submitting}>
         <legend className="mb-2 text-label-md text-on-surface-variant">Icon</legend>
-        <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Icon">
-          {LIFE_AREA_ICON_KEYS.map((key) => {
-            const Icon = lifeAreaIconMap[key];
-            const selected = icon === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={key}
-                onClick={() => setIcon(key)}
-                className={cn(
-                  "flex aspect-square items-center justify-center rounded-lg border transition-colors",
-                  selected
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary",
-                )}
-              >
-                <Icon className="size-5" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
+        <IconPicker value={icon} onChange={setIcon} disabled={submitting} />
       </fieldset>
 
       <fieldset disabled={submitting}>

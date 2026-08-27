@@ -182,41 +182,54 @@ function RhythmCard({
       title="Daily rhythm"
       description="When you intend to plan the day and look back at it."
     >
+      {/*
+        Two times side by side once there is room, stacked on a phone.
+
+        Each was previously a full-width field: a five-character time stretched
+        across the whole card, which read as a text box waiting for a sentence
+        and left the label stranded above a lot of empty space. Capped at a
+        width the value actually needs, and the pair shares a row on anything
+        wider than a phone.
+      */}
       <div className="flex flex-col gap-5">
-        <div className="space-y-1.5">
-          <label htmlFor="settings-planning" className="text-subhead text-label-secondary">
-            Plan the day
-          </label>
-          <Input
-            id="settings-planning"
-            type="time"
-            value={planning}
-            disabled={pending}
-            onChange={(e) => setPlanning(e.target.value)}
-            onBlur={() =>
-              persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
-            }
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="settings-planning" className="text-subhead text-label-secondary">
+              Plan the day
+            </label>
+            <Input
+              id="settings-planning"
+              type="time"
+              className="max-w-[11rem]"
+              value={planning}
+              disabled={pending}
+              onChange={(e) => setPlanning(e.target.value)}
+              onBlur={() =>
+                persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
+              }
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="settings-reflection" className="text-subhead text-label-secondary">
+              Look back
+            </label>
+            <Input
+              id="settings-reflection"
+              type="time"
+              className="max-w-[11rem]"
+              value={reflection}
+              disabled={pending}
+              onChange={(e) => setReflection(e.target.value)}
+              onBlur={() =>
+                persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
+              }
+            />
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <label htmlFor="settings-reflection" className="text-subhead text-label-secondary">
-            Look back
-          </label>
-          <Input
-            id="settings-reflection"
-            type="time"
-            value={reflection}
-            disabled={pending}
-            onChange={(e) => setReflection(e.target.value)}
-            onBlur={() =>
-              persist({ dailyPlanningTime: planning, eveningReflectionTime: reflection })
-            }
-          />
-        </div>
-        <p className="text-footnote text-label-tertiary">
+        <p className="text-footnote leading-snug text-label-tertiary">
           When notifications are enabled, GoHa uses these times in your saved timezone for the
           morning brief and evening summary. Leave a time empty to keep that scheduled message
-          off.
+          off. These are separate from the dates on a task.
         </p>
       </div>
     </SettingsCard>

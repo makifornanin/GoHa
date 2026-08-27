@@ -20,4 +20,5 @@ export * as appSettingsRepo from "./app-settings";
 export * as automationRepo from "./automation";
 export * as pushRepo from "./push";
 export * as workerRepo from "./worker";
+export * as inspirationsRepo from "./inspirations";
 export * as quotesRepo from "./quotes";

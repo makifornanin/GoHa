@@ -186,8 +186,8 @@ not have expired.
 `payload` is server-derived and kind-specific. The active forms are:
 
 - `morning_brief`: `localDate`, `timezone`, `isSabbath`, `generatedAt`, `quote`,
-  `recommendation`, `reason`, `state`, complete `topPriorities`, task groups `overdue`,
-  `dueToday`, and `scheduledToday`, `habitsToday`, `activeGoals`, `counts`,
+  `dailyInspiration`, `recommendation`, `reason`, `state`, complete `topPriorities`, task groups
+  `overdue`, `dueToday`, and `scheduledToday`, `habitsToday`, `activeGoals`, `counts`,
   `alreadyDelivered`, and `quiet`. The overdue array is not truncated by GoHa.
 - `evening_summary`: `localDate`, `timezone`, `isSabbath`, `generatedAt`,
   `tasksCompleted`, `tasksPlannedNotDone`, `habitOutcomes`, `focusMinutes`,
@@ -199,6 +199,41 @@ not have expired.
   duration data, `minutesOver`, `dedupeKey`, `localDate`, and `timezone`.
 - `sabbath`: `localDate`, `timezone`, `isSabbath: true`, the canonical rest `message`, and an
   optional deterministic quote.
+
+### `dailyInspiration` on `morning_brief`
+
+The one canonical inspiration for that user and that local calendar date. GoHa decides it, stores
+it, and serves the identical record to the Today card and to this payload, so the app and the
+notification can never show different content on the same morning.
+
+```json
+{
+  "dailyInspiration": {
+    "type": "bible_verse",
+    "text": "Commit your deeds to Yahweh, and your plans shall succeed.",
+    "source": "Proverbs 16:3",
+    "translation": "WEB",
+    "provider": "bible_api"
+  }
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `type` | `quote` or `bible_verse`. Roughly an even split, decided once per local date. |
+| `text` | The content itself. Never truncated by GoHa; over-long provider content is rejected and refetched instead. |
+| `source` | An author for a quote, a `Book chapter:verse` reference for scripture. |
+| `translation` | Present for scripture only, currently always `WEB`. **Absent** for quotes, not null. |
+| `provider` | `zenquotes`, `bible_api`, or `goha_fallback` when no provider was reachable. Identifies the source only; GoHa shows any required credit in its own UI, and the notification body does not need to carry it. |
+
+`dailyInspiration` is `null` only when the day could not be resolved at all, which does not stop
+the brief being sent. The older `quote` field is unchanged and still populated from the curated
+`daily_quotes` pool, so an existing workflow keeps working; new work should read
+`dailyInspiration`.
+
+The workflow decides how, and whether, to use this. GoHa does not compose the sentence around it,
+does not add a greeting, and does not rank it against the rest of the brief. `evening_summary`
+deliberately does NOT carry this field.
 
 n8n may send the morning or evening structured payload to Gemini for concise presentation. It
 must not ask the model to recalculate dates, completion, streaks, ranking, Sabbath, or dedupe.

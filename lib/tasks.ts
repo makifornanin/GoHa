@@ -39,6 +39,8 @@ type PriorityMeta = {
   label: string;
   /** Chip classes. */
   badge: string;
+  /** Colour for showing the priority as plain words rather than a chip. */
+  text: string;
   /** Left accent-bar color on the task card. */
   accent: string;
   /** Sort weight (higher = more urgent) for priority sorting. */
@@ -49,23 +51,27 @@ export const taskPriorityConfig: Record<Priority, PriorityMeta> = {
   low: {
     label: "Low",
     badge: "bg-gray-5 text-label-secondary",
+    text: "text-label-secondary",
     accent: "bg-gray-3",
     weight: 0,
   },
   medium: {
     label: "Medium",
     badge: "bg-blue/15 text-blue",
+    text: "text-blue",
     accent: "bg-blue",
     weight: 1,
   },
   high: {
     label: "High",
     badge: "bg-orange/15 text-orange",
+    text: "text-orange",
     accent: "bg-orange",
     weight: 2,
   },
   urgent: {
     label: "Urgent",
+    text: "text-red",
     badge: "bg-red text-white",
     accent: "bg-red",
     weight: 3,

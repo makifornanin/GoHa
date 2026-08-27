@@ -7,7 +7,6 @@ import {
   goalsRepo,
   habitsRepo,
   lifeAreasRepo,
-  quotesRepo,
   tasksRepo,
 } from "@/db";
 import {
@@ -17,7 +16,8 @@ import {
   zonedPartOfDay,
   zonedToday,
 } from "@/lib/date";
-import { pickDailyQuote, sourcesFor } from "@/lib/daily-quote";
+import { getDailyInspiration } from "@/lib/inspiration/daily";
+import { resolveRestDayQuote } from "@/lib/inspiration/rest-quote";
 import { buildHabitViews } from "@/lib/habit-view";
 import { completionsByDay } from "@/lib/progress";
 import { isSabbathDate, SABBATH_MESSAGE } from "@/lib/sabbath";
@@ -65,20 +65,33 @@ export default async function TodayPage() {
    * nothing (Guide 07, step 3.1).
    */
   const isSabbath = isSabbathDate(settings.sabbathDay, today);
-  const quotePool = isSabbath
-    ? await quotesRepo.listRestQuotes(user.id)
-    : await quotesRepo.listActiveQuotes(user.id, sourcesFor(settings.quoteSourcePref));
-  const pool =
-    isSabbath && quotePool.length === 0
-      ? await quotesRepo.listActiveQuotes(user.id, sourcesFor(settings.quoteSourcePref))
-      : quotePool;
-  // A pinned quote wins over the pool pick, so a verse an automation chose for
-  // today is the one the card shows.
-  const pinnedQuote = await quotesRepo.getPinnedQuote(user.id, today);
-  const picked = pinnedQuote ?? pickDailyQuote(pool, today);
+
+  /*
+   * The rest-day quote, through the SAME resolver the Sabbath worker job uses,
+   * so the banner here and the rest-day notification cannot disagree. Only
+   * loaded on a rest day: on an ordinary day the Daily Inspiration below is
+   * what the page shows.
+   */
+  const picked = isSabbath
+    ? await resolveRestDayQuote(user.id, today, settings.quoteSourcePref)
+    : null;
   const quote = picked
     ? { text: picked.text, attribution: picked.attribution, translation: picked.translation }
     : null;
+
+  /*
+   * The canonical Daily Inspiration for this user's local date.
+   *
+   * Read-through: the first caller on a new local date decides and stores it,
+   * everyone after reads that row. Whether that first caller is this page or
+   * the worker preparing the morning job does not matter, which is the point:
+   * the card below and the Morning Brief payload are the same record.
+   *
+   * Skipped entirely on a rest day. The Sabbath banner already carries a
+   * rest-themed line, and resolving here would spend a provider call on
+   * something this page will not render.
+   */
+  const inspiration = isSabbath ? null : await getDailyInspiration(user.id, today);
 
   // --- Momentum, derived from records already written elsewhere ---
   const views = buildHabitViews({ habits, entries: habitEntries, today, weekStartsOn, timeZone });
@@ -138,6 +151,17 @@ export default async function TodayPage() {
         lifeAreas={lifeAreas}
         momentum={momentum}
         quote={quote}
+        inspiration={
+          inspiration
+            ? {
+                type: inspiration.type,
+                text: inspiration.text,
+                source: inspiration.source,
+                translation: inspiration.translation,
+                provider: inspiration.provider,
+              }
+            : null
+        }
         sabbath={isSabbath ? { message: SABBATH_MESSAGE } : null}
       />
     </>

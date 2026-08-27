@@ -51,3 +51,26 @@ export function pickDailyQuote<T extends QuoteLike>(pool: T[], date: IsoDate): T
   if (pool.length === 0) return null;
   return pool[hashDate(date) % pool.length];
 }
+
+/**
+ * The rest-day pick, from pools the caller has already loaded.
+ *
+ * Split out because the Today page and the Sabbath worker job had each written
+ * this sequence separately and had drifted apart: the worker hardcoded a
+ * verse-only fallback pool instead of honouring the saved
+ * `quoteSourcePref`, and never consulted a pinned quote at all. So on a rest day
+ * the card could show one thing and the notification another, and a verse
+ * deliberately pinned to that date was ignored by the push.
+ *
+ * The order is the same one the ordinary day uses: a pin is an explicit choice
+ * for this exact date and beats everything, then the rest-themed pool, then the
+ * general pool so an empty rest pool still says something.
+ */
+export function pickRestDayQuote<T extends QuoteLike>(
+  sources: { pinned: T | null; restPool: T[]; generalPool: T[] },
+  date: IsoDate,
+): T | null {
+  if (sources.pinned) return sources.pinned;
+  const pool = sources.restPool.length > 0 ? sources.restPool : sources.generalPool;
+  return pickDailyQuote(pool, date);
+}

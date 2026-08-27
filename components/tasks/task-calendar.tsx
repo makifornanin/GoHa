@@ -116,7 +116,27 @@ export function TaskCalendar({
                   !cell.inMonth && "bg-surface-secondary/40",
                 )}
               >
-                <div className="mb-1 flex items-center justify-between">
+                {/*
+                  The whole empty area of the day is the "add here" target.
+
+                  It used to be a 20px `+` that only appeared on hover, so on a
+                  phone it was invisible and unreachable, and on a desktop it
+                  asked for a precise click on the smallest thing in the cell.
+                  One button stretched over the cell means tapping the day you
+                  are already looking at plans into it.
+
+                  It sits BEHIND the task chips (`z-0` here, `z-10` there), so a
+                  click on a task still edits that task rather than creating a
+                  second one.
+                */}
+                <button
+                  type="button"
+                  aria-label={`Add a task on ${cell.date}`}
+                  onClick={() => onCreateOn(cell.date)}
+                  className="absolute inset-0 z-0 cursor-pointer rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-[-2px] focus-visible:outline-blue/50"
+                />
+
+                <div className="pointer-events-none relative z-10 mb-1 flex items-center justify-between">
                   <span
                     className={cn(
                       "flex size-6 items-center justify-center rounded-full font-mono text-footnote tabular-nums",
@@ -129,18 +149,18 @@ export function TaskCalendar({
                   >
                     {cell.day}
                   </span>
-                  {/* Plan straight into a day. */}
-                  <button
-                    type="button"
-                    aria-label={`Add a task on ${cell.date}`}
-                    onClick={() => onCreateOn(cell.date)}
-                    className="flex size-5 cursor-pointer items-center justify-center rounded-md text-label-tertiary opacity-0 transition-opacity hover:bg-surface-hover hover:text-blue focus-visible:opacity-100 group-hover/day:opacity-100"
+                  {/* Decoration, not a control: the cell button behind it is what
+                      actually adds, so this is one tab stop per day rather than
+                      two. Shown on hover and whenever the cell has focus. */}
+                  <span
+                    aria-hidden
+                    className="flex size-5 items-center justify-center rounded-md text-label-tertiary opacity-0 transition-opacity group-hover/day:opacity-100 group-focus-within/day:opacity-100"
                   >
-                    <Plus className="size-3.5" aria-hidden />
-                  </button>
+                    <Plus className="size-3.5" />
+                  </span>
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="relative z-10 flex flex-col gap-1">
                   {shown.map((task) => {
                     const done = task.status === "completed";
                     const late = isTaskLate(task, new Date(), timeZone);

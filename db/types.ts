@@ -8,6 +8,7 @@ import type {
   automationRequests,
   automationJobs,
   automationTokens,
+  dailyInspirations,
   dailyQuotes,
   notificationLog,
   pushDeliveries,
@@ -93,6 +94,8 @@ export type PushPairingSession = typeof pushPairingSessions.$inferSelect;
 export type NewPushPairingSession = typeof pushPairingSessions.$inferInsert;
 export type PushDelivery = typeof pushDeliveries.$inferSelect;
 export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
+export type DailyInspirationRow = typeof dailyInspirations.$inferSelect;
+export type NewDailyInspiration = typeof dailyInspirations.$inferInsert;
 export type DailyQuote = typeof dailyQuotes.$inferSelect;
 export type NewDailyQuote = typeof dailyQuotes.$inferInsert;
 

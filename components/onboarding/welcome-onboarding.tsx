@@ -146,7 +146,36 @@ export function WelcomeOnboarding({ name }: { name: string | null }) {
       className="sm:max-w-lg"
     >
       <div className="flex flex-col gap-6 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1">
-        <div className="min-h-[9rem]">{step.body}</div>
+        {/*
+          All three steps occupy ONE grid cell, and only the active one is
+          visible.
+
+          The cell is therefore as tall as the tallest step, so the shell stops
+          resizing between them: the progress bar and the buttons stay exactly
+          where they were when you press Continue. The previous `min-h-[9rem]`
+          was a guess that fitted step one and was overshot by the other two,
+          which is what made the modal jump.
+
+          Height comes from the content rather than from a fixed number, so a
+          narrow screen that wraps the text grows the cell instead of clipping
+          it. Inactive steps are hidden from assistive tech and cannot be
+          tabbed into, so only the visible step is reachable.
+        */}
+        <div className="grid">
+          {steps.map((entry, position) => (
+            <div
+              key={entry.key}
+              aria-hidden={position !== index}
+              inert={position !== index ? true : undefined}
+              className={cn(
+                "col-start-1 row-start-1 transition-opacity duration-200",
+                position === index ? "opacity-100" : "pointer-events-none invisible opacity-0",
+              )}
+            >
+              {entry.body}
+            </div>
+          ))}
+        </div>
 
         <div className="flex flex-col gap-4">
           {/* Progress reads as position, not decoration, so it is announced too. */}

@@ -85,22 +85,65 @@ export const lifeAreaColorConfig: Record<
   },
 };
 
-/** Curated icon set for life areas. Keys are stable; components map them to lucide. */
-export const LIFE_AREA_ICON_KEYS = [
-  "target",
-  "briefcase",
-  "heart",
-  "wallet",
-  "growth",
-  "family",
-  "rocket",
-  "home",
-  "fitness",
-  "sparkles",
-  "leaf",
-  "globe",
+/**
+ * The icon catalog, grouped for the picker.
+ *
+ * Keys are STABLE and stored in the database, so the original twelve keep both
+ * their names and their meaning: an area saved as "growth" still renders the
+ * same glyph it always did. Everything here is lucide, the one family GoHa
+ * already uses, so nothing looks borrowed from another set.
+ *
+ * Grouped rather than dumped into one grid. Forty-odd icons in a flat wall is
+ * slower to search than a list of headings, and the headings are also what make
+ * the picker answer the real question, which is "what is this area about"
+ * rather than "which of these little pictures do I like".
+ */
+export const ICON_GROUPS = [
+  {
+    label: "Work",
+    keys: ["briefcase", "business", "code", "automation", "projects", "meeting"],
+  },
+  {
+    label: "Learning",
+    keys: ["growth", "school", "reading", "language", "science"],
+  },
+  {
+    label: "Money",
+    keys: ["wallet", "savings", "investing", "shopping"],
+  },
+  {
+    label: "Body",
+    keys: ["heart", "fitness", "food", "sleep", "outdoors", "medical"],
+  },
+  {
+    label: "People",
+    keys: ["family", "relationships", "friends", "pets"],
+  },
+  {
+    label: "Life",
+    keys: ["home", "travel", "car", "leaf", "globe"],
+  },
+  {
+    label: "Making",
+    keys: ["creativity", "music", "writing", "photo", "design"],
+  },
+  {
+    label: "Inner",
+    keys: ["spirituality", "mindfulness", "sparkles", "journal"],
+  },
+  {
+    label: "Planning",
+    keys: ["target", "planning", "routines", "habits", "rocket", "milestone"],
+  },
 ] as const;
-export type LifeAreaIconKey = (typeof LIFE_AREA_ICON_KEYS)[number];
+
+/** One key from any group. Derived, so a group edit updates the type with it. */
+export type LifeAreaIconKey = (typeof ICON_GROUPS)[number]["keys"][number];
+
+/** Every key, flattened. The order here is the order the picker shows them in. */
+export const LIFE_AREA_ICON_KEYS: readonly LifeAreaIconKey[] = ICON_GROUPS.flatMap(
+  (group) => group.keys as readonly LifeAreaIconKey[],
+);
 export const DEFAULT_ICON_KEY: LifeAreaIconKey = "target";
 
 /**
@@ -186,4 +229,124 @@ export function toIconKey(value: string | null | undefined): LifeAreaIconKey {
   return LIFE_AREA_ICON_KEYS.includes(value as LifeAreaIconKey)
     ? (value as LifeAreaIconKey)
     : DEFAULT_ICON_KEY;
+}
+
+// ---------------------------------------------------------------------------
+// Custom colours
+// ---------------------------------------------------------------------------
+
+/**
+ * A broader palette, stored as hex in the SAME `color` column.
+ *
+ * The six original keys ("teal", "violet", ...) are unchanged and still resolve
+ * through `lifeAreaColorConfig`, so every area saved before today renders
+ * exactly as it did. New choices are written as `#rrggbb` instead, which the
+ * column already accepts because it is plain text. That is the whole reason
+ * there is no migration here: the shape of the data did not change, only the
+ * range of values it can hold.
+ *
+ * Muted on purpose. These sit behind real content as dots, chips and edges, so
+ * a saturated neon reads as an error state rather than as a category.
+ */
+export const COLOR_PRESETS: readonly { label: string; hex: string }[] = [
+  { label: "Slate", hex: "#64748b" },
+  { label: "Stone", hex: "#78716c" },
+  { label: "Rose", hex: "#be5f6a" },
+  { label: "Red", hex: "#c05b52" },
+  { label: "Amber", hex: "#c08a3e" },
+  { label: "Olive", hex: "#7d8c4e" },
+  { label: "Green", hex: "#4f8a63" },
+  { label: "Emerald", hex: "#3f8f7a" },
+  { label: "Teal", hex: "#30b0c7" },
+  { label: "Cyan", hex: "#4a90a4" },
+  { label: "Blue", hex: "#4a7ab5" },
+  { label: "Indigo", hex: "#6470b8" },
+  { label: "Violet", hex: "#8168b0" },
+  { label: "Plum", hex: "#9c5f97" },
+  { label: "Clay", hex: "#a9705c" },
+  { label: "Sand", hex: "#b09372" },
+];
+
+const HEX_PATTERN = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/** Whether a stored value is a custom colour rather than one of the old keys. */
+export function isHexColor(value: string | null | undefined): boolean {
+  return typeof value === "string" && HEX_PATTERN.test(value.trim());
+}
+
+/**
+ * Normalize user input to `#rrggbb`, or null when it is not a colour.
+ *
+ * Accepts the forms people actually type: with or without the hash, three
+ * digits or six, any case. Anything else is rejected rather than guessed at, so
+ * a typo becomes a visible validation message instead of a silently wrong
+ * colour.
+ */
+export function normalizeHex(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const match = HEX_PATTERN.exec(value.trim());
+  if (!match) return null;
+  const digits = match[1].toLowerCase();
+  const full =
+    digits.length === 3
+      ? digits
+          .split("")
+          .map((d) => d + d)
+          .join("")
+      : digits;
+  return `#${full}`;
+}
+
+/**
+ * Relative luminance, for deciding whether a colour wants light or dark text.
+ *
+ * The sRGB coefficients from WCAG. A user is free to pick pale sand or deep
+ * plum, and white-on-sand is unreadable while black-on-plum is too, so the
+ * foreground is derived rather than fixed.
+ */
+export function hexLuminance(hex: string): number {
+  const normalized = normalizeHex(hex) ?? "#000000";
+  const channel = (pair: string) => {
+    const value = parseInt(pair, 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel(normalized.slice(1, 3));
+  const g = channel(normalized.slice(3, 5));
+  const b = channel(normalized.slice(5, 7));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Readable foreground for a custom colour, chosen by luminance not by taste.
+ *
+ * The threshold is the real crossover, not a guess. WCAG contrast against white
+ * is 1.05 / (L + 0.05) and against black is (L + 0.05) / 0.05; those are equal
+ * at L = 0.179, so anything lighter takes dark text and anything darker takes
+ * light. An earlier 0.45 put white on mid-tan, which measures about 2.7:1 and
+ * is unreadable, where black on the same swatch measures about 7.8:1.
+ */
+const LUMINANCE_CROSSOVER = 0.179;
+
+export function readableForeground(hex: string): "#ffffff" | "#111111" {
+  return hexLuminance(hex) > LUMINANCE_CROSSOVER ? "#111111" : "#ffffff";
+}
+
+/**
+ * The one colour answer for an entity, whichever form it was saved in.
+ *
+ * `fill` is always a usable CSS colour: a token reference for a legacy key, the
+ * hex itself for a custom one. Call sites that only need a colour can use it
+ * without caring which kind it is; the ones that style with Tailwind classes
+ * check `tile`/`dot`, which are null for custom colours.
+ */
+export function resolveAreaColor(
+  color: string | null | undefined,
+  id: string,
+): { kind: "preset" | "custom"; fill: string; tile: string | null; dot: string | null } {
+  const hex = isHexColor(color) ? normalizeHex(color) : null;
+  if (hex) return { kind: "custom", fill: hex, tile: null, dot: null };
+
+  const key = resolveColorKey(color, id);
+  const config = lifeAreaColorConfig[key];
+  return { kind: "preset", fill: config.fill, tile: config.tile, dot: config.dot };
 }

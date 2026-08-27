@@ -67,6 +67,19 @@ export function DetailPanel({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        /*
+         * Only if nothing nearer the user has already dealt with it.
+         *
+         * This listener is on `document`, so a React `stopPropagation` inside
+         * the panel never reaches it: the inline subtask composer cancelled
+         * itself on Escape and the panel then closed the whole task on the same
+         * keypress, taking the half-typed step with it.
+         *
+         * `defaultPrevented` is the signal that already travels with the event,
+         * so an inner control that calls `preventDefault` when it handles
+         * Escape is respected without the panel needing to know it exists.
+         */
+        if (event.defaultPrevented) return;
         event.preventDefault();
         onClose();
         return;

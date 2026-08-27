@@ -43,6 +43,9 @@ import {
   graveyardKey,
 } from "@/lib/automation/graveyard";
 import { pickDailyQuote, sourcesFor } from "@/lib/daily-quote";
+import { getDailyInspiration } from "@/lib/inspiration/daily";
+import { resolveRestDayQuote } from "@/lib/inspiration/rest-quote";
+import { toInspirationPayload } from "@/lib/inspiration/resolve";
 import { deriveReviewStats, weekBounds } from "@/lib/review";
 import { addDays, getZonedParts, startOfWeek, zonedToday, type Weekday } from "@/lib/date";
 import { sendNotificationToUser, VapidConfigurationError } from "@/lib/push/web-push";
@@ -275,7 +278,7 @@ export async function prepareWorkerJob(
     return { state: "skip", job, reason: "sabbath_changed" };
   }
 
-  if (job.kind === "sabbath") return prepareSabbath(job);
+  if (job.kind === "sabbath") return prepareSabbath(job, settings);
   if (job.kind === "morning_brief") return prepareMorning(job, settings, now);
   if (job.kind === "evening_summary") return prepareEvening(job, settings, now);
   if (job.kind === "deadline" || job.kind === "focus_overrun") {
@@ -286,10 +289,17 @@ export async function prepareWorkerJob(
   return { state: "skip", job, reason: "kind_not_active" };
 }
 
-async function prepareSabbath(job: AutomationJob): Promise<PreparedWorkerJob> {
-  const rest = await quotesRepo.listRestQuotes(job.userId);
-  const pool = rest.length > 0 ? rest : await quotesRepo.listActiveQuotes(job.userId, ["verse"]);
-  const quote = pickDailyQuote(pool, job.localDate);
+async function prepareSabbath(
+  job: AutomationJob,
+  settings: Awaited<ReturnType<typeof getUserSettingsCached>>,
+): Promise<PreparedWorkerJob> {
+  /*
+   * Through the shared resolver, so the rest day picks the same quote the Today
+   * page shows. This used to select here: it hardcoded a verse-only fallback
+   * pool, ignoring the saved preference, and never looked for a quote pinned to
+   * this date. Both are fixed by not choosing twice.
+   */
+  const quote = await resolveRestDayQuote(job.userId, job.localDate, settings.quoteSourcePref);
   const payload = {
     localDate: job.localDate,
     timezone: job.timezone,
@@ -337,6 +347,25 @@ async function prepareMorning(
     timeZone: settings.timezone,
     hour: getZonedParts(now, settings.timezone).hour,
   });
+  /*
+   * The same canonical record the Today card reads.
+   *
+   * `job.localDate` is the user's local date, already resolved when the job was
+   * materialized, so a job that runs at 06:00 Manila and a page opened at 09:00
+   * Manila resolve the identical row. Whichever of the two arrives first on a
+   * new day decides it; the other reads it.
+   *
+   * Failure here must not lose the morning: a brief without an inspiration is
+   * far better than no brief, so this degrades to null rather than throwing the
+   * job into its fail route.
+   */
+  let dailyInspiration = null;
+  try {
+    dailyInspiration = toInspirationPayload(await getDailyInspiration(job.userId, job.localDate));
+  } catch (error) {
+    console.warn("[daily-inspiration] morning job could not resolve", error);
+  }
+
   const payload = toMorningPayload({
     signal,
     tasks,
@@ -344,6 +373,7 @@ async function prepareMorning(
     habits,
     habitEntries,
     quote: pinnedQuote ?? pickDailyQuote(quotes, job.localDate),
+    dailyInspiration,
     alreadyDelivered: Boolean(delivered),
     today: job.localDate,
     timeZone: settings.timezone,
