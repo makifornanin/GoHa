@@ -505,6 +505,7 @@ export function TodayView({
         goals={goals}
         lifeAreas={lifeAreas}
         timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onClose={() => setDetailId(null)}
         handlers={detailHandlers}
       />

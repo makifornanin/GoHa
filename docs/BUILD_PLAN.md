@@ -189,6 +189,15 @@ Status: [x] Completed (2026-07-08)
 
 ## Change log
 
+### 2026-08-27: Task detail panel, dates and editable subtasks
+- The detail panel still had the native `<input type="date">`, `type="time">` and `type="datetime-local">` controls: the earlier date work replaced them in the create/edit MODAL only, and this second editor was missed. Both rows now use the same `DateField`, so planning is dates everywhere. The start-time input is gone; `dueAt` is still stored as an instant because deadline automation keys on it, with the hour preserved for a task that has one and end of local day for a task given a due date for the first time.
+- The task name moved into the panel header, on the same row as the close button (measured: both at y=17). It used to be the first thing in the scrolling body, so it slid out of sight the moment you looked at the subtasks and you lost track of which task you were editing.
+- Completing moved from a checkbox beside the title to a "Mark done" / "Reopen task" button in the footer. A checkbox is right in a LIST where you tick things off in passing, and wrong on a detail view where it sat next to the title competing with it and a mis-click silently completed the task you had opened to read.
+- Subtask titles are editable in place. Rewording a step previously meant deleting and retyping it, which threw away its completion state with it.
+- Escape in any of these fields is claimed ONLY when there is an edit to discard. The panel skips an Escape that is already handled, so claiming it unconditionally would have trapped the user: with the cursor in the title, which is where the panel puts it on open, Escape would revert nothing and the panel could never be closed with the keyboard.
+- A `discarding` ref guards the revert. Escape reverts and then blurs, blur is what commits, and the state reset has not flushed by then, so without it the discarded text was saved by the very keypress meant to throw it away. Caught by a test.
+- Verification: typecheck clean, lint clean, 740/740 unit tests pass, `pnpm build` compiles. Browser-verified against the QA account: zero native date/time inputs in the panel, title and close button aligned, done button in the footer, a subtask renamed and still renamed after a reload, and Escape reverting an edit without closing the panel.
+
 ### 2026-08-27: Icon catalog, colour customization, authenticated QA
 - Icon catalog grown from 12 to 45 keys across 9 groups, all lucide, the one family GoHa already uses. Every original key keeps its name AND its glyph, because those strings are in the database: an area saved as "growth" renders exactly what it always did. New shared `IconPicker` with a filter that matches the key and the group name, so typing "money" finds the wallet.
 - Colour customization reuses the EXISTING `color` text column, which is why there is no migration: the shape of the data did not change, only the range of values it can hold. Six legacy keys still resolve through `lifeAreaColorConfig`; new choices are stored as `#rrggbb`. `resolveAreaColor` returns one answer either way, with Tailwind classes for presets and an inline style for custom.

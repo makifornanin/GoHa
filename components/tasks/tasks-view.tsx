@@ -423,6 +423,7 @@ export function TasksView({
         goals={goals}
         lifeAreas={lifeAreas}
         timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onClose={() => setDetailId(null)}
         handlers={detailHandlers}
       />

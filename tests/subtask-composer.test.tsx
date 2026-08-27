@@ -62,16 +62,19 @@ function makeTask(over: Partial<Task> = {}): Task {
   } as Task;
 }
 
-function setup(subtasks: Task[] = []) {
+function setup(subtasks: Task[] = [], extra: Record<string, unknown> = {}) {
   const onAddSubtask = vi.fn(async () => ({ ok: true }));
   const onToggleSubtask = vi.fn();
   const handlers = {
     onAddSubtask,
     onToggleSubtask,
     onDeleteSubtask: vi.fn(),
+    onSave: vi.fn(async () => ({ ok: true })),
     onUpdate: vi.fn(async () => ({ ok: true })),
     onToggleComplete: vi.fn(),
     onEditNote: vi.fn(),
+    onDelete: vi.fn(),
+    ...extra,
   };
   const onClose = vi.fn();
   render(
@@ -161,7 +164,8 @@ describe("existing steps", () => {
     const step = makeTask({ id: "s1", title: "Pick three projects", parentTaskId: "t1" });
     const { onToggleSubtask } = setup([step]);
 
-    expect(screen.getByText("Pick three projects")).toBeTruthy();
+    // The title is an editable field now, not static text.
+    expect(screen.getByRole("textbox", { name: /rename pick three projects/i })).toBeTruthy();
     await userEvent.click(screen.getByRole("checkbox", { name: /complete pick three projects/i }));
     expect(onToggleSubtask).toHaveBeenCalledWith(step);
   });
@@ -170,6 +174,46 @@ describe("existing steps", () => {
     setup([makeTask({ id: "s1", title: "Pick three projects", parentTaskId: "t1" })]);
     expect(composer()).toBeNull();
     expect(addTrigger()).toBeTruthy();
+  });
+
+  it("lets a step be renamed in place", async () => {
+    const step = makeTask({ id: "s1", title: "Pick three projects", parentTaskId: "t1" });
+    const onSave = vi.fn(
+      async (...args: [string, { title: string }]) => ({ ok: true, args }),
+    );
+    setup([step], { onSave });
+
+    const field = screen.getByRole("textbox", { name: /rename pick three projects/i });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Pick five projects");
+    await userEvent.tab();
+
+    expect(onSave).toHaveBeenCalled();
+    expect(onSave.mock.calls[0][1]).toMatchObject({ title: "Pick five projects" });
+  });
+
+  it("reverts a step rename on Escape rather than saving it", async () => {
+    const step = makeTask({ id: "s1", title: "Pick three projects", parentTaskId: "t1" });
+    const onSave = vi.fn(
+      async (...args: [string, { title: string }]) => ({ ok: true, args }),
+    );
+    setup([step], { onSave });
+
+    const field = screen.getByRole("textbox", { name: /rename pick three projects/i });
+    await userEvent.type(field, " and more");
+    await userEvent.keyboard("{Escape}");
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect((field as HTMLInputElement).value).toBe("Pick three projects");
+  });
+
+  it("does not swallow Escape when there is nothing to revert", async () => {
+    // Otherwise the cursor sitting in a title, which is where the panel puts it
+    // on open, would make the panel impossible to dismiss with the keyboard.
+    const { onClose } = setup([makeTask({ id: "s1", title: "A step", parentTaskId: "t1" })]);
+    screen.getByRole("textbox", { name: /rename a step/i }).focus();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
   });
 });
 
