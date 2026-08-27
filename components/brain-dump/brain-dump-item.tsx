@@ -229,7 +229,7 @@ export function BrainDumpItem({
                 {item.convertedType ? (
                   <Link
                     href={convertTargetConfig[item.convertedType].module}
-                    className="inline-flex items-center gap-1 text-footnote font-medium text-blue hover:underline"
+                    className="touch-target inline-flex items-center gap-1 text-footnote font-medium text-blue hover:underline"
                   >
                     View <ExternalLink className="size-3" aria-hidden />
                   </Link>

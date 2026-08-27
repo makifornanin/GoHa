@@ -234,9 +234,9 @@ export function DateField({
               type="button"
               onClick={() => commit(option.date)}
               className={cn(
-                "rounded-full px-3 py-1.5 text-footnote font-medium transition-colors",
+                "touch-target rounded-full px-3 py-1.5 text-footnote font-medium transition-colors",
                 value === option.date
-                  ? "bg-blue text-white"
+                  ? "bg-blue-fill text-white"
                   : "bg-fill-tertiary text-label-secondary hover:bg-fill-secondary hover:text-label",
               )}
             >
@@ -310,7 +310,7 @@ export function DateField({
                   "relative flex h-9 items-center justify-center rounded-lg text-callout transition-colors",
                   outside ? "text-label-quaternary" : "text-label",
                   selected
-                    ? "bg-blue font-semibold text-white"
+                    ? "bg-blue-fill font-semibold text-white"
                     : day === focusedDay
                       ? "bg-fill-tertiary"
                       : "hover:bg-surface-hover",

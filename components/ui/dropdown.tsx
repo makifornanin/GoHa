@@ -222,7 +222,7 @@ export function Dropdown({
                     active &&
                       (item.tone === "destructive"
                         ? "bg-red text-white"
-                        : "bg-blue text-white"),
+                        : "bg-blue-fill text-white"),
                     "disabled:pointer-events-none disabled:text-label-quaternary",
                   )}
                 >

@@ -288,7 +288,7 @@ function GoalDetailBody({
 
         <Link
           href="/tasks"
-          className="mt-2 inline-flex text-callout font-medium text-blue hover:underline"
+          className="touch-target mt-2 inline-flex items-center text-callout font-medium text-blue hover:underline"
         >
           Manage in To-dos
         </Link>

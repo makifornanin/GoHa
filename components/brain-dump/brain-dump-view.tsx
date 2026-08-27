@@ -286,7 +286,7 @@ export function BrainDumpView({
                 aria-checked={draftColor === key}
                 aria-label={noteColorConfig[key].label}
                 onClick={() => setDraftColor(key)}
-                className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-blue/40"
+                className="touch-target hit-44-narrow flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-blue/40"
               >
                 <span
                   aria-hidden

@@ -11,7 +11,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && node scripts/consistency-sweep.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -28,7 +28,8 @@
     "db:studio": "drizzle-kit studio",
     "test:account:create": "node --experimental-strip-types scripts/test-account.mts create",
     "test:account:reset": "node --experimental-strip-types scripts/test-account.mts reset",
-    "test:account:destroy": "node --experimental-strip-types scripts/test-account.mts destroy"
+    "test:account:destroy": "node --experimental-strip-types scripts/test-account.mts destroy",
+    "check:consistency": "node scripts/consistency-sweep.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -135,7 +135,7 @@ export function TodayHabits({
         {todayHabits.length === 0 ? (
           <p className="mx-3 mb-2 rounded-xl bg-surface-secondary px-4 py-6 text-center text-callout text-label-secondary">
             No habits scheduled today.{" "}
-            <Link href="/habits" className="font-medium text-blue hover:underline">
+            <Link href="/habits" className="touch-target font-medium text-label underline decoration-blue/60 underline-offset-2 hover:decoration-blue">
               Manage habits
             </Link>
           </p>

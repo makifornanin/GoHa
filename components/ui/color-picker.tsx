@@ -134,7 +134,7 @@ export function ColorPicker({
                 commitCustom((e.target as HTMLInputElement).value);
               }
             }}
-            className="h-11 w-full rounded-lg bg-fill-tertiary px-3 font-mono text-[16px] text-label placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 sm:h-8 sm:px-2.5 sm:text-body"
+            className="h-11 w-full rounded-lg bg-fill-tertiary px-3 font-mono text-[16px] text-label placeholder:text-label-secondary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 sm:h-8 sm:px-2.5 sm:text-body"
           />
         </div>
         {error ? (

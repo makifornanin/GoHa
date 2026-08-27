@@ -1187,7 +1187,7 @@ function LegendEditor({
             maxLength={LEGEND_LABEL_MAX}
             placeholder={SUGGESTED_LEGEND[key] ?? nodeColorConfig[key].label}
             aria-label={`What ${nodeColorConfig[key].label} means`}
-            className="h-7 w-full min-w-0 rounded-md bg-fill-tertiary px-2 text-callout text-label placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+            className="h-7 w-full min-w-0 rounded-md bg-fill-tertiary px-2 text-callout text-label placeholder:text-label-secondary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
           />
         </label>
       ))}
@@ -1198,7 +1198,7 @@ function LegendEditor({
           setDraft(SUGGESTED_LEGEND);
           commit(SUGGESTED_LEGEND);
         }}
-        className="mt-1 cursor-pointer self-start text-footnote font-medium text-blue hover:underline"
+        className="touch-target mt-1 inline-flex cursor-pointer items-center self-start text-footnote font-medium text-blue hover:underline"
       >
         Use suggested labels
       </button>
@@ -1320,7 +1320,7 @@ function ImportTasksDialog({
                     <span
                       className={cn(
                         "flex size-4 shrink-0 items-center justify-center rounded-sm border-[1.5px] transition-colors",
-                        isSelected ? "border-transparent bg-blue text-white" : "border-gray-3",
+                        isSelected ? "border-transparent bg-blue-fill text-white" : "border-gray-3",
                       )}
                       aria-hidden
                     >

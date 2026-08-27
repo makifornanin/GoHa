@@ -109,7 +109,7 @@ export function ExtendControl({
                   type="button"
                   disabled={disabled || draft.trim() === ""}
                   onClick={submitCustom}
-                  className="h-8 cursor-pointer rounded-lg bg-blue px-3 text-callout font-medium text-white transition-[filter] hover:brightness-[1.06] disabled:bg-gray-5 disabled:text-label-quaternary"
+                  className="h-8 cursor-pointer rounded-lg bg-blue-fill px-3 text-callout font-medium text-white transition-[filter] hover:brightness-[1.06] disabled:bg-gray-5 disabled:text-label-quaternary"
                 >
                   Add
                 </button>

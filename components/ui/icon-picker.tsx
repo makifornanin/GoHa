@@ -58,7 +58,7 @@ export function IconPicker({
           aria-label="Search icons"
           // Same metrics as the other inputs, including the 16px that stops iOS
           // zooming the page when the field takes focus.
-          className="h-11 w-full rounded-lg bg-fill-tertiary pl-8 pr-3 text-[16px] text-label placeholder:text-label-tertiary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 sm:h-8 sm:text-body"
+          className="h-11 w-full rounded-lg bg-fill-tertiary pl-8 pr-3 text-[16px] text-label placeholder:text-label-secondary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 sm:h-8 sm:text-body"
         />
       </div>
 
@@ -97,7 +97,7 @@ export function IconPicker({
                           ? // Selection is a filled chip AND a ring, not colour
                             // alone, so it survives a colour-blind reader and a
                             // high-contrast mode.
-                            "bg-blue text-white ring-2 ring-blue ring-offset-1 ring-offset-surface"
+                            "bg-blue-fill text-white ring-2 ring-blue-fill ring-offset-1 ring-offset-surface"
                           : "text-label-secondary hover:bg-surface-hover hover:text-label",
                       )}
                     >

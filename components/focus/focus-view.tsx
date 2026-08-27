@@ -163,7 +163,9 @@ function FocusSetup({
         <p
           className={cn(
             "font-mono text-large-title tabular-nums",
-            minutes === null ? "text-label-quaternary" : "text-label",
+            // Quaternary is the decorative tier and measured 1.97:1 on a 34px
+            // readout, which is display text people actually read.
+            minutes === null ? "text-label-tertiary" : "text-label",
           )}
         >
           {minutes === null ? "--:--" : formatClock(minutes * 60)}

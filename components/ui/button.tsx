@@ -16,11 +16,13 @@ import { cn } from "@/lib/utils";
  * would read as broken feedback.
  */
 const buttonVariants = cva(
-  "inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,color,opacity,transform,filter] duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 active:scale-[0.96] active:opacity-80 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "touch-target inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,color,opacity,transform,filter] duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 active:scale-[0.96] active:opacity-80 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-blue text-white hover:brightness-[1.06]",
+        // `bg-blue-fill`, not `bg-blue`: white on the accent blue measures 4.02:1
+        // in light and 3.65:1 in dark, and a button label is normal-size text.
+        default: "bg-blue-fill text-white hover:brightness-[1.08]",
         secondary: "bg-fill-tertiary text-label hover:bg-fill-secondary",
         outline:
           "border border-separator-opaque bg-transparent text-label-secondary hover:bg-surface-hover hover:text-label",

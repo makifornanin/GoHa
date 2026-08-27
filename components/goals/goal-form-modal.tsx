@@ -5,10 +5,12 @@ import { useRef, useState } from "react";
 import type { ActionResult } from "@/app/(app)/goals/actions";
 import type { Goal } from "@/db";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
 import {
   DEFAULT_TIMEFRAME,
   GOAL_DESCRIPTION_MAX,
@@ -54,6 +56,10 @@ type FormProps = {
   goal?: Goal | null;
   lifeAreas: LifeAreaOption[];
   parentOptions: ParentOption[];
+  /** The user's saved timezone, so "today" is their today. */
+  timeZone?: string;
+  /** Their saved week start, so the picker's week matches theirs. */
+  weekStartsOn?: Weekday;
   onSubmit: (values: GoalFormInput) => Promise<ActionResult<Goal>>;
   onClose: () => void;
   titleRef: React.RefObject<HTMLInputElement | null>;
@@ -64,10 +70,15 @@ function GoalFormFields({
   goal,
   lifeAreas,
   parentOptions,
+  timeZone = MANILA_TZ,
+  weekStartsOn = 1,
   onSubmit,
   onClose,
   titleRef,
 }: FormProps) {
+  // Resolved from the SAVED zone, not the browser's: at 23:30 in Manila a
+  // traveller's browser would already say tomorrow.
+  const today = zonedToday(new Date(), timeZone);
   const [title, setTitle] = useState(() => goal?.title ?? "");
   const [description, setDescription] = useState(() => goal?.description ?? "");
   const [lifeAreaId, setLifeAreaId] = useState(() => goal?.lifeAreaId ?? "");
@@ -226,24 +237,45 @@ function GoalFormFields({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="goal-start">Start date <span className="text-outline">(optional)</span></Label>
-          <Input
+          <Label htmlFor="goal-start">
+            Start date <span className="text-outline">(optional)</span>
+          </Label>
+          {/*
+            The same picker the tasks use. Goals kept the native
+            `<input type="date">` through two rounds of this work because the
+            fix was applied to the component that had been reported rather than
+            to every place the pattern lived.
+          */}
+          <DateField
             id="goal-start"
-            type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={setStartDate}
+            today={today}
+            weekStartsOn={weekStartsOn}
+            placeholder="No start date"
             disabled={submitting}
+            ariaLabel="Start date"
+            ariaDescribedBy="goal-start-error"
+            // A goal spans time, so its week matters in a way a task's does not.
+            presets="week"
           />
           <FieldError id="goal-start-error" message={fieldErrors.startDate} />
         </div>
         <div>
-          <Label htmlFor="goal-target">Target date <span className="text-outline">(optional)</span></Label>
-          <Input
+          <Label htmlFor="goal-target">
+            Target date <span className="text-outline">(optional)</span>
+          </Label>
+          <DateField
             id="goal-target"
-            type="date"
             value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
+            onChange={setTargetDate}
+            today={today}
+            weekStartsOn={weekStartsOn}
+            placeholder="No target date"
             disabled={submitting}
+            ariaLabel="Target date"
+            ariaDescribedBy="goal-target-error"
+            presets="week"
           />
           <FieldError id="goal-target-error" message={fieldErrors.targetDate} />
         </div>
@@ -323,6 +355,8 @@ export function GoalFormModal({
   goal,
   lifeAreas,
   parentOptions,
+  timeZone,
+  weekStartsOn,
   onSubmit,
   onClose,
 }: {
@@ -331,6 +365,10 @@ export function GoalFormModal({
   goal?: Goal | null;
   lifeAreas: LifeAreaOption[];
   parentOptions: ParentOption[];
+  /** The user's saved timezone, so "today" is their today. */
+  timeZone?: string;
+  /** Their saved week start, so the picker's week matches theirs. */
+  weekStartsOn?: Weekday;
   onSubmit: (values: GoalFormInput) => Promise<ActionResult<Goal>>;
   onClose: () => void;
 }) {
@@ -354,6 +392,8 @@ export function GoalFormModal({
         goal={goal}
         lifeAreas={lifeAreas}
         parentOptions={parentOptions}
+        timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onSubmit={onSubmit}
         onClose={onClose}
         titleRef={titleRef}

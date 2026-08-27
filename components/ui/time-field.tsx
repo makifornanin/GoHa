@@ -46,7 +46,7 @@ function serialize(hour: number, minute: number, meridiem: Meridiem): string {
 }
 
 const SEGMENT =
-  "w-[2.5ch] bg-transparent text-center tabular-nums text-label outline-none placeholder:text-label-tertiary focus:rounded focus:bg-blue focus:text-white";
+  "h-full w-[2.5ch] bg-transparent text-center tabular-nums text-label outline-none placeholder:text-label-secondary focus:rounded focus:bg-blue-fill focus:text-white";
 
 export function TimeField({
   id,
@@ -284,7 +284,7 @@ export function TimeField({
         onClick={toggleMeridiem}
         disabled={disabled}
         aria-label={`${ariaLabel ?? "Time"} meridiem, currently ${meridiem}`}
-        className="ml-0.5 rounded px-1.5 py-0.5 text-label transition-colors hover:bg-surface-hover focus-visible:bg-blue focus-visible:text-white focus-visible:outline-none"
+        className="touch-target hit-44-narrow ml-0.5 rounded px-1.5 py-0.5 text-label transition-colors hover:bg-surface-hover focus-visible:bg-blue-fill focus-visible:text-white focus-visible:outline-none"
       >
         {meridiem}
       </button>
@@ -295,7 +295,7 @@ export function TimeField({
           onClick={clear}
           disabled={disabled}
           aria-label={`Clear ${ariaLabel ?? "time"}`}
-          className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full text-label-tertiary transition-colors hover:bg-surface-hover hover:text-red focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue/40"
+          className="touch-target hit-44-narrow ml-auto flex size-6 shrink-0 items-center justify-center rounded-full text-label-tertiary transition-colors hover:bg-surface-hover hover:text-red focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue/40"
         >
           <X className="size-3.5" aria-hidden />
         </button>

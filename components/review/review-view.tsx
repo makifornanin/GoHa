@@ -307,7 +307,7 @@ export function ReviewView({ data }: { data: ReviewData }) {
                 ))}
                 <Link
                   href="/tasks"
-                  className="mt-1 text-callout font-medium text-blue hover:underline"
+                  className="touch-target mt-1 inline-flex items-center text-callout font-medium text-blue hover:underline"
                 >
                   Reschedule in To-dos
                 </Link>
@@ -374,9 +374,9 @@ export function ReviewView({ data }: { data: ReviewData }) {
                         aria-label={`${value} out of 5`}
                         onClick={() => setRating(rating === value ? null : value)}
                         className={cn(
-                          "h-9 flex-1 cursor-pointer rounded-lg text-body font-medium transition-colors focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+                          "touch-target hit-44-narrow h-9 flex-1 cursor-pointer rounded-lg text-body font-medium transition-colors focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
                           rating === value
-                            ? "bg-blue text-white"
+                            ? "bg-blue-fill text-white"
                             : "bg-fill-tertiary text-label-secondary hover:bg-fill-secondary",
                         )}
                       >

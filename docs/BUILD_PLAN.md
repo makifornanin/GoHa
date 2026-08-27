@@ -187,7 +187,45 @@ Status: [x] Completed (2026-07-08)
 
 ---
 
+## Consistency sweep (read before calling a shared-primitive change done)
+
+Three separate rounds of this project shipped a fix to the component that had
+been reported while its siblings kept the old pattern: the date picker was
+replaced in the task modal, found again in the task detail panel, then again in
+the goal form. Each time the change itself was correct and the sweep was what
+was missing.
+
+When you replace a shared UX primitive:
+
+1. `pnpm check:consistency` (also runs inside `pnpm lint`).
+2. Grep for the old pattern yourself; the script only knows the rules it has.
+3. Migrate every sibling you find, not only the reported one.
+4. Re-run the grep.
+5. Add a rule to `scripts/consistency-sweep.mjs` so the next person cannot
+   half-migrate the same thing.
+
+What the guards can and cannot see:
+
+- `scripts/consistency-sweep.mjs` and the `no-restricted-syntax` rules in
+  `eslint.config.mjs` catch SOURCE patterns: native date/time inputs, white text
+  on the accent blue.
+- They cannot see rendered geometry. Contrast ratios and hit-area sizes depend
+  on layout, which no linter computes, so those are handled by fixing the shared
+  primitives and measuring in a real browser. `tests/remediation-guards.test.ts`
+  asserts the primitives still carry the behaviour.
+
 ## Change log
+
+### 2026-08-27: Accessibility and consistency remediation
+- Goals was the last native `<input type="date">`, missed by two earlier rounds of exactly this work. It now uses the shared `DateField` with week presets, and the goals page threads the saved timezone and week start through so "today" is the user's today. Zero native date or time inputs remain outside the two shared primitives.
+- Contrast is now measured, not assumed. `--label-secondary` at 0.6 measured 3.44:1 on surface and 3.29:1 on canvas: it FAILED AA everywhere and is the token most secondary copy uses, which the first QA pass had not spotted. Raised to 0.75 light (5.15:1 / 4.82:1); dark was already clear at 0.6 and moved to 0.68 to clear the fill overlays. `--label-tertiary` went 0.3 -> 0.6 light and 0.3 -> 0.5 dark; at 0.3 it measured 1.72:1 while carrying whole sentences.
+- `--blue` as TEXT measured 4.02:1 on white. Light `--blue` is now #0062d6 (5.65:1), and a separate `--blue-fill` carries white text in dark where the accent must stay light for text use. Light `--red`, `--green` and `--orange` were darkened for the same reason: they are used as text on tinted chips, where the Apple values measure about 2.2:1.
+- The 44px rule is structural now. A `.touch-target` utility grows the hit area on COARSE pointers only, so desktop density is untouched, and `max(100%, ...)` means it can only ever grow a target. It is applied inside Button and SegmentedControl so every caller inherits it, plus the raw-button clusters the primitives do not reach.
+- One limitation worth knowing: a replaced element like `<input>` generates no `::after`, so the pseudo-element hit area silently does nothing on one. The time field's segments were given real height instead.
+- The global top bar no longer carries "Add Task". The sidebar's "New Task" sits about 78px below it in the same chrome, so a second one put two near-identical primary buttons in one viewport and /tasks added a third. Every deliberate path is kept: sidebar, page header, mobile "+", command palette, calendar cell.
+- A branded `app/not-found.tsx` replaces the bare Next.js 404, which had no branding and no navigation at all. It reads the session so the way out suits who is asking. A signed-OUT unknown URL still redirects to /login: the proxy cannot tell an unknown route from a protected one without a route manifest, and guessing wrong would serve a protected page, so the redirect stays deliberately.
+- A long unbroken task title (a pasted URL, or a 160-character word) had no break opportunity and pushed the page sideways: measured 460px of horizontal overflow from one task. Titles wrap now.
+- Verification: typecheck clean, lint clean, 773/773 unit tests, `pnpm build` compiles. Browser-measured across 13 pages x 3 viewports x 2 themes, with the theme ASSERTED per page rather than assumed: 0 contrast failures (from 26 per theme), 0px horizontal overflow, 0 undersized targets (from 52), 0 console, page or network errors.
 
 ### 2026-08-27: Daily Rhythm time field, inline instead of a dropdown
 - The three-column popover is gone. The native `<input type="time">` had the right SHAPE all along, segments you type straight into with nothing to open for a value you already know; what was wrong was the rendering, which was the browser's own spinner. So this is the same interaction drawn properly.

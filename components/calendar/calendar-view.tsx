@@ -275,7 +275,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                     className={cn(
                       "mb-1 flex size-6 items-center justify-center rounded-full font-mono text-footnote tabular-nums",
                       cell.isToday
-                        ? "bg-blue font-semibold text-white"
+                        ? "bg-blue-fill font-semibold text-white"
                         : cell.inMonth
                           ? "text-label-secondary"
                           : "text-label-quaternary",

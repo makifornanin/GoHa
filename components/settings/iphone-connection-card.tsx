@@ -328,7 +328,7 @@ export function IphoneConnectionCard({
                 ].map(([title, detail], index) => (
                   <li key={title} className="flex gap-3">
                     <span
-                      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue text-footnote font-semibold text-white"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-fill text-footnote font-semibold text-white"
                       aria-hidden
                     >
                       {index + 1}

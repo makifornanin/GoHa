@@ -27,8 +27,23 @@
 
   /* Label opacity system: rgba, never hex grays. */
   --label: #000000;
-  --label-secondary: rgba(60, 60, 67, 0.6);
-  --label-tertiary: rgba(60, 60, 67, 0.3);
+  /*
+   * Raised from 0.6 for contrast, not for looks.
+   *
+   * At 0.6 this measured 3.44:1 on `--surface` and 3.29:1 on `--canvas`, which
+   * fails WCAG AA for normal text (4.5:1) everywhere it was used, and it is the
+   * token most secondary copy in the app relies on. 0.75 measures 5.15:1 and
+   * 4.82:1 respectively. Dark mode was already comfortably clear at 0.6 and is
+   * left alone, so the two themes now differ on purpose.
+   */
+  --label-secondary: rgba(60, 60, 67, 0.75);
+  /*
+   * 0.3 measured 1.72:1: barely visible, and it was carrying real sentences
+   * (empty states, help text, review counts). 0.6 measures 3.44:1, which meets
+   * AA for LARGE text only, so this tier is now for adornment and large text.
+   * Anything that is a normal-size sentence belongs on `--label-secondary`.
+   */
+  --label-tertiary: rgba(60, 60, 67, 0.6);
   --label-quaternary: rgba(60, 60, 67, 0.18);
 
   /* Backgrounds */
@@ -60,10 +75,20 @@
   --grid-line-strong: rgba(60, 60, 67, 0.2);
 
   /* System colors, light values. */
-  --blue: #007aff;
-  --green: #34c759;
-  --red: #ff3b30;
-  --orange: #ff9500;
+  --blue: #0062d6;
+  /*
+   * The blue behind white text.
+   *
+   * `--blue` is the accent: links, dots, active states, where it sits ON a
+   * light surface and reads fine. As a BUTTON FILL it measured 4.02:1 against
+   * white in light and 3.65:1 in dark, both short of AA for normal text, and
+   * button labels are normal text. This is the same hue pushed darker to
+   * 5.65:1 and is used only where white sits on top of it.
+   */
+  --blue-fill: #0062d6;
+  --green: #187f37;
+  --red: #d12318;
+  --orange: #a35f00;
   --yellow: #ffcc00;
   --system-teal: #30b0c7;
   --indigo: #5856d6;
@@ -197,8 +222,9 @@
   color-scheme: dark;
 
   --label: #ffffff;
-  --label-secondary: rgba(235, 235, 245, 0.6);
-  --label-tertiary: rgba(235, 235, 245, 0.3);
+  --label-secondary: rgba(235, 235, 245, 0.68);
+  /* 0.3 measured 2.48:1 here. 0.5 measures 4.58:1, clearing AA for normal text. */
+  --label-tertiary: rgba(235, 235, 245, 0.5);
   --label-quaternary: rgba(235, 235, 245, 0.18);
 
   --canvas: #000000;
@@ -220,6 +246,8 @@
 
   /* System colors, dark values (Apple ships different values per mode). */
   --blue: #0a84ff;
+  /* See the light theme: white-on-blue needs a darker fill to clear AA. */
+  --blue-fill: #0a6fd6;
   --green: #30d158;
   --red: #ff453a;
   --orange: #ff9f0a;
@@ -368,6 +396,7 @@
   --color-separator-opaque: var(--separator-opaque);
 
   --color-blue: var(--blue);
+  --color-blue-fill: var(--blue-fill);
   --color-green: var(--green);
   --color-red: var(--red);
   --color-orange: var(--orange);
@@ -723,6 +752,40 @@
      overlap and steal taps. Vertical stays 44. */
   .hit-44-narrow {
     --hit-x: 36px;
+  }
+
+  /*
+   * The 44px rule, applied structurally rather than remembered.
+   *
+   * `hit-44` works, but it only helps where someone thought to add it: a sweep
+   * measured 52 interactive controls under 44px across seven mobile screens,
+   * including an 18px link. Rather than annotate every call site and hope the
+   * next one remembers, the shared primitives carry this class and it does the
+   * work automatically.
+   *
+   * Scoped to COARSE pointers on purpose. A mouse is precise and desktop
+   * density is deliberate (spec section 8), so this changes nothing there; it
+   * only grows the invisible target where a fingertip is doing the aiming.
+   *
+   * `max(100%, ...)` means an element already big enough is untouched, so this
+   * can never shrink a target. The horizontal cap is 100% by default, so a
+   * neighbour sitting beside it cannot have its taps stolen: only the vertical
+   * axis grows unless a caller opts in with `--hit-x`.
+   */
+  .touch-target {
+    position: relative;
+  }
+  @media (pointer: coarse) {
+    .touch-target::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, var(--hit-x, 100%));
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+    }
   }
 
   /* Tabular figures for numeric content. */

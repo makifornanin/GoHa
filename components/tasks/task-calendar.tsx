@@ -141,7 +141,7 @@ export function TaskCalendar({
                     className={cn(
                       "flex size-6 items-center justify-center rounded-full font-mono text-footnote tabular-nums",
                       cell.isToday
-                        ? "bg-blue font-semibold text-white"
+                        ? "bg-blue-fill font-semibold text-white"
                         : cell.inMonth
                           ? "text-label-secondary"
                           : "text-label-quaternary",

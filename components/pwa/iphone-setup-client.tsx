@@ -256,7 +256,7 @@ function ValidSetup({
           ].map((step, index) => (
             <li key={step} className="flex items-start gap-3 text-callout text-label-secondary">
               <span
-                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue text-footnote font-semibold text-white"
+                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-fill text-footnote font-semibold text-white"
                 aria-hidden
               >
                 {index + 1}

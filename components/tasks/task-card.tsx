@@ -132,7 +132,7 @@ export function TaskCard({
                 type="button"
                 onClick={() => onOpen(task)}
                 className={cn(
-                  "min-w-0 rounded-sm text-left text-body font-medium text-label after:absolute after:inset-0 after:content-[''] hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+                  "min-w-0 break-words rounded-sm text-left text-body font-medium text-label after:absolute after:inset-0 after:content-[''] hover:text-blue focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
                   (isCompleted || isCancelled) && "text-label-tertiary line-through",
                 )}
               >
@@ -141,7 +141,7 @@ export function TaskCard({
             ) : (
               <h3
                 className={cn(
-                  "text-body font-medium text-label",
+                  "break-words text-body font-medium text-label",
                   (isCompleted || isCancelled) && "text-label-tertiary line-through",
                 )}
               >
@@ -309,7 +309,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-footnote font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-label focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+        "touch-target hit-44-narrow inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-footnote font-medium text-label-secondary transition-colors hover:bg-surface-hover hover:text-label focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
         className,
       )}
     >

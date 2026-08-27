@@ -1,6 +1,6 @@
 "use client";
 
-import { Focus, Plus, Search } from "lucide-react";
+import { Focus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,17 @@ export function AppHeader({ className }: { className?: string }) {
         <Focus />
         <span className="hidden lg:inline">Focus Mode</span>
       </Button>
-      {/* `?new=1` opens the create form on arrival: this button promises a form,
-          so it must deliver one rather than just navigating. */}
-      <Button onClick={() => router.push("/tasks?new=1")}>
-        <Plus />
-        <span className="hidden sm:inline">Add Task</span>
-      </Button>
+      {/*
+        No "Add Task" here.
+
+        The sidebar's "New Task" is the global create affordance and sits about
+        78px below this bar in the same chrome, so a second one made two
+        near-identical primary buttons compete inside one viewport; on /tasks
+        the page header added a third. Creating a task is still reachable from
+        everywhere it was: the sidebar, the page header on /tasks, the mobile
+        "+", the command palette, and clicking a day in the calendar. This bar
+        keeps what is unique to it, search and Focus Mode.
+      */}
 
       <div className="mx-2 h-5 w-px bg-separator" />
 

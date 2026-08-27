@@ -230,7 +230,7 @@ export function Select({
                       onClick={() => commit(index)}
                       className={cn(
                         "flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-callout outline-none transition-colors",
-                        isActive ? "bg-blue text-white" : "text-label",
+                        isActive ? "bg-blue-fill text-white" : "text-label",
                         option.disabled && "pointer-events-none text-label-quaternary",
                       )}
                     >

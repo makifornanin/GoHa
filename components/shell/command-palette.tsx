@@ -304,7 +304,7 @@ export function CommandPalette() {
                 }
                 aria-autocomplete="list"
                 autoComplete="off"
-                className="h-12 w-full bg-transparent text-body text-label outline-none placeholder:text-label-tertiary"
+                className="h-12 w-full bg-transparent text-body text-label outline-none placeholder:text-label-secondary"
               />
               <kbd className="hidden shrink-0 rounded-md bg-fill-tertiary px-1.5 py-0.5 font-mono text-footnote text-label-secondary sm:block">
                 esc
@@ -345,7 +345,7 @@ export function CommandPalette() {
                         onClick={() => command.run()}
                         className={cn(
                           "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors",
-                          active ? "bg-blue text-white" : "text-label hover:bg-surface-hover",
+                          active ? "bg-blue-fill text-white" : "text-label hover:bg-surface-hover",
                         )}
                       >
                         <Icon

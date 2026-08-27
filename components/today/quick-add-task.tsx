@@ -44,7 +44,7 @@ export function QuickAddTask({ today }: { today: string }) {
         placeholder="Quick add a task for today..."
         aria-label="Quick add task for today"
         disabled={pending}
-        className="min-w-0 flex-1 bg-transparent text-body text-label placeholder:text-label-tertiary focus:outline-none disabled:text-label-quaternary"
+        className="h-11 min-w-0 flex-1 bg-transparent text-[16px] text-label placeholder:text-label-secondary focus:outline-none disabled:text-label-quaternary sm:h-8 sm:text-body"
       />
       <button
         type="button"

@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { Plus, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { Weekday } from "@/lib/date";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -54,10 +55,16 @@ export function GoalsView({
   goals,
   lifeAreas,
   tasks = [],
+  timeZone,
+  weekStartsOn,
 }: {
   goals: GoalWithCounts[];
   lifeAreas: LifeArea[];
   tasks?: Task[];
+  /** The user's saved timezone, so "today" is their today. */
+  timeZone?: string;
+  /** Their saved week start, so the picker's week matches theirs. */
+  weekStartsOn?: Weekday;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("all");
@@ -271,6 +278,8 @@ export function GoalsView({
         goal={editing}
         lifeAreas={lifeAreaOptions}
         parentOptions={parentOptions}
+        timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         onSubmit={editing ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />
@@ -314,7 +323,7 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "cursor-pointer whitespace-nowrap py-2.5 text-callout font-medium transition-colors",
+        "touch-target cursor-pointer whitespace-nowrap py-2.5 text-callout font-medium transition-colors",
         active
           ? "border-b-2 border-blue text-blue"
           : "text-label-secondary hover:text-label",

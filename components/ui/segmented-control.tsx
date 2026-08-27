@@ -76,7 +76,7 @@ export function SegmentedControl<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              "relative h-full flex-1 cursor-pointer rounded-full px-3 text-[13px]/[18px] font-medium sm:flex-none transition-colors duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+              "touch-target relative h-full flex-1 cursor-pointer rounded-full px-3 text-[13px]/[18px] font-medium sm:flex-none transition-colors duration-150 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
               selected ? "text-label" : "text-label-secondary hover:text-label",
             )}
           >
