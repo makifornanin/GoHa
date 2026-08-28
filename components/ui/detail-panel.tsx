@@ -63,7 +63,19 @@ export function DetailPanel({
           )
         : [];
 
-    (focusables()[0] ?? panel)?.focus();
+    /*
+     * Focus the panel itself, NOT the first control inside it.
+     *
+     * Focusing the first focusable put the caret straight into the task's name
+     * field, so opening a task to read it looked exactly like being dropped
+     * into renaming it: a focus ring around the title and a live cursor, on a
+     * panel the user opened to look at subtasks. Nobody asked to edit.
+     *
+     * The panel still takes focus, so the Escape and Tab handling below keeps
+     * working and a screen reader still lands inside the dialog. Editing the
+     * name is now what it should be: click the name.
+     */
+    panel?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -129,6 +141,8 @@ export function DetailPanel({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
+            // Focusable programmatically, never a tab stop of its own.
+            tabIndex={-1}
             // Slides in from the edge it actually lives on: the side on
             // desktop, straight up from the bottom on mobile. Animating `x` on
             // both left the mobile sheet arriving sideways and parked

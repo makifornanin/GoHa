@@ -318,16 +318,29 @@ function TaskDetailBody({
   function addSubtask() {
     const value = newSubtask.trim();
     if (!value || addingSubtask) return;
+    /*
+     * Cleared NOW, not after the round trip.
+     *
+     * Clearing on success meant the clear landed whenever the server replied,
+     * which could be several hundred milliseconds later, on top of whatever the
+     * user had already started typing. Breaking a task down is exactly the
+     * moment people type fast, so the next step would silently lose its opening
+     * characters. The test suite caught this as an intermittent failure long
+     * before it was understood as a real one.
+     *
+     * The composer stays open and focused either way: several steps in a row
+     * should not need a click between each one.
+     */
+    setNewSubtask("");
     startAddSubtask(async () => {
       const result = await handlers.onAddSubtask(task.id, value);
       if (result.ok) {
-        // Cleared but still open and focused: breaking a task down means typing
-        // several steps in a row, and re-opening the composer each time would
-        // put a click between every one of them.
-        setNewSubtask("");
         subtaskInputRef.current?.focus();
       } else {
         toast.error(result.error ?? "Could not add that step.");
+        // Put the text back only if nothing has been typed since, so recovering
+        // from a failure never overwrites the step already under way.
+        setNewSubtask((current) => (current === "" ? value : current));
       }
     });
   }
