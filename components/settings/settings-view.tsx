@@ -24,7 +24,7 @@ import { SettingsCard, SettingsSection } from "@/components/settings/settings-ca
 import type { AutomationOverview } from "@/app/(app)/settings/automation-actions";
 import type { PeopleOverview } from "@/app/(app)/settings/invite-actions";
 import type { PushOverview } from "@/app/(app)/settings/push-actions";
-import { IphoneConnectionCard } from "@/components/settings/iphone-connection-card";
+import { NotificationDevicesCard } from "@/components/settings/notification-devices-card";
 import { InvitesCard } from "@/components/settings/invites-card";
 import {
   AutomationPrefsCard,
@@ -117,7 +117,7 @@ export function SettingsView({
         description="GoHa never sends anything itself. These decide what it hands to the tool that does."
       >
         <AutomationPrefsCard prefs={settings.automation} />
-        <IphoneConnectionCard initial={pushOverview} />
+        <NotificationDevicesCard initial={pushOverview} />
       </SettingsSection>
 
       {people.isOwner ? (

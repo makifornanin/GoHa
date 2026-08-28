@@ -64,7 +64,7 @@ describe("settings layout", () => {
     // Cards render inside those sections, one level down. Both used to be h2,
     // which flattened the page for screen readers and made "People" ambiguous
     // between the group and the card sitting in it.
-    for (const card of ["Profile", "Password", "Connect your iPhone", "Invitations", "Archive"]) {
+    for (const card of ["Profile", "Password", "Notification Devices", "Invitations", "Archive"]) {
       expect(screen.getByRole("heading", { name: card, level: 3 })).toBeTruthy();
     }
   });

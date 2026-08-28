@@ -5,8 +5,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/components/settings/automation-card", () => ({
   AutomationCard: () => <div data-testid="advanced-automation">Advanced Automation API</div>,
 }));
-vi.mock("@/components/settings/iphone-connection-card", () => ({
-  IphoneConnectionCard: () => <div data-testid="consumer-push">Connect your iPhone</div>,
+vi.mock("@/components/settings/notification-devices-card", () => ({
+  NotificationDevicesCard: () => <div data-testid="consumer-push">Notification Devices</div>,
 }));
 vi.mock("@/components/settings/invites-card", () => ({ InvitesCard: () => null }));
 vi.mock("@/components/settings/automation-prefs-card", () => ({

@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Flag,
+  Laptop,
   MonitorSmartphone,
   RefreshCw,
   Send,
@@ -12,17 +13,21 @@ import {
   Sunrise,
   Unplug,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
   createPushPairingAction,
+  disconnectPushDeviceAction,
+  listPushDevicesAction,
+  type PushDevice,
   type PushOverview,
 } from "@/app/(app)/settings/push-actions";
 import { usePushDevice } from "@/components/pwa/use-push-device";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { SettingsCard } from "@/components/settings/settings-card";
+import { displayDeviceLabel } from "@/lib/push/device-label";
 
 const BENEFITS = [
   { icon: Sunrise, label: "Morning Brief" },
@@ -41,14 +46,27 @@ function deviceCountLabel(count: number) {
   return `${count} ${count === 1 ? "device" : "devices"} connected`;
 }
 
+/** "Aug 27". The year is noise for something the user connected themselves. */
+function shortDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 /**
- * Consumer iPhone onboarding through PWA Web Push.
+ * Web Push device management, for every platform GoHa supports.
  *
- * This component never creates or reads an automation credential. The QR is a
- * short-lived setup intent, and the connected state comes only from active push
- * subscriptions reported by the server.
+ * This was an iPhone-only card, which described the feature far more narrowly
+ * than it worked: the same standard Push API flow already succeeded in desktop
+ * Chrome and Edge, but every word and icon here said "iPhone", so nobody on a
+ * laptop had any reason to press the button. Nothing in the backend changed to
+ * support this; the capability was always there.
+ *
+ * iPhone-specific guidance survives, but only where the running browser
+ * actually needs it: iOS refuses Web Push until the app is on the Home Screen,
+ * and that is worth explaining precisely when it is true.
  */
-export function IphoneConnectionCard({
+export function NotificationDevicesCard({
   initial,
   className,
 }: {
@@ -61,9 +79,33 @@ export function IphoneConnectionCard({
   const [pairingExpired, setPairingExpired] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [devices, setDevices] = useState<PushDevice[] | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const overview = device.overview ?? initial;
   const refreshOverview = device.refreshOverview;
+  const currentEndpoint = device.currentEndpoint;
+
+  /*
+   * The endpoint is sent so the server can mark one row as "this device". It
+   * is matched only against rows already scoped to the session user, and it is
+   * never rendered: it is a capability URL, and anyone holding it could push.
+   */
+  const loadDevices = useCallback(async () => {
+    const result = await listPushDevicesAction({ currentEndpoint });
+    if (result.ok) setDevices(result.data.devices);
+  }, [currentEndpoint]);
+
+  useEffect(() => {
+    /*
+     * Deferred by a tick, matching `inspectCurrentDevice` in the push hook.
+     * The device list is external state being read in, not state derived
+     * during render, and settling it inside the effect body makes React
+     * cascade a second render before the first has painted.
+     */
+    const timer = window.setTimeout(() => void loadDevices(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadDevices]);
 
   useEffect(() => {
     if (!pairing) return;
@@ -77,13 +119,11 @@ export function IphoneConnectionCard({
 
       const next = await refreshOverview();
       if (stopped || !next) return;
-      if (
-        next.deviceCount > pairing!.startingDeviceCount ||
-        next.pendingPairing === null
-      ) {
+      if (next.deviceCount > pairing!.startingDeviceCount || next.pendingPairing === null) {
         setPairing(null);
         setPairingExpired(false);
-        toast.success("Your iPhone is ready for GoHa notifications.");
+        void loadDevices();
+        toast.success("That device is ready for GoHa notifications.");
       }
     }
 
@@ -92,7 +132,7 @@ export function IphoneConnectionCard({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [pairing, refreshOverview]);
+  }, [pairing, refreshOverview, loadDevices]);
 
   async function createPairing() {
     if (!overview.pushConfigured) {
@@ -108,20 +148,12 @@ export function IphoneConnectionCard({
         toast.error(result.error);
         return;
       }
-      setPairing({
-        ...result.data,
-        startingDeviceCount: overview.deviceCount,
-      });
+      setPairing({ ...result.data, startingDeviceCount: overview.deviceCount });
       device.setOverview((value) =>
-        value
-          ? {
-              ...value,
-              pendingPairing: { expiresAt: result.data.expiresAt },
-            }
-          : value,
+        value ? { ...value, pendingPairing: { expiresAt: result.data.expiresAt } } : value,
       );
     } catch {
-      toast.error("GoHa could not prepare iPhone setup. Please try again.");
+      toast.error("GoHa could not prepare device setup. Please try again.");
     } finally {
       setPairingPending(false);
     }
@@ -134,16 +166,14 @@ export function IphoneConnectionCard({
       return;
     }
     setSetupOpen(false);
+    await loadDevices();
     toast.success("Notifications are enabled on this device.");
   }
 
   async function sendTest() {
     const result = await device.sendTest();
-    if (result.ok) {
-      toast.success("Test notification sent.");
-    } else {
-      toast.error(result.error);
-    }
+    if (result.ok) toast.success("Test notification sent.");
+    else toast.error(result.error);
   }
 
   async function disconnectThisDevice() {
@@ -153,15 +183,42 @@ export function IphoneConnectionCard({
       return;
     }
     setDisconnectOpen(false);
+    await loadDevices();
     toast.success("Notifications were disconnected on this device.");
   }
+
+  /** Remove any device by id, including one the user is not sitting at. */
+  async function removeDevice(target: PushDevice) {
+    setRemovingId(target.id);
+    try {
+      const result = await disconnectPushDeviceAction({ id: target.id });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      device.setOverview((value) =>
+        value ? { ...value, deviceCount: result.data.deviceCount } : value,
+      );
+      // The browser's own subscription is now inert server side; re-reading
+      // keeps the "this device" state honest without a page reload.
+      if (target.isCurrentDevice) await device.inspectCurrentDevice();
+      await loadDevices();
+      toast.success(`${displayDeviceLabel(target.deviceLabel)} was disconnected.`);
+    } catch {
+      toast.error("GoHa could not disconnect that device.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  const connectedHere = device.currentConnected === true;
 
   return (
     <SettingsCard
       className={className}
-      icon={<Smartphone className="size-5" />}
-      title="Connect your iPhone"
-      description="Receive GoHa smart notifications directly on your iPhone."
+      icon={<MonitorSmartphone className="size-5" />}
+      title="Notification Devices"
+      description="Connect this device to receive GoHa reminders and notifications."
     >
       <ul className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {BENEFITS.map(({ icon: Icon, label }) => (
@@ -176,30 +233,36 @@ export function IphoneConnectionCard({
       </ul>
 
       {!overview.pushConfigured ? (
-        <p role="status" className="rounded-xl bg-fill-quaternary px-4 py-3 text-callout text-label-secondary">
-          Phone notifications are not available yet. GoHa still needs its notification service
+        <p
+          role="status"
+          className="rounded-xl bg-fill-quaternary px-4 py-3 text-callout text-label-secondary"
+        >
+          Notifications are not available yet. GoHa still needs its notification service
           configured.
         </p>
-      ) : overview.deviceCount > 0 ? (
-        <div className="flex flex-col gap-4" aria-live="polite">
+      ) : (
+        <div className="flex flex-col gap-5">
           <div className="flex items-start gap-3 rounded-xl bg-fill-quaternary px-4 py-4">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green" aria-hidden />
+            <CheckCircle2
+              className={connectedHere ? "mt-0.5 size-5 shrink-0 text-green" : "mt-0.5 size-5 shrink-0 text-label-tertiary"}
+              aria-hidden
+            />
             <div>
               <h3 className="text-subhead text-label">
-                {device.currentConnected
-                  ? "Notifications enabled on this device"
-                  : deviceCountLabel(overview.deviceCount)}
+                {connectedHere ? "Notifications Enabled" : "Notifications are off on this device"}
               </h3>
               <p className="mt-1 text-callout text-label-secondary">
-                {device.currentConnected
-                  ? deviceCountLabel(overview.deviceCount)
-                  : "This browser is not one of them. You can set it up without changing your other devices."}
+                {overview.deviceCount > 0
+                  ? connectedHere
+                    ? deviceCountLabel(overview.deviceCount)
+                    : `${deviceCountLabel(overview.deviceCount)}, but not this browser. You can add it without changing the others.`
+                  : "No devices are connected to this account yet."}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap justify-end gap-3">
-            {device.currentConnected ? (
+            {connectedHere ? (
               <>
                 <Button variant="secondary" onClick={sendTest} loading={device.pending}>
                   <Send aria-hidden />
@@ -215,69 +278,94 @@ export function IphoneConnectionCard({
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setSetupOpen(true)} disabled={device.availability === "checking"}>
-                <Smartphone aria-hidden />
-                Set up this device
+              <Button
+                onClick={() => setSetupOpen(true)}
+                disabled={device.availability === "checking"}
+              >
+                <BellRing aria-hidden />
+                Enable Notifications
               </Button>
             )}
             <Button variant="outline" onClick={createPairing} loading={pairingPending}>
-              <MonitorSmartphone aria-hidden />
-              Add another iPhone
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {overview.pendingPairing ? (
-            <div className="rounded-xl bg-fill-quaternary px-4 py-3">
-              <p className="text-subhead text-label">Finish connecting your iPhone</p>
-              <p className="mt-1 text-callout text-label-secondary">
-                A setup code was created but no phone has enabled notifications yet. Make a new
-                code if the previous screen was closed.
-              </p>
-            </div>
-          ) : null}
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => setSetupOpen(true)}
-              disabled={device.availability === "checking"}
-            >
               <Smartphone aria-hidden />
-              Set up this device
-            </Button>
-            <Button onClick={createPairing} loading={pairingPending}>
-              <MonitorSmartphone aria-hidden />
-              {overview.pendingPairing ? "Make a new QR code" : "Show QR code"}
+              {overview.pendingPairing ? "Make a new QR code" : "Connect another device"}
             </Button>
           </div>
+
+          {devices && devices.length > 0 ? (
+            <section aria-labelledby="connected-devices-heading" className="flex flex-col gap-2">
+              <h3
+                id="connected-devices-heading"
+                className="text-caption font-medium uppercase tracking-wide text-label-tertiary"
+              >
+                Connected devices
+              </h3>
+              <ul className="flex flex-col gap-2">
+                {devices.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center gap-3 rounded-xl bg-fill-quaternary px-4 py-3"
+                  >
+                    <Laptop className="size-4 shrink-0 text-label-secondary" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 text-subhead text-label">
+                        <span className="break-words">{displayDeviceLabel(entry.deviceLabel)}</span>
+                        {entry.isCurrentDevice ? (
+                          <span className="rounded-full bg-blue-fill px-2 py-0.5 text-caption font-medium text-white">
+                            This device
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 text-footnote text-label-tertiary">
+                        Connected {shortDate(entry.createdAt)}
+                        {entry.lastSuccessAt
+                          ? ` · Last notified ${shortDate(entry.lastSuccessAt)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void removeDevice(entry)}
+                      loading={removingId === entry.id}
+                      aria-label={`Disconnect ${displayDeviceLabel(entry.deviceLabel)}`}
+                    >
+                      Disconnect
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
 
       <Modal
         open={setupOpen}
         onClose={() => setSetupOpen(false)}
-        title="Set up this device"
-        description="Enable notifications on the device you are using now."
+        title="Enable notifications"
+        description="Turn on GoHa notifications for the device you are using now."
       >
         <div className="flex flex-col gap-5 px-6 py-5">
+          {/* Shown only when THIS browser genuinely cannot subscribe yet, which
+              in practice means iOS before the app is on the Home Screen. */}
           {device.availability === "needs_install" ? (
             <InstallSteps />
           ) : device.availability === "unsupported" ? (
             <Guidance
               title="Notifications are not supported here"
-              detail="Update your device and open GoHa from its Home Screen icon, then try again."
+              detail="This browser does not support Web Push. Try the latest Chrome, Edge, Firefox, or Safari."
             />
           ) : device.availability === "denied" ? (
             <Guidance
               title="Notifications are blocked"
-              detail="Open your device's notification settings, allow notifications for GoHa, then return here."
+              detail="Open this browser's site settings, allow notifications for GoHa, then return here."
             />
           ) : (
             <>
               <Guidance
                 title="Ready to ask for permission"
-                detail="Your device will show its own permission prompt after you tap Enable Notifications."
+                detail="Your browser will show its own permission prompt after you choose Enable Notifications."
               />
               <div className="flex justify-end">
                 <Button
@@ -296,11 +384,11 @@ export function IphoneConnectionCard({
       <Modal
         open={pairing !== null}
         onClose={() => setPairing(null)}
-        title={pairingExpired ? "This setup code expired" : "Finish connecting your iPhone"}
+        title={pairingExpired ? "This setup code expired" : "Connect another device"}
         description={
           pairingExpired
             ? "Make a fresh code to continue."
-            : "Scan this short-lived code using your iPhone Camera."
+            : "Scan this short-lived code with the phone or tablet you want to connect."
         }
       >
         <div className="flex flex-col gap-5 px-6 py-5">
@@ -321,10 +409,10 @@ export function IphoneConnectionCard({
             <>
               <ol className="flex flex-col gap-3">
                 {[
-                  ["Scan with your iPhone Camera", "The code opens GoHa's secure phone setup page."],
+                  ["Scan with the other device's camera", "The code opens GoHa's secure setup page there."],
                   ["Sign in to the same GoHa account", "The setup code never replaces your normal sign-in."],
-                  ["Add GoHa to your Home Screen", "Use your browser's Share menu, then open the new GoHa icon."],
-                  ["Tap Enable Notifications", "Tap Allow when your iPhone asks for permission."],
+                  ["On iPhone, add GoHa to the Home Screen", "iOS only allows notifications from an installed web app. Android and desktop can skip this."],
+                  ["Choose Enable Notifications", "Allow the permission prompt when it appears."],
                 ].map(([title, detail], index) => (
                   <li key={title} className="flex gap-3">
                     <span
@@ -346,7 +434,7 @@ export function IphoneConnectionCard({
                   className="rounded-xl bg-white p-3 [&_svg]:block [&_svg]:size-52"
                   dangerouslySetInnerHTML={{ __html: pairing?.qrSvg ?? "" }}
                   role="img"
-                  aria-label="Short-lived iPhone setup code"
+                  aria-label="Short-lived device setup code"
                 />
                 <p className="text-center text-footnote text-label-tertiary">
                   This code expires in about ten minutes and works once.
@@ -354,8 +442,8 @@ export function IphoneConnectionCard({
               </div>
 
               <p className="rounded-xl bg-fill-quaternary px-3 py-2.5 text-footnote text-label-secondary">
-                Scanning only opens setup. Your iPhone is connected after you add GoHa to the Home
-                Screen and explicitly allow notifications.
+                Scanning only opens setup. The device is connected after it signs in and explicitly
+                allows notifications.
               </p>
 
               <div className="flex justify-end">
@@ -372,7 +460,7 @@ export function IphoneConnectionCard({
         open={disconnectOpen}
         onClose={() => setDisconnectOpen(false)}
         title="Disconnect this device?"
-        description="Other phones and browsers connected to this GoHa account will keep working."
+        description="Your other connected devices will keep receiving notifications."
       >
         <div className="flex items-center justify-end gap-3 px-6 py-5">
           <Button variant="ghost" onClick={() => setDisconnectOpen(false)} disabled={device.pending}>
@@ -396,20 +484,24 @@ function Guidance({ title, detail }: { title: string; detail: string }) {
   );
 }
 
+/**
+ * iOS is the only platform that requires installation before Web Push, so this
+ * renders only for a browser that reported it cannot subscribe yet.
+ */
 function InstallSteps() {
   return (
     <div className="space-y-4">
       <Guidance
         title="Add GoHa to your Home Screen first"
-        detail="On iPhone, open your browser's Share menu, choose Add to Home Screen, and keep Open as Web App turned on."
+        detail="On iPhone and iPad, open the Share menu, choose Add to Home Screen, and keep Open as Web App turned on."
       />
       <ol className="list-decimal space-y-2 pl-5 text-callout text-label-secondary">
         <li>Open GoHa using the new Home Screen icon.</li>
-        <li>Return to Settings and choose Set up this device.</li>
-        <li>Tap Enable Notifications, then Allow.</li>
+        <li>Return to Settings and choose Enable Notifications.</li>
+        <li>Tap Allow when the permission prompt appears.</li>
       </ol>
       <p className="text-footnote text-label-tertiary">
-        iPhone does not allow a website to add itself to your Home Screen automatically.
+        iOS does not allow a website to add itself to the Home Screen automatically.
       </p>
     </div>
   );

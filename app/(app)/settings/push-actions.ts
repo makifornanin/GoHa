@@ -26,11 +26,21 @@ import {
 import { requireUser } from "@/lib/session";
 import {
   PUSH_ENDPOINT_MAX,
+  pushSubscriptionIdSchema,
   pushSubscriptionSchema,
   type PushSubscriptionInput,
 } from "@/lib/validations/push";
 
-export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type ActionResult<T> =
+  | { ok: true; data: T }
+  /**
+   * `code` is an optional machine-readable reason, for the few failures a
+   * client can actually act on. `error` stays the only thing shown to a person.
+   */
+  | { ok: false; error: string; code?: PushActionErrorCode };
+
+/** The browser holds a subscription owned by a DIFFERENT GoHa account. */
+export type PushActionErrorCode = "foreign_subscription";
 
 export type PushOverview = {
   deviceCount: number;
@@ -253,8 +263,15 @@ export async function subscribePushAction(
       deviceLabel: parsed.data.deviceLabel ?? null,
     });
     if (!saved) {
+      /*
+       * The endpoint exists and belongs to someone else, so the upsert's
+       * ownership guard matched no row. Ownership is NEVER transferred here.
+       * The code lets the browser discard its stale subscription and ask the
+       * push service for a genuinely new one, which is the only safe fix.
+       */
       return {
         ok: false,
+        code: "foreign_subscription",
         error: "That device connection is already associated with another account.",
       };
     }
@@ -309,6 +326,97 @@ export async function unsubscribePushAction(input: {
     return { ok: true, data: { deviceCount } };
   } catch (error) {
     safeLog("unsubscribePushAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * One connected device, as the browser is allowed to see it.
+ *
+ * Deliberately NOT the database row. The endpoint, the p256dh and auth keys and
+ * every delivery diagnostic stay server side: the endpoint is a capability URL
+ * that anyone holding it could push to, and the keys decrypt the payload. What
+ * the list needs is a name, when it joined and whether it is still working, so
+ * that is all that crosses.
+ */
+export type PushDevice = {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastSuccessAt: string | null;
+  /** True for the subscription belonging to the browser making this request. */
+  isCurrentDevice: boolean;
+};
+
+/**
+ * The authenticated user's active push devices, newest first.
+ *
+ * `currentEndpoint` is optional and is used ONLY to mark one row as "this
+ * device". It is matched against rows already scoped to the session user, so a
+ * guessed or stolen endpoint reveals nothing: an endpoint belonging to someone
+ * else simply matches no row in this user's list.
+ */
+export async function listPushDevicesAction(input?: {
+  currentEndpoint?: string | null;
+}): Promise<ActionResult<{ devices: PushDevice[] }>> {
+  const user = await requireUser();
+
+  let currentEndpoint: string | null = null;
+  if (input?.currentEndpoint) {
+    const parsed = endpointInputSchema.safeParse({ endpoint: input.currentEndpoint });
+    // A malformed endpoint is not an error worth failing the list over. The
+    // page still renders; nothing is marked as the current device.
+    if (parsed.success) currentEndpoint = parsed.data.endpoint;
+  }
+
+  try {
+    const rows = await pushRepo.listActiveSubscriptions(user.id);
+    return {
+      ok: true,
+      data: {
+        devices: rows.map((row) => ({
+          id: row.id,
+          deviceLabel: row.deviceLabel,
+          createdAt: row.createdAt.toISOString(),
+          lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+          isCurrentDevice: currentEndpoint !== null && row.endpoint === currentEndpoint,
+        })),
+      },
+    };
+  } catch (error) {
+    safeLog("listPushDevicesAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Disconnect one device by id, including a device other than this one.
+ *
+ * This is what makes a lost laptop revocable from a phone. The id alone is not
+ * authority: `deleteSubscription` filters on the session user as well, so an id
+ * belonging to another account deletes nothing and reports not-found.
+ */
+export async function disconnectPushDeviceAction(input: {
+  id: string;
+}): Promise<ActionResult<{ deviceCount: number }>> {
+  const user = await requireUser();
+  const parsed = pushSubscriptionIdSchema.safeParse(input.id);
+  if (!parsed.success) return { ok: false, error: "That device is not valid." };
+
+  try {
+    const removed = await pushRepo.deleteSubscription(user.id, parsed.data);
+    if (!removed) return { ok: false, error: "That device is no longer connected." };
+
+    const deviceCount = await pushRepo.countActiveSubscriptions(user.id);
+    // Unchanged from the single-device behaviour: the last device leaving turns
+    // notifications off, and any remaining device keeps them on.
+    if (deviceCount === 0) {
+      await settingsRepo.updateUserSettings(user.id, { notificationsEnabled: false });
+    }
+    revalidatePath("/settings");
+    return { ok: true, data: { deviceCount } };
+  } catch (error) {
+    safeLog("disconnectPushDeviceAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }

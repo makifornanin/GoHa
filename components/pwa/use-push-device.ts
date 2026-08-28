@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { currentDeviceLabel } from "@/lib/push/device-label";
 import {
   getCurrentPushStateAction,
   listPushOverviewAction,
@@ -174,16 +175,48 @@ export function usePushDevice(
       }
 
       const registration = await navigator.serviceWorker.ready;
+      const key = applicationServerKey(overview.vapidPublicKey);
+      const deviceLabel = currentDeviceLabel();
+
       let current = await registration.pushManager.getSubscription();
       if (!current) {
         current = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: applicationServerKey(overview.vapidPublicKey),
+          applicationServerKey: key,
         });
         created = current;
       }
 
-      const result = await subscribePushAction(serializableSubscription(current));
+      let result = await subscribePushAction({
+        ...serializableSubscription(current),
+        deviceLabel,
+      });
+
+      /*
+       * This browser was still holding a subscription created under a
+       * DIFFERENT GoHa account, so the server refused to move it. That refusal
+       * is correct and stays untouched; what was wrong was leaving the person
+       * stuck with it.
+       *
+       * Discarding the stale subscription makes the push service issue a new
+       * endpoint, which belongs to nobody and can be claimed normally. Exactly
+       * one retry: if the fresh endpoint is somehow taken too, something is
+       * wrong that retrying will not fix, and a loop would just hammer the
+       * push service.
+       */
+      if (!result.ok && result.code === "foreign_subscription") {
+        await current.unsubscribe().catch(() => false);
+        current = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        });
+        created = current;
+        result = await subscribePushAction({
+          ...serializableSubscription(current),
+          deviceLabel,
+        });
+      }
+
       if (!result.ok) {
         if (created) await created.unsubscribe().catch(() => false);
         return { ok: false, error: result.error };
@@ -267,6 +300,12 @@ export function usePushDevice(
     setOverview,
     availability,
     currentConnected,
+    /*
+     * The live endpoint of THIS browser, used only to mark one row in the
+     * device list as the current device. It is a capability URL, so it goes
+     * straight to an authenticated Server Action and is never rendered.
+     */
+    currentEndpoint: subscription?.endpoint ?? null,
     pending,
     enable,
     disconnect,

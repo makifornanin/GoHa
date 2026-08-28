@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
     upsertSubscription: vi.fn(),
     getSubscriptionByEndpoint: vi.fn(),
     deleteSubscriptionByEndpoint: vi.fn(),
+    listActiveSubscriptions: vi.fn(),
+    deleteSubscription: vi.fn(),
   },
   automationRepo: { claimNotification: vi.fn() },
   settingsRepo: {
@@ -93,6 +95,8 @@ describe("authenticated push Settings actions", () => {
     mocks.pushRepo.upsertSubscription.mockResolvedValue({ id: "subscription-a" });
     mocks.pushRepo.countActiveSubscriptions.mockResolvedValue(2);
     mocks.settingsRepo.updateUserSettings.mockResolvedValue({});
+    mocks.pushRepo.listActiveSubscriptions.mockResolvedValue([]);
+    mocks.pushRepo.deleteSubscription.mockResolvedValue(true);
   });
 
   it("derives subscription ownership from the session and supports multiple devices", async () => {
@@ -159,10 +163,15 @@ describe("authenticated push Settings actions", () => {
 
     const result = await subscribePushAction(subscriptionInput);
 
+    // The refusal itself is unchanged. It now also carries a machine-readable
+    // code so the browser can discard its stale subscription and ask the push
+    // service for a fresh endpoint, rather than leaving the person stuck.
     expect(result).toEqual({
       ok: false,
+      code: "foreign_subscription",
       error: "That device connection is already associated with another account.",
     });
+    expect(mocks.settingsRepo.updateUserSettings).not.toHaveBeenCalled();
   });
 
   it("checks and disconnects only the authenticated user's exact endpoint", async () => {
