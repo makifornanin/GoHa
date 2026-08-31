@@ -6,8 +6,16 @@ export const BRAIN_DUMP_CONTENT_MAX = 2000;
 
 export const CONVERT_TARGETS = ["task", "goal", "habit"] as const satisfies readonly BrainDumpConvertedType[];
 
+/**
+ * What a captured thought can become, and what to call it on the button.
+ *
+ * The KEY is the stored `brain_dump_converted_type` enum value and does not
+ * move: it is in the database, in the check constraint, and in rows people
+ * already have. The LABEL is what a person reads, and that follows
+ * docs/TERMINOLOGY.md, which is why the two differ for `task`.
+ */
 export const convertTargetConfig: Record<BrainDumpConvertedType, { label: string; module: string }> = {
-  task: { label: "Task", module: "/tasks" },
+  task: { label: "To-do", module: "/tasks" },
   goal: { label: "Goal", module: "/goals" },
   habit: { label: "Habit", module: "/habits" },
 };

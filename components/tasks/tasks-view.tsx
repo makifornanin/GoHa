@@ -2,8 +2,7 @@
 
 import { ListTodo, Plus } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -36,6 +35,7 @@ import {
   type TaskTimeframeKey,
 } from "@/lib/task-buckets";
 import { taskPriorityConfig } from "@/lib/tasks";
+import { useCreateSignal } from "@/lib/use-create-signal";
 import { useNow } from "@/lib/use-now";
 import type { TaskFormInput } from "@/lib/validations/task";
 
@@ -115,6 +115,8 @@ export function TasksView({
   weekStartsOn = 1,
   openCreateOnMount = false,
   defaultGoalId,
+  defaultLifeAreaId,
+  defaultParentTaskId,
 }: {
   tasks: Task[];
   subtasks?: Task[];
@@ -125,60 +127,42 @@ export function TasksView({
   weekStartsOn?: Weekday;
   openCreateOnMount?: boolean;
   defaultGoalId?: string;
+  defaultLifeAreaId?: string;
+  /**
+   * `?parentTaskId=` — "+ Add > Subtask" from inside a to-do.
+   *
+   * Opens that to-do's detail panel rather than the create modal. A subtask is
+   * added through the panel's inline composer, which already knows how to make
+   * one; routing this to a second form would be a second way to write the same
+   * row, and the two would drift.
+   */
+  defaultParentTaskId?: string;
 }) {
   const [layout, setLayout] = useState<"list" | "calendar">("list");
   const [timeframe, setTimeframe] = useState<TaskTimeframeKey>("all");
   const [progress, setProgress] = useState<TaskProgressKey>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [lifeAreaFilter, setLifeAreaFilter] = useState<string>("all");
-  const [formOpen, setFormOpen] = useState(openCreateOnMount);
   const [editing, setEditing] = useState<Task | null>(null);
   const [createDate, setCreateDate] = useState<string | undefined>(undefined);
 
-  /*
-   * Reopen the create form when the URL asks again.
-   *
-   * `useState(openCreateOnMount)` is an INITIALIZER: it runs once. The shell's
-   * "Add Task", the mobile "+" and the command palette all navigate to
-   * `/tasks?new=1`, and when you are ALREADY on /tasks that is a soft
-   * navigation, so the component re-renders with the prop still true and the
-   * form never opens. The button silently did nothing on the one page you are
-   * most likely to press it from.
-   *
-   * Adjusting state during render is React's documented answer to "a prop
-   * changed and some state should follow it". An effect here would render the
-   * closed form first and reopen it a frame later, which flickers.
-   */
-  const router = useRouter();
-
-  /*
-   * Spend the `?new=1` signal once it has been honoured.
-   *
-   * Without this the parameter sits in the URL, so pressing "Add Task" again
-   * pushes the identical address, the prop never changes, and the transition
-   * above never fires a second time. Only `new` is removed; `goalId` is left
-   * alone so "Add task" from a goal keeps its preselection.
-   */
-  useEffect(() => {
-    if (!openCreateOnMount) return;
-    const params = new URLSearchParams(window.location.search);
-    params.delete("new");
-    const query = params.toString();
-    router.replace(query ? `/tasks?${query}` : "/tasks", { scroll: false });
-  }, [openCreateOnMount, router]);
-
-  const [lastCreateSignal, setLastCreateSignal] = useState(openCreateOnMount);
-  if (openCreateOnMount !== lastCreateSignal) {
-    setLastCreateSignal(openCreateOnMount);
-    if (openCreateOnMount) {
+  // "+ Add > To-do" from anywhere in the shell lands here with `?new=1`; the
+  // shared hook opens the form and spends the signal. See its comments for the
+  // two subtleties (soft navigation, and re-arming the parameter).
+  const [formOpen, setFormOpen] = useCreateSignal(
+    // A subtask request is not a request for the to-do form: it opens the
+    // parent's panel below instead, so the modal must stay shut.
+    openCreateOnMount && !defaultParentTaskId,
+    "/tasks",
+    () => {
       setEditing(null);
       setCreateDate(undefined);
-      setFormOpen(true);
-    }
-  }
+    },
+  );
+
   const [noteTask, setNoteTask] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(defaultParentTaskId ?? null);
   const [milestone, setMilestone] = useState<Milestone | null>(null);
   const [, startTransition] = useTransition();
 
@@ -210,7 +194,18 @@ export function TasksView({
 
   const goalTitleById = useMemo(() => new Map(goals.map((g) => [g.id, g.title])), [goals]);
   const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
-  const goalOptions = useMemo(() => goals.map((g) => ({ id: g.id, title: g.title })), [goals]);
+  /* `parentGoalId` travels with each option so the pickers can show subgoals
+     under their parents instead of beside them. */
+  const goalOptions = useMemo(
+    () =>
+      goals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        parentGoalId: g.parentGoalId,
+        isArchived: g.isArchived,
+      })),
+    [goals],
+  );
   const lifeAreaOptions = useMemo(() => lifeAreas.map((a) => ({ id: a.id, name: a.name })), [lifeAreas]);
 
   /** Life-area scoping applies to both layouts. */
@@ -437,6 +432,7 @@ export function TasksView({
           editing ? undefined : (createDate ?? (timeframe === "today" ? zonedToday(now, timeZone) : undefined))
         }
         defaultGoalId={editing ? undefined : defaultGoalId}
+        defaultLifeAreaId={editing ? undefined : defaultLifeAreaId}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
         onSubmit={editing ? handleUpdate : handleCreate}
@@ -446,7 +442,7 @@ export function TasksView({
       <Modal
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
-        title="Delete this task?"
+        title="Delete this to-do?"
         description={
           deleting ? `"${deleting.title}" will be permanently removed. This cannot be undone.` : undefined
         }
@@ -471,8 +467,8 @@ export function TasksView({
         <PageHeader title="To-dos" description="Plan, schedule, and complete the work that moves your goals." />
         <EmptyState
           icon={ListTodo}
-          title="No tasks yet"
-          description="Tasks are the actions that move your goals forward. Add your first one and schedule when you'll do it."
+          title="No to-dos yet"
+          description="To-dos are the actions that move your goals forward. Add your first one and schedule when you will do it."
           action={
             <Button data-testid="new-task" onClick={() => openCreate()}>
               <Plus />
@@ -495,7 +491,7 @@ export function TasksView({
         action={
           <Button data-testid="new-task" onClick={() => openCreate()}>
             <Plus />
-            Add Task
+            Add to-do
           </Button>
         }
       />
@@ -547,7 +543,7 @@ export function TasksView({
           />
           {layout === "list" ? (
             <Select
-              aria-label="Sort tasks"
+              aria-label="Sort to-dos"
               value={sort}
               onChange={(v) => setSort(v as SortKey)}
               className="w-full sm:w-36"
@@ -568,7 +564,7 @@ export function TasksView({
           className="flex cursor-pointer items-center gap-2 self-start rounded-full bg-red/12 px-3 py-1.5 text-callout font-medium text-red transition-colors hover:bg-red/20"
         >
           <span className="font-mono tabular-nums">{lateCount}</span>
-          {lateCount === 1 ? "task is late" : "tasks are late"} — review
+          {lateCount === 1 ? "to-do is late" : "to-dos are late"} — review
         </button>
       ) : null}
 
@@ -591,7 +587,7 @@ export function TasksView({
               onClick={() => openCreate()}
               className="cursor-pointer font-medium text-blue hover:underline"
             >
-              Add a task
+              Add a to-do
             </button>
             .
           </p>

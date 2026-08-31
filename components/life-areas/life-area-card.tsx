@@ -10,6 +10,8 @@ import {
 } from "@/lib/life-areas";
 import { cn } from "@/lib/utils";
 
+import { AddMenu } from "@/components/shell/add-menu";
+
 import { LifeAreaIcon } from "./icon";
 
 /** Actions reveal on hover for pointer devices, stay visible on touch. */
@@ -90,6 +92,26 @@ export function LifeAreaCard({
           <h3 className="truncate text-headline text-label">{area.name}</h3>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/*
+            Start something IN this area, with the area already chosen.
+
+            A life area is the top of the chain, so the useful thing to do from
+            one is to hang a goal off it. Before this, doing that meant leaving
+            the page, opening the goals board, opening a form, and re-selecting
+            the area you had just been looking at.
+          */}
+          <AddMenu
+            context="life-area"
+            lifeAreaId={area.id}
+            variant="ghost"
+            size="sm"
+            iconOnly
+            iconLabel={`Add something to ${area.name}`}
+            className={cn(
+              "[&_button]:size-7 [&_button]:min-h-0 [&_button]:rounded-full [&_button]:p-0",
+              "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:opacity-100",
+            )}
+          />
           <button
             type="button"
             onClick={() => onEdit(area)}

@@ -2,6 +2,8 @@ import { BookOpen, Quote } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
+import { TakeawayComposer } from "./takeaway-composer";
+
 /** Exactly what the card needs. Ids, dates and provider stay server-side. */
 export type DailyInspirationView = {
   type: "quote" | "bible_verse";
@@ -13,17 +15,24 @@ export type DailyInspirationView = {
 };
 
 /**
- * Providers whose terms require visible credit where their content is shown.
+ * Providers credited where their content is shown.
  *
- * ZenQuotes asks for it on the free tier, so this is an obligation rather than
- * a courtesy. Keyed by provider so adding one later means adding a row here,
- * not another branch in the markup.
+ * Two different reasons to appear here, and the distinction matters:
+ *
+ *   - ZenQuotes REQUIRES credit on its free tier, so that one is an obligation.
+ *   - The Berean Standard Bible does not. It was placed in the public domain on
+ *     30 April 2023, and its own terms say attribution is appreciated rather
+ *     than required. It is credited anyway: a translation given away for free
+ *     is worth naming, and a reader who wants to know which wording they are
+ *     looking at should not have to guess.
  *
  * bible-api.com serves the World English Bible, which is public domain and
- * needs no credit, and the curated local pool is ours; neither appears here.
+ * carries its translation label in the line above; the curated local pool is
+ * ours. Neither needs a row.
  */
 const PROVIDER_CREDIT: Record<string, { label: string; href: string }> = {
   zenquotes: { label: "ZenQuotes", href: "https://zenquotes.io/" },
+  bsb: { label: "Berean Standard Bible", href: "https://berean.bible/" },
 };
 
 /**
@@ -43,8 +52,11 @@ const PROVIDER_CREDIT: Record<string, { label: string; href: string }> = {
  */
 export function DailyInspirationCard({
   inspiration,
+  takeaway,
 }: {
   inspiration?: DailyInspirationView | null;
+  /** What this reader already wrote about it today, if anything. */
+  takeaway?: string | null;
 }) {
   if (!inspiration) {
     return (
@@ -109,6 +121,10 @@ export function DailyInspirationCard({
           </figcaption>
         </figure>
       </CardContent>
+
+      {/* Reflection sits UNDER the quotation, inside the same card, because it
+          is a response to it rather than a separate feature. */}
+      <TakeawayComposer initialBody={takeaway ?? ""} />
     </Card>
   );
 }

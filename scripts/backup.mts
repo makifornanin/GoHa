@@ -16,8 +16,11 @@ import { loadEnv, requireEnv } from "./lib/env.mts";
  * its hard caps and date ranges. It also has no counterpart that can put the
  * data back. It is a useful thing to hand yourself; it is not a backup.
  *
- * This script captures ALL 19 tables with no caps, no ranges and no filters,
- * in dependency order, to a timestamped file under ./backups.
+ * This script captures EVERY table with no caps, no ranges and no filters, in
+ * dependency order, to a timestamped file under ./backups. The manifest lives
+ * in ./lib/backup-tables.mts and is checked against the schema by
+ * tests/backup-manifest.test.ts, because it once said 19 while the schema had
+ * 30 and the dump was silently a third short.
  *
  *   pnpm db:backup                 -> pg_dump if available, else JSON
  *   pnpm db:backup -- --json       -> force the JSON driver path

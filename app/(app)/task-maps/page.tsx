@@ -41,7 +41,7 @@ export default async function TaskMapsPage({
     <div className="space-y-6">
       <PageHeader
         title="Task Map"
-        description="Sketch how your tasks and ideas connect. Drag to arrange, link nodes to your tasks, and connect the ones that depend on each other."
+        description="Sketch how your to-dos and ideas connect. Drag to arrange, link nodes to your to-dos, and connect the ones that depend on each other."
       />
       <TaskMapsWorkspace maps={maps} graph={graph} activeMapId={activeMapId} tasks={taskOptions} />
     </div>

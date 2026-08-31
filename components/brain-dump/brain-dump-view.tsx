@@ -3,7 +3,7 @@
 import { AnimatePresence } from "motion/react";
 import { Brain, CornerDownLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -53,11 +53,35 @@ type OptimisticAction =
 export function BrainDumpView({
   items,
   timeZone,
+  focusCaptureOnMount = false,
 }: {
   items: BrainDumpItemRow[];
   timeZone?: string;
+  /**
+   * `?new=1` from "+ Add > Brain dump".
+   *
+   * Brain Dump has no create MODAL: the composer is always on screen, so the
+   * honest reading of "create here" is to put the caret in it. Opening a dialog
+   * over a page whose whole point is a single always-ready field would be a
+   * step backwards for the one screen built for speed.
+   */
+  focusCaptureOnMount?: boolean;
 }) {
   const router = useRouter();
+  const captureRef = useRef<HTMLTextAreaElement>(null);
+
+  /*
+   * Answer `?new=1` by focusing the composer, and spend the parameter.
+   *
+   * Spent for the same reason every other screen spends it: left in the URL,
+   * pressing Add again pushes the identical address, the prop never changes,
+   * and the second press does nothing.
+   */
+  useEffect(() => {
+    if (!focusCaptureOnMount) return;
+    captureRef.current?.focus();
+    router.replace("/brain-dump", { scroll: false });
+  }, [focusCaptureOnMount, router]);
   const [tab, setTab] = useState<Tab>("inbox");
   const [draft, setDraft] = useState("");
   const [draftColor, setDraftColor] = useState<NoteColorKey>(DEFAULT_NOTE_COLOR);
@@ -262,6 +286,7 @@ export function BrainDumpView({
       {/* Capture: one field, a colour, one key to post it. */}
       <section className="rounded-2xl border border-separator-opaque bg-surface p-1 shadow-e1 transition-colors focus-within:border-blue/40">
         <Textarea
+          ref={captureRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -332,7 +357,7 @@ export function BrainDumpView({
           title={tab === "inbox" ? "Your mind is clear" : `Nothing ${tab}`}
           description={
             tab === "inbox"
-              ? "Capture anything above and it lands here. Convert thoughts into tasks, goals, or habits when you're ready."
+              ? "Capture anything above and it lands here. Convert thoughts into to-dos, goals, or habits when you're ready."
               : `Items you ${tab === "archived" ? "archive" : "convert"} will show up here.`
           }
         />

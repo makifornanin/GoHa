@@ -82,12 +82,12 @@ export function BrainCard({
               Focus on this
             </Link>
             <Button variant="secondary" onClick={() => onOpenTask(signal.task!)}>
-              Open task
+              Open to-do
             </Button>
           </>
         ) : (
           <Link href="/tasks" className={buttonVariants({ size: "lg" })}>
-            Plan a task
+            Plan a to-do
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         )}

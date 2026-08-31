@@ -116,7 +116,13 @@ export function SettingsView({
         title="Notifications"
         description="GoHa never sends anything itself. These decide what it hands to the tool that does."
       >
-        <AutomationPrefsCard prefs={settings.automation} />
+        <AutomationPrefsCard
+          prefs={settings.automation}
+          // Smart reminders need a gap between these two, so the card can warn
+          // when the toggle is on but no slot could ever be scheduled.
+          morningTime={settings.dailyPlanningTime}
+          eveningTime={settings.eveningReflectionTime}
+        />
         <NotificationDevicesCard initial={pushOverview} />
       </SettingsSection>
 
@@ -330,11 +336,11 @@ const ARCHIVE_LABEL: Record<ArchivedKind, string> = {
 
 const DELETE_CONSEQUENCE: Record<ArchivedKind, string> = {
   "life-area":
-    "Only the label goes. Goals, tasks and habits filed under it stay, with no life area.",
-  goal: "Its sub-goals and its progress history go with it. Linked tasks stay.",
+    "Only the label goes. Goals, to-dos and habits filed under it stay, with no life area.",
+  goal: "Its subgoals and its progress history go with it. Linked to-dos stay.",
   habit:
     "Its whole entry history goes with it, which means the streak. This is the one deletion here that destroys a record of something you actually did.",
-  "task-map": "Its nodes and connections go with it. Any tasks they linked to stay.",
+  "task-map": "Its nodes and connections go with it. Any to-dos they linked to stay.",
 };
 
 function ArchiveCard({ className }: { className?: string }) {

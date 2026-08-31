@@ -19,8 +19,11 @@ beforeEach(() => {
   completeOnboardingAction.mockResolvedValue({ ok: true });
 });
 
-async function advanceTo(step: 2 | 3) {
-  for (let i = 1; i < step; i += 1) {
+/** How many screens the flow has. Kept in one place, not spread over asserts. */
+const STEP_COUNT = 5;
+
+async function advanceToLast() {
+  for (let i = 1; i < STEP_COUNT; i += 1) {
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
   }
 }
@@ -44,35 +47,71 @@ describe("welcome onboarding", () => {
     expect(screen.getByRole("heading", { name: "Welcome to GoHa" })).toBeTruthy();
   });
 
-  it("is three steps and no more", async () => {
+  it("teaches the chain in order, then stops", async () => {
+    /*
+     * The order IS the lesson. The previous flow listed three features, and a
+     * reader who finished it still did not know that a goal breaks into
+     * subgoals, or that subgoals hold the to-dos that land on a day. That is
+     * the one idea the whole product rests on.
+     */
     render(<WelcomeOnboarding name="Maki" />);
 
-    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("Step 1 of 3");
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("Step 1 of " + STEP_COUNT);
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByRole("heading", { name: "How GoHa helps" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Start with what matters" })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByRole("heading", { name: "Get reminders on your phone" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Break the goal down" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("heading", { name: "Plan your day" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("heading", { name: "Stay on track" })).toBeTruthy();
 
     // The last step offers the CTA instead of another Continue.
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
   });
 
-  it("persists completion when the user finishes via Set up notifications", async () => {
+  it("shows the hierarchy as a worked example, not a definition", async () => {
     render(<WelcomeOnboarding name="Maki" />);
-    await advanceTo(3);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Set up notifications" }));
+    // Concrete, and in chain order: everybody already knows how these relate,
+    // which is what makes the model land in three lines instead of a paragraph.
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("Find a new job");
+    expect(dialog.textContent).toContain("Finish my resume");
+    expect(dialog.textContent).toContain("Rewrite the experience section");
+  });
+
+  it("uses the canonical vocabulary and not a synonym for it", async () => {
+    // docs/TERMINOLOGY.md: Life Area, Goal, Subgoal, To-do. Teaching a beginner
+    // one word here and showing them another in the menu is the whole problem.
+    render(<WelcomeOnboarding name="Maki" />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    const text = screen.getByRole("dialog").textContent ?? "";
+    expect(text).toContain("Subgoal");
+    expect(text).toContain("To-do");
+    expect(text).not.toContain("Sub-goal");
+  });
+
+  it("persists completion when the user finishes via Enable notifications", async () => {
+    render(<WelcomeOnboarding name="Maki" />);
+    await advanceToLast();
+
+    await userEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
 
     await waitFor(() => expect(completeOnboardingAction).toHaveBeenCalledTimes(1));
   });
 
-  it("sends Set up notifications to the existing settings flow, not a copy of it", async () => {
+  it("sends Enable notifications to the existing settings flow, not a copy of it", async () => {
     // /iphone/setup is a QR landing page that dead-ends without a pairing
     // fragment, so the CTA must land on the Settings notifications section.
     render(<WelcomeOnboarding name="Maki" />);
-    await advanceTo(3);
+    await advanceToLast();
 
-    await userEvent.click(screen.getByRole("button", { name: "Set up notifications" }));
+    await userEvent.click(screen.getByRole("button", { name: "Enable notifications" }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/settings#notifications"));
   });
@@ -81,7 +120,7 @@ describe("welcome onboarding", () => {
     // "Later" is taken at face value: the popup does not return next login.
     // Phone setup stays permanently available in Settings.
     render(<WelcomeOnboarding name="Maki" />);
-    await advanceTo(3);
+    await advanceToLast();
 
     await userEvent.click(screen.getByRole("button", { name: "Maybe later" }));
 
@@ -118,7 +157,7 @@ describe("welcome onboarding", () => {
   it("avoids naming the machinery behind notifications", async () => {
     // The reader does not need to know what a service worker or VAPID is.
     render(<WelcomeOnboarding name="Maki" />);
-    await advanceTo(3);
+    await advanceToLast();
 
     const text = screen.getByRole("dialog").textContent ?? "";
     for (const jargon of ["PWA", "service worker", "VAPID", "push subscription", "endpoint"]) {

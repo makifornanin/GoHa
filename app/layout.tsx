@@ -69,11 +69,31 @@ export default function RootLayout({
         >
           <MotionProvider>
             {children}
-            {/* Top-right, matching platform convention. Bottom-right stacked
-                toasts sat on top of form controls (Settings' selects) and
-                intercepted their clicks until they timed out. The offset clears
-                the 56px app header so toasts never cover its actions either. */}
-            <Toaster position="top-right" duration={3500} offset={72} />
+            {/*
+              Top-CENTRE, which is the only band that is reliably empty.
+
+              Two positions have now been ruled out by real use, in opposite
+              directions. BOTTOM-right stacked toasts sat on Settings' selects
+              and intercepted their clicks until they timed out. TOP-right then
+              covered the page-header actions, because every page header puts
+              its actions at the right: the Day Planner's Today/Tomorrow toggle
+              and the goal detail Archive/Edit/Add row were both obscured.
+
+              Page headers are title-left, actions-right, so the horizontal
+              middle is the one part of that band with nothing in it. The top
+              offset still clears the 56px app header.
+
+              On a phone the header stacks and the toast is near full width, so
+              it briefly overlays the page TITLE. That is deliberate: a title is
+              not interactive, and the alternative bottom edge belongs to the
+              tab bar and the "+" button.
+            */}
+            <Toaster
+              position="top-center"
+              duration={3500}
+              offset={{ top: "72px" }}
+              mobileOffset={{ top: "64px", left: "16px", right: "16px" }}
+            />
           </MotionProvider>
         </ThemeProvider>
       </body>

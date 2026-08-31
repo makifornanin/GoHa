@@ -41,8 +41,8 @@ export function QuickAddTask({ today }: { today: string }) {
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
         }}
-        placeholder="Quick add a task for today..."
-        aria-label="Quick add task for today"
+        placeholder="Quick add a to-do for today..."
+        aria-label="Quick add to-do for today"
         disabled={pending}
         className="h-11 min-w-0 flex-1 bg-transparent text-[16px] text-label placeholder:text-label-secondary focus:outline-none disabled:text-label-quaternary sm:h-8 sm:text-body"
       />
@@ -50,7 +50,7 @@ export function QuickAddTask({ today }: { today: string }) {
         type="button"
         onClick={submit}
         disabled={!canSubmit}
-        aria-label="Save quick task"
+        aria-label="Save quick to-do"
         className="hit-44 hit-44-narrow flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-fill-tertiary text-label-secondary transition-colors hover:bg-fill-secondary hover:text-label focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:text-label-quaternary"
       >
         <CornerDownLeft className="size-4" aria-hidden />

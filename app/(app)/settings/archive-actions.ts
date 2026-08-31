@@ -111,9 +111,9 @@ export async function restoreArchivedAction(
  *
  *  - a life area: only the label. Goals, tasks and habits filed under it survive
  *    with no area (`set null`).
- *  - a goal: its sub-goals and its progress journal. Linked tasks survive.
+ *  - a goal: its subgoals and its progress journal. Linked to-dos survive.
  *  - a habit: its schedules AND its entire entry history, which is the streak.
- *  - a task map: its nodes and connections. Linked tasks survive.
+ *  - a task map: its nodes and connections. Linked to-dos survive.
  */
 export async function deleteArchivedAction(
   kind: ArchivedKind,

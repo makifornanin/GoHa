@@ -79,3 +79,44 @@ export const taskPriorityConfig: Record<Priority, PriorityMeta> = {
 };
 
 export const TASK_PRIORITY_ORDER: readonly Priority[] = TASK_PRIORITY_VALUES;
+
+/**
+ * Duration options offered when estimating a to-do.
+ *
+ * A short ladder, not a number field. Planning a day is a judgement call, and
+ * asking for minutes invites false precision: nobody's "write the case study"
+ * is 47 minutes. These are the buckets people actually think in, and the
+ * planner's arithmetic is honest at this resolution.
+ *
+ * `null` is a real, first-class choice. An estimate is optional everywhere in
+ * GoHa, and the planner says so out loud rather than inventing a default: a
+ * fabricated duration would silently corrupt the one number the Day Planner
+ * exists to get right.
+ */
+export const TASK_ESTIMATE_OPTIONS: readonly number[] = [15, 30, 45, 60, 90, 120, 180, 240];
+
+/** The largest estimate the form accepts, in minutes. A day is the ceiling. */
+export const TASK_ESTIMATE_MAX_MINUTES = 24 * 60;
+
+/**
+ * "1h 30m" rather than "90m". Nobody plans a day in three-digit minutes, and
+ * the planner adds these up in front of the user, so they have to read as time.
+ */
+export function formatEstimate(minutes: number | null | undefined): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}m`;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
+/** The same value spelled for a screen reader, which should not read "1h 30m". */
+export function describeEstimate(minutes: number | null | undefined): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+  if (rest > 0) parts.push(`${rest} minute${rest === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}

@@ -10,12 +10,16 @@ import type {
   automationTokens,
   dailyInspirations,
   dailyQuotes,
+  inspirationTakeaways,
   notificationLog,
   pushDeliveries,
   pushPairingSessions,
   pushSubscriptions,
   brainDumpItems,
   dailyPriorities,
+  dayPlanAllocations,
+  dayPlanItems,
+  dayPlans,
   focusSessions,
   goalProgressUpdates,
   goals,
@@ -67,6 +71,13 @@ export type NewBrainDumpItem = typeof brainDumpItems.$inferInsert;
 export type DailyPriority = typeof dailyPriorities.$inferSelect;
 export type NewDailyPriority = typeof dailyPriorities.$inferInsert;
 
+export type DayPlan = typeof dayPlans.$inferSelect;
+export type NewDayPlan = typeof dayPlans.$inferInsert;
+export type DayPlanAllocation = typeof dayPlanAllocations.$inferSelect;
+export type NewDayPlanAllocation = typeof dayPlanAllocations.$inferInsert;
+export type DayPlanItem = typeof dayPlanItems.$inferSelect;
+export type NewDayPlanItem = typeof dayPlanItems.$inferInsert;
+
 export type TaskMap = typeof taskMaps.$inferSelect;
 export type NewTaskMap = typeof taskMaps.$inferInsert;
 export type TaskMapNode = typeof taskMapNodes.$inferSelect;
@@ -98,6 +109,8 @@ export type DailyInspirationRow = typeof dailyInspirations.$inferSelect;
 export type NewDailyInspiration = typeof dailyInspirations.$inferInsert;
 export type DailyQuote = typeof dailyQuotes.$inferSelect;
 export type NewDailyQuote = typeof dailyQuotes.$inferInsert;
+export type InspirationTakeaway = typeof inspirationTakeaways.$inferSelect;
+export type NewInspirationTakeaway = typeof inspirationTakeaways.$inferInsert;
 
 export type Invite = typeof invites.$inferSelect;
 export type NewInvite = typeof invites.$inferInsert;

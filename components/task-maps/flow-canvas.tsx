@@ -191,7 +191,7 @@ function GohaNodeView({ data, selected }: NodeProps<GohaNode>) {
             </span>
           ) : null}
           {data.taskId ? (
-            <Link2 className="size-3.5 shrink-0 text-blue" aria-label="Linked to a task" />
+            <Link2 className="size-3.5 shrink-0 text-blue" aria-label="Linked to a to-do" />
           ) : null}
         </span>
       </div>
@@ -890,7 +890,7 @@ function FlowCanvasInner({
                 onClick={() => setImportOpen(true)}
                 disabled={isAdding || tasks.length === 0}
                 className={toolbarButton}
-                title={tasks.length === 0 ? "No tasks to import yet" : "Add existing tasks to this map"}
+                title={tasks.length === 0 ? "No to-dos to import yet" : "Add existing to-dos to this map"}
               >
                 <Download className="size-4" aria-hidden /> Import tasks
               </button>
@@ -1041,7 +1041,7 @@ function MapProgress({
         {done}/{total}
       </span>
       <span className="text-footnote text-label-secondary">
-        {doing > 0 ? `${doing} in progress` : percent === 100 ? "Map complete" : "linked tasks done"}
+        {doing > 0 ? `${doing} in progress` : percent === 100 ? "Map complete" : "linked to-dos done"}
       </span>
     </div>
   );
@@ -1281,7 +1281,7 @@ function ImportTasksDialog({
       >
         <div className="flex items-center justify-between">
           <h3 id="import-tasks-title" className="text-headline text-label">
-            Add tasks to this map
+            Add to-dos to this map
           </h3>
           <span className="font-mono text-footnote tabular-nums text-label-secondary">
             {selected.size} selected
@@ -1296,8 +1296,8 @@ function ImportTasksDialog({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search your tasks..."
-            aria-label="Search tasks"
+            placeholder="Search your to-dos..."
+            aria-label="Search to-dos"
             className="pl-8"
           />
         </div>
@@ -1474,7 +1474,7 @@ function NodeInspector({
           value={taskId}
           onChange={setTaskId}
           options={[
-            { value: "", label: "No linked task" },
+            { value: "", label: "No linked to-do" },
             ...tasks.map((t) => ({ value: t.id, label: t.title })),
           ]}
         />

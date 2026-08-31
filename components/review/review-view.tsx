@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import {
+  BookOpen,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -40,6 +41,20 @@ export type ReviewData = {
   stats: ReviewStats;
   review: WeeklyReview | null;
   lifeAreas: LifeArea[];
+  /**
+   * The week's daily inspirations, with whatever the reader wrote about each.
+   *
+   * Plain strings rather than rows: this is read-only history, and the review
+   * screen has no business holding ids it can never act on.
+   */
+  inspirations: {
+    localDate: string;
+    type: "quote" | "bible_verse";
+    text: string;
+    source: string;
+    translation: string | null;
+    takeaway: string | null;
+  }[];
 };
 
 function Stat({
@@ -79,7 +94,7 @@ const RATINGS = [1, 2, 3, 4, 5];
  */
 export function ReviewView({ data }: { data: ReviewData }) {
   const router = useRouter();
-  const { stats, review } = data;
+  const { stats, review, inspirations } = data;
 
   /*
    * The saved values this week started from. The page keys this component on
@@ -210,7 +225,7 @@ export function ReviewView({ data }: { data: ReviewData }) {
             <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Stat
                 icon={CheckCircle2}
-                label="tasks completed"
+                label="to-dos completed"
                 value={String(stats.completed.length)}
               />
               <Stat
@@ -311,6 +326,47 @@ export function ReviewView({ data }: { data: ReviewData }) {
                 >
                   Reschedule in To-dos
                 </Link>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {inspirations.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="size-4 text-label-tertiary" aria-hidden />
+                  This week&apos;s inspirations
+                </CardTitle>
+                <span className="font-mono text-footnote tabular-nums text-label-secondary">
+                  {inspirations.filter((entry) => entry.takeaway).length}/{inspirations.length}
+                </span>
+              </CardHeader>
+              {/*
+                Where takeaways are read back.
+
+                The weekly review is the one screen already built for looking
+                backwards, so the notes belong here rather than behind a
+                separate history page nobody would visit. Days without a note
+                still appear: seeing the verse again is most of the value, and
+                hiding the quiet days would make the week look tidier than it was.
+              */}
+              <CardContent className="flex flex-col gap-3">
+                {inspirations.map((entry) => (
+                  <div key={entry.localDate} className="border-l-2 border-separator pl-3">
+                    <p className="text-callout leading-snug text-label-secondary">
+                      {entry.type === "bible_verse" ? entry.text : `“${entry.text}”`}
+                    </p>
+                    <p className="mt-0.5 text-footnote text-label-tertiary">
+                      {entry.source}
+                      {entry.translation ? ` · ${entry.translation}` : ""}
+                    </p>
+                    {entry.takeaway ? (
+                      <p className="mt-1.5 whitespace-pre-wrap text-callout leading-relaxed text-label">
+                        {entry.takeaway}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ) : null}

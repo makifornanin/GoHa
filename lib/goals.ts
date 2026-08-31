@@ -99,6 +99,34 @@ export const GOAL_TIMEFRAME_ORDER: readonly GoalTimeframe[] = GOAL_TIMEFRAME_VAL
 export const DEFAULT_TIMEFRAME: GoalTimeframe = "monthly";
 
 export const goalProgressModeConfig: Record<GoalProgressMode, { label: string; hint: string }> = {
-  auto: { label: "From tasks", hint: "Progress is calculated from linked tasks." },
+  auto: {
+    label: "From to-dos",
+    hint: "Progress is calculated from the to-dos under this goal and its subgoals.",
+  },
   manual: { label: "Manual", hint: "You set the progress percentage yourself." },
 };
+
+/**
+ * How the two levels of the same table are named on screen.
+ *
+ * A subgoal IS a goal row, so nothing but this table distinguishes them to a
+ * reader. Keeping the words, the chip and the one-line explanation together
+ * means a surface cannot describe one level in the other's language, which is
+ * how the two came to look interchangeable in the first place. See
+ * docs/TERMINOLOGY.md for the canonical vocabulary.
+ */
+export const goalLevelConfig = {
+  goal: {
+    label: "Goal",
+    plural: "Goals",
+    /** What this level is FOR, in one line, for empty states and form help. */
+    meaning: "An outcome worth working toward.",
+    chip: "bg-blue/15 text-blue",
+  },
+  subgoal: {
+    label: "Subgoal",
+    plural: "Subgoals",
+    meaning: "A milestone on the way to the goal.",
+    chip: "bg-purple/15 text-purple",
+  },
+} as const;

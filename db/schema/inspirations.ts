@@ -1,6 +1,7 @@
-import { date, index, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, date, index, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
-import { primaryId } from "./_shared";
+import { auditTimestamps, primaryId } from "./_shared";
 import { user } from "./auth";
 
 /**
@@ -75,5 +76,75 @@ export const dailyInspirations = pgTable(
      * index's order.
      */
     index("daily_inspirations_user_date_idx").on(t.userId, t.localDate),
+  ],
+);
+
+/**
+ * What today's inspiration meant to the person who read it.
+ *
+ * A SEPARATE table rather than a column on `daily_inspirations`, and the reason
+ * is that table's central promise: once a day's inspiration is decided it is
+ * never rewritten, which is what stops the Today card and the Morning Brief
+ * from ever disagreeing. A takeaway is the opposite kind of thing. It is
+ * written later, edited freely, and belongs to the reader rather than to the
+ * ledger. Putting a mutable column on an immutable row would blur a boundary
+ * that is currently load-bearing, and every UPDATE would touch the row the
+ * morning notification was built from.
+ *
+ * Deliberately small. This is a place to answer "what does this mean for me
+ * today", not a journal: one entry per day, plain text, no title, no tags, no
+ * mood, no history of edits. The brief asks for reflection, and the fastest way
+ * to stop someone reflecting is to hand them a form.
+ */
+export const inspirationTakeaways = pgTable(
+  "inspiration_takeaways",
+  {
+    id: primaryId(),
+    userId: uuid()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /**
+     * The inspiration this responds to.
+     *
+     * CASCADES with it. A takeaway is a reply, and a reply to a deleted message
+     * is not something anyone can read; `daily_inspirations` rows are never
+     * deleted in normal operation anyway, so in practice this only fires when
+     * the account itself goes.
+     */
+    inspirationId: uuid()
+      .notNull()
+      .references(() => dailyInspirations.id, { onDelete: "cascade" }),
+    /**
+     * The user's LOCAL date, carried alongside the link.
+     *
+     * Denormalized on purpose, the same way `day_plan_items` carries its plan
+     * id: it is what the uniqueness rule below is expressed against, and it
+     * lets a history read scan by date without joining. It is the inspiration's
+     * own `local_date`, written by the server, never supplied by the client.
+     */
+    localDate: date().notNull(),
+    body: text().notNull(),
+    ...auditTimestamps,
+  },
+  (t) => [
+    /*
+     * One takeaway per person per day (V1). Saving again EDITS it.
+     *
+     * Keyed on the date rather than on the inspiration id, because the date is
+     * what the product promises: "your takeaway for today". Both would be
+     * unique in practice, since a day has exactly one inspiration, but only
+     * this one says so in the constraint.
+     */
+    unique("inspiration_takeaways_user_local_date_uq").on(t.userId, t.localDate),
+    index("inspiration_takeaways_user_date_idx").on(t.userId, t.localDate),
+    index("inspiration_takeaways_inspiration_idx").on(t.inspirationId),
+    /*
+     * A saved takeaway has words in it.
+     *
+     * Clearing the field DELETES the row rather than storing an empty one, so
+     * "no takeaway today" has exactly one representation instead of two that
+     * every reader would have to check for.
+     */
+    check("inspiration_takeaways_body_not_blank", sql`length(btrim(${t.body})) > 0`),
   ],
 );

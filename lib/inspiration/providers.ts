@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { pickReference, referenceKey, type VerseReference } from "./verse-references";
+
 /**
  * The two external content providers, normalized into one shape.
  *
@@ -25,7 +27,37 @@ export type InspirationContent = {
 
 export const QUOTESLATE_URL = "https://quoteslate.vercel.app/api/quotes/random";
 export const ZENQUOTES_URL = "https://zenquotes.io/api/random";
-export const BIBLE_API_URL = "https://bible-api.com/data/web/random";
+
+/**
+ * The Free Use Bible API (AO Lab), serving the Berean Standard Bible.
+ *
+ * Chosen after checking what the licensing actually permits, which is the part
+ * that rules out most of the alternatives. The BSB was placed in the PUBLIC
+ * DOMAIN on 30 April 2023: no licence, no permission, no verse limit, no fee.
+ * The API itself needs no key, states no rate limit, and imposes no copyright
+ * restrictions of its own.
+ *
+ * That combination is rarer than it sounds. Every modern translation people
+ * actually ask for by name (NIV, NLT, CSB, ESV) is under copyright, and reading
+ * one out of an unofficial endpoint is republishing someone else's text without
+ * permission. The BSB is the one that is BOTH modern and free, which is why the
+ * readability improvement here costs nothing legally.
+ *
+ * The replaced provider served the World English Bible, whose 1901-derived
+ * English ("Yahweh", "Don't be dismayed") was the readability problem this
+ * change exists to fix. It is kept below as the fallback, because a public
+ * domain verse in older English is still far better than no verse at all.
+ */
+export const BSB_API_BASE = "https://bible.helloao.org/api/BSB";
+export const BSB_TRANSLATION = "BSB";
+
+/**
+ * The previous provider, kept as the second link in the chain.
+ *
+ * The BASE now, not the random endpoint: the fallback asks for the same curated
+ * reference the BSB was asked for. See `fetchWebBibleVerse`.
+ */
+export const BIBLE_API_URL = "https://bible-api.com";
 
 /**
  * Asked of QuoteSlate directly, rather than fetching anything and filtering
@@ -231,12 +263,127 @@ export async function fetchQuote(
     : new ProviderError("no quote provider answered");
 }
 
-/** A World English Bible verse, normalized. Throws `ProviderError` on anything unusable. */
+/**
+ * The Free Use Bible API's chapter shape.
+ *
+ * A chapter is a list of blocks: headings, verses, line breaks. A verse's
+ * `content` is an array because footnote markers and formatting runs arrive as
+ * their own entries; only the strings are text, and the rest is dropped.
+ */
+const bsbChapterSchema = z.object({
+  book: z.object({ commonName: z.string().min(1).optional(), name: z.string().min(1).optional() }),
+  chapter: z.object({
+    number: z.number().int().positive(),
+    content: z.array(
+      z.object({
+        type: z.string(),
+        number: z.number().int().positive().optional(),
+        content: z.array(z.unknown()).optional(),
+      }),
+    ),
+  }),
+});
+
+/**
+ * Pull the words out of one verse's content array.
+ *
+ * TWO shapes, and missing the second one is a bug a stubbed test cannot catch.
+ * PROSE arrives as plain strings. POETRY (the Psalms, Proverbs, Isaiah, and
+ * every other verse the API marks up with line breaks) arrives as objects
+ * carrying `{ text, poem }`. Reading only the strings silently returned an
+ * empty verse for every poetic reference, which is most of the curated list;
+ * a live fetch is what surfaced it.
+ *
+ * Everything without text is dropped: `{ noteId }` footnote markers and
+ * `{ lineBreak: true }` are structure, not words. Nothing here is ever
+ * stringified blindly, because `[object Object]` inside scripture is the kind
+ * of quiet corruption a verse must never suffer.
+ */
+function verseText(parts: readonly unknown[]): string {
+  const words: string[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      words.push(part);
+      continue;
+    }
+    if (part && typeof part === "object" && "text" in part) {
+      const value = (part as { text: unknown }).text;
+      if (typeof value === "string") words.push(value);
+    }
+  }
+  return words.join(" ");
+}
+
+/**
+ * A verse from the Berean Standard Bible: modern, readable, public domain.
+ *
+ * GoHa names the reference and the provider supplies the wording. The endpoint
+ * has no random-verse route, which turned out to be a feature rather than a
+ * gap: drawing at random from every verse in scripture surfaces genealogies and
+ * census figures far more often than encouragement, and this feature exists to
+ * encourage someone at the start of their day. See `verse-references.ts`.
+ *
+ * `avoidKeys` are references already shown inside the freshness window, so a
+ * retry after a rejection asks for a different verse instead of the same one.
+ */
 export async function fetchBibleVerse(
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = PROVIDER_TIMEOUT_MS,
+  options: {
+    avoidKeys?: ReadonlySet<string>;
+    random?: () => number;
+    /** An already-chosen reference, so a chain can ask both providers for it. */
+    reference?: VerseReference;
+  } = {},
 ): Promise<InspirationContent> {
-  const parsed = bibleApiSchema.safeParse(await getJson(BIBLE_API_URL, fetchImpl, timeoutMs));
+  const reference =
+    options.reference ??
+    pickReference(options.avoidKeys ?? new Set(), options.random ?? Math.random);
+  const url = `${BSB_API_BASE}/${reference.book}/${reference.chapter}.json`;
+
+  const parsed = bsbChapterSchema.safeParse(await getJson(url, fetchImpl, timeoutMs));
+  if (!parsed.success) throw new ProviderError("malformed bsb response");
+
+  const block = parsed.data.chapter.content.find(
+    (entry) => entry.type === "verse" && entry.number === reference.verse,
+  );
+  if (!block) throw new ProviderError(`bsb chapter is missing ${referenceKey(reference)}`);
+
+  const text = tidy(verseText(block.content ?? []));
+  if (text.length < MIN_TEXT_LENGTH) throw new ProviderError("verse too short");
+
+  const bookName = parsed.data.book.commonName ?? parsed.data.book.name ?? reference.book;
+  return {
+    type: "bible_verse",
+    text,
+    source: `${tidy(bookName)} ${reference.chapter}:${reference.verse}`,
+    translation: BSB_TRANSLATION,
+    provider: "bsb",
+  };
+}
+
+/**
+ * The same curated reference, in the World English Bible. The fallback link.
+ *
+ * Worth keeping because it is a different host with a different failure mode:
+ * when the BSB endpoint is down, this is the difference between a verse in
+ * older English and no verse at all. WEB is public domain and needs no credit.
+ *
+ * It asks for a REFERENCE, not for a random verse, which is the correction the
+ * live smoke test forced. Pointing the fallback at the random endpoint quietly
+ * reintroduced the exact problem this whole change exists to fix: with the BSB
+ * failing, mornings were being handed "the third part of a hin of wine" from
+ * Numbers. A fallback that abandons the curation is not a fallback for THIS
+ * feature. Conveniently, bible-api.com accepts the same USFM book ids.
+ */
+export async function fetchWebBibleVerse(
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = PROVIDER_TIMEOUT_MS,
+  reference?: VerseReference,
+): Promise<InspirationContent> {
+  const ref = reference ?? pickReference();
+  const url = `${BIBLE_API_URL}/${ref.book}+${ref.chapter}:${ref.verse}?translation=web`;
+  const parsed = bibleApiSchema.safeParse(await getJson(url, fetchImpl, timeoutMs));
   if (!parsed.success) throw new ProviderError("malformed bible response");
 
   // The endpoint has shipped both shapes; take whichever is present rather than
@@ -269,6 +416,39 @@ export async function fetchBibleVerse(
     translation: parsed.data.translation?.identifier?.toUpperCase() || "WEB",
     provider: "bible_api",
   };
+}
+
+/**
+ * A verse from the first provider that answers usefully.
+ *
+ * Same shape as `fetchQuote`: each provider gets one chance per call, and the
+ * resolver's retry loop decides whether to ask again. The BSB is first because
+ * it is what this feature is FOR; the WEB endpoint answers when it cannot.
+ */
+export async function fetchVerse(
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = PROVIDER_TIMEOUT_MS,
+  options: { avoidKeys?: ReadonlySet<string>; random?: () => number } = {},
+): Promise<InspirationContent> {
+  /*
+   * The reference is chosen ONCE, here, and both providers are asked for it.
+   *
+   * Letting the fallback pick its own would mean a BSB outage silently changed
+   * which verse the day got, and freshness would be steered for one provider
+   * and not the other.
+   */
+  const reference = pickReference(options.avoidKeys ?? new Set(), options.random ?? Math.random);
+  try {
+    return await fetchBibleVerse(fetchImpl, timeoutMs, { reference });
+  } catch (error) {
+    try {
+      return await fetchWebBibleVerse(fetchImpl, timeoutMs, reference);
+    } catch {
+      // The FIRST failure is the useful one to report: it names the provider
+      // this feature actually depends on.
+      throw error instanceof Error ? error : new ProviderError("no verse provider answered");
+    }
+  }
 }
 
 /** Whether content is short enough to survive a phone notification intact. */

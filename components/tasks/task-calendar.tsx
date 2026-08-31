@@ -131,7 +131,7 @@ export function TaskCalendar({
                 */}
                 <button
                   type="button"
-                  aria-label={`Add a task on ${cell.date}`}
+                  aria-label={`Add a to-do on ${cell.date}`}
                   onClick={() => onCreateOn(cell.date)}
                   className="absolute inset-0 z-0 cursor-pointer rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-[-2px] focus-visible:outline-blue/50"
                 />

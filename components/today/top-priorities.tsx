@@ -113,7 +113,7 @@ export function TopPriorities({
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         title="Pick a priority"
-        description="Choose a task to focus on today."
+        description="Choose a to-do to focus on today."
         layoutId={PICKER_LAYOUT_ID}
       >
         <div className="px-6 py-5">

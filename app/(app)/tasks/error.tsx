@@ -14,7 +14,7 @@ export default function TasksError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Tasks route error", error);
+    console.error("To-dos route error", error);
   }, [error]);
 
   return (

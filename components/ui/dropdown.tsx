@@ -42,12 +42,21 @@ export function Dropdown({
   trigger,
   items,
   align = "end",
+  side = "bottom",
   menuLabel,
   className,
 }: {
   trigger: ReactNode;
   items: DropdownItem[];
   align?: "start" | "end";
+  /**
+   * Which way the menu opens.
+   *
+   * `top` exists for triggers that sit at the bottom of the viewport, where a
+   * downward menu opens off-screen: the mobile tab bar's centre "+" is the case
+   * this was added for. Everything else keeps opening downward.
+   */
+  side?: "bottom" | "top";
   menuLabel?: string;
   className?: string;
 }) {
@@ -183,9 +192,12 @@ export function Dropdown({
             animate="visible"
             exit="exit"
             onKeyDown={onMenuKeyDown}
-            style={{ transformOrigin: align === "end" ? "top right" : "top left" }}
+            style={{
+              transformOrigin: `${side === "top" ? "bottom" : "top"} ${align === "end" ? "right" : "left"}`,
+            }}
             className={cn(
-              "glass-regular absolute top-full z-50 mt-2 min-w-52 overflow-hidden rounded-3xl p-2 shadow-e3",
+              "glass-regular absolute z-50 min-w-52 overflow-hidden rounded-3xl p-2 shadow-e3",
+              side === "top" ? "bottom-full mb-2" : "top-full mt-2",
               align === "end" ? "right-0" : "left-0",
             )}
           >

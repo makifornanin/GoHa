@@ -120,8 +120,8 @@ export function TaskMapsWorkspace({
           title="No task maps yet"
           description={
             isCompact
-              ? "Task maps let you sketch how tasks and ideas connect. Building one needs a bigger screen, so make your first map on a computer, then open it here to read it."
-              : "Task maps let you sketch how tasks and ideas connect. Create your first map to start building a branching flow."
+              ? "Task maps let you sketch how to-dos and ideas connect. Building one needs a bigger screen, so make your first map on a computer, then open it here to read it."
+              : "Task maps let you sketch how to-dos and ideas connect. Create your first map to start building a branching flow."
           }
           action={
             isCompact ? undefined : (

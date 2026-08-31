@@ -111,7 +111,13 @@ describe("providers are never reachable from the browser", () => {
       new Set([
         "https://quoteslate.vercel.app/api/quotes/random",
         "https://zenquotes.io/api/random",
-        "https://bible-api.com/data/web/random",
+        // The Berean Standard Bible: modern, readable, and public domain since
+        // 30 April 2023, so quoting it needs no licence and no key.
+        "https://bible.helloao.org/api/BSB",
+        // The previous provider, kept as the fallback link in the chain. The
+        // BASE, not the random endpoint: it is asked for the same curated
+        // reference the BSB was asked for.
+        "https://bible-api.com",
       ]),
     );
   });

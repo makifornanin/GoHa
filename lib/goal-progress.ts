@@ -12,7 +12,7 @@ import type { GoalProgressMode, GoalStatus } from "@/db/schema/enums";
  *     regardless of tasks or manual value. A completed goal is done.
  *
  *  2. MANUAL MODE (`progressMode = 'manual'`): progress is `manualProgress`
- *     (clamped to 0-100; null is treated as 0). Linked tasks do not affect it.
+ *     (clamped to 0-100; null is treated as 0). Linked to-dos do not affect it.
  *     This suits goals measured by a number, not a checklist (e.g. "save 6
  *     months of expenses"). Intentional changes are journaled in
  *     `goal_progress_updates`; the value is never recomputed on render.
@@ -35,9 +35,9 @@ import type { GoalProgressMode, GoalStatus } from "@/db/schema/enums";
 export type GoalTaskCounts = {
   /** All tasks linked to the goal, any status (including done and cancelled). */
   total: number;
-  /** Linked tasks with status `done`. */
+  /** Linked to-dos with status `done`. */
   completed: number;
-  /** Linked tasks with status `cancelled`. */
+  /** Linked to-dos with status `cancelled`. */
   cancelled: number;
 };
 

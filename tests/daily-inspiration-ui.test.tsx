@@ -1,5 +1,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+/*
+ * The card now carries the takeaway composer, which imports a Server Action.
+ * Under Next that import is replaced with a reference and the server module
+ * never reaches the browser; under Vitest it is followed for real, so the
+ * `server-only` guard fires. Mocked here the same way the worker tests do it.
+ */
+vi.mock("server-only", () => ({}));
 
 import { DailyInspirationCard } from "@/components/today/daily-inspiration-card";
 

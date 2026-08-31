@@ -12,8 +12,12 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { instantToZonedDateTimeInput, MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
+import { goalPickerOptions } from "@/lib/goal-tree";
+import { cn } from "@/lib/utils";
 import {
+  formatEstimate,
   TASK_DESCRIPTION_MAX,
+  TASK_ESTIMATE_OPTIONS,
   TASK_PRIORITY_ORDER,
   TASK_STATUS_ORDER,
   TASK_TITLE_MAX,
@@ -36,7 +40,12 @@ import {
  */
 const DEFAULT_DUE_CLOCK = "23:59";
 
-export type TaskGoalOption = { id: string; title: string };
+export type TaskGoalOption = {
+  id: string;
+  title: string;
+  parentGoalId: string | null;
+  isArchived?: boolean;
+};
 export type TaskLifeAreaOption = { id: string; name: string };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -45,6 +54,38 @@ function FieldError({ id, message }: { id: string; message?: string }) {
     <p id={id} className="mt-1 text-body-sm text-error">
       {message}
     </p>
+  );
+}
+
+/** One duration choice. A radio in behaviour, a chip in appearance. */
+function EstimateChip({
+  selected,
+  onSelect,
+  disabled,
+  label,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "touch-target cursor-pointer rounded-lg border px-3 text-callout transition-colors",
+        selected
+          ? "border-blue bg-blue/10 font-medium text-blue"
+          : "border-separator-opaque text-label-secondary hover:border-blue/40 hover:text-label",
+        disabled && "pointer-events-none opacity-50",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -62,8 +103,10 @@ type FormProps = {
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
-  /** Preselected goal for a new task (e.g. "Add task" from a goal's details). */
+  /** Preselected goal for a new to-do (e.g. "+ Add > To-do" inside a goal). */
   defaultGoalId?: string;
+  /** Preselected life area, inherited from the goal or the area in view. */
+  defaultLifeAreaId?: string;
   /** The user's saved timezone: due-at wall-clock times are shown/read in it. */
   timeZone?: string;
   /** Their saved week start, so the date picker's week matches theirs. */
@@ -80,6 +123,7 @@ function TaskFormFields({
   lifeAreas,
   defaultScheduledFor,
   defaultGoalId,
+  defaultLifeAreaId,
   timeZone = MANILA_TZ,
   weekStartsOn = 1,
   onSubmit,
@@ -92,7 +136,9 @@ function TaskFormFields({
   const [title, setTitle] = useState(() => task?.title ?? "");
   const [description, setDescription] = useState(() => task?.description ?? "");
   const [goalId, setGoalId] = useState(() => task?.goalId ?? defaultGoalId ?? "");
-  const [lifeAreaId, setLifeAreaId] = useState(() => task?.lifeAreaId ?? "");
+  const [lifeAreaId, setLifeAreaId] = useState(
+    () => task?.lifeAreaId ?? defaultLifeAreaId ?? "",
+  );
   const [status, setStatus] = useState<TaskStatus>(() => task?.status ?? "todo");
   const [priority, setPriority] = useState<Priority>(() => task?.priority ?? "medium");
   const [scheduledFor, setScheduledFor] = useState(
@@ -116,6 +162,9 @@ function TaskFormFields({
    * 29th" means to a person.
    */
   const existingDue = instantToZonedDateTimeInput(task?.dueAt, timeZone);
+  const [estimateMinutes, setEstimateMinutes] = useState(
+    () => (task?.estimateMinutes != null ? String(task.estimateMinutes) : ""),
+  );
   const [dueDate, setDueDate] = useState(() => existingDue.slice(0, 10));
   const [dueClock] = useState(() => (existingDue ? existingDue.slice(11, 16) : DEFAULT_DUE_CLOCK));
 
@@ -140,6 +189,7 @@ function TaskFormFields({
        */
       scheduledTime: scheduledFor ? scheduledTime : "",
       dueAt: dueDate ? `${dueDate}T${dueClock}` : "",
+      estimateMinutes,
     };
   }
 
@@ -244,7 +294,9 @@ function TaskFormFields({
             disabled={submitting}
             options={[
               { value: "", label: "No goal" },
-              ...goals.map((goal) => ({ value: goal.id, label: goal.title })),
+              // Subgoals read as "Find a new job > Finish resume", so a to-do
+              // can be filed against a milestone on purpose.
+              ...goalPickerOptions(goals, goalId || task?.goalId).map((g) => ({ value: g.id, label: g.label })),
             ]}
           />
           <FieldError id="task-goal-error" message={fieldErrors.goalId} />
@@ -300,12 +352,50 @@ function TaskFormFields({
         </div>
       </div>
 
+      <div>
+        <Label htmlFor="task-estimate">
+          How long will this take? <span className="text-outline">(optional)</span>
+        </Label>
+        {/*
+          A short ladder, not a number field.
+
+          The column has existed since the first migration and nothing ever
+          wrote to it, because there was no control. The Day Planner needs this
+          value and needs it to be honest, so "Not sure" is a real answer rather
+          than a default of zero: the planner would rather ask later than add up
+          a number nobody chose.
+        */}
+        <div
+          id="task-estimate"
+          role="radiogroup"
+          aria-label="Estimated time"
+          className="flex flex-wrap gap-1.5"
+        >
+          <EstimateChip
+            selected={estimateMinutes === ""}
+            onSelect={() => setEstimateMinutes("")}
+            disabled={submitting}
+            label="Not sure"
+          />
+          {TASK_ESTIMATE_OPTIONS.map((minutes) => (
+            <EstimateChip
+              key={minutes}
+              selected={estimateMinutes === String(minutes)}
+              onSelect={() => setEstimateMinutes(String(minutes))}
+              disabled={submitting}
+              label={formatEstimate(minutes) ?? ""}
+            />
+          ))}
+        </div>
+        <FieldError id="task-estimate-error" message={fieldErrors.estimateMinutes} />
+      </div>
+
       <div className="mt-1 flex items-center justify-end gap-3 border-t border-outline-variant pt-4">
         <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
           Cancel
         </Button>
         <Button type="submit" loading={submitting}>
-          {mode === "create" ? "Create task" : "Save changes"}
+          {mode === "create" ? "Create to-do" : "Save changes"}
         </Button>
       </div>
     </form>
@@ -321,6 +411,7 @@ export function TaskFormModal({
   lifeAreas,
   defaultScheduledFor,
   defaultGoalId,
+  defaultLifeAreaId,
   timeZone,
   weekStartsOn,
   onSubmit,
@@ -332,8 +423,10 @@ export function TaskFormModal({
   goals: TaskGoalOption[];
   lifeAreas: TaskLifeAreaOption[];
   defaultScheduledFor?: string;
-  /** Preselected goal for a new task (e.g. "Add task" from a goal's details). */
+  /** Preselected goal for a new to-do (e.g. "+ Add > To-do" inside a goal). */
   defaultGoalId?: string;
+  /** Preselected life area, inherited from the goal or the area in view. */
+  defaultLifeAreaId?: string;
   timeZone?: string;
   /** The user's saved week start, so the picker's week matches theirs. */
   weekStartsOn?: Weekday;
@@ -346,7 +439,7 @@ export function TaskFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === "create" ? "New task" : "Edit task"}
+      title={mode === "create" ? "New to-do" : "Edit to-do"}
       description={
         mode === "create" ? "Capture what needs doing and when." : undefined
       }
@@ -360,6 +453,7 @@ export function TaskFormModal({
         lifeAreas={lifeAreas}
         defaultScheduledFor={defaultScheduledFor}
         defaultGoalId={defaultGoalId}
+        defaultLifeAreaId={defaultLifeAreaId}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
         onSubmit={onSubmit}

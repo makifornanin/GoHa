@@ -2,7 +2,6 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
-  Brain,
   CornerDownLeft,
   ListChecks,
   Moon,
@@ -20,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { loadCommandIndexAction, type CommandTarget } from "@/app/(app)/search-actions";
+import { addHrefFor, addOptionsFor } from "@/lib/add-menu";
 import { primaryNav } from "@/lib/nav";
 import { spring } from "@/lib/motion";
 import { useMounted } from "@/lib/use-mounted";
@@ -142,29 +142,32 @@ export function CommandPalette() {
   );
 
   const commands = useMemo<Command[]>(() => {
+    /*
+     * Everything the "+ Add" menu offers, from the same source.
+     *
+     * The palette used to know how to create exactly one thing, a task, which
+     * left the keyboard route agreeing with the old sidebar button rather than
+     * with the product: someone who typed "goal" got navigation to the board
+     * and no way to start one. `addOptionsFor` is the single list, so a new
+     * creatable kind appears here without anyone remembering to add it.
+     */
+    const createActions: Command[] = addOptionsFor("root").map((option) => ({
+      id: `action-new-${option.kind}`,
+      label: `New ${option.label.toLowerCase()}`,
+      hint: option.hint,
+      group: "Actions" as const,
+      icon: Plus,
+      run: () => go(addHrefFor(option.kind)),
+    }));
+
     const actions: Command[] = [
-      {
-        id: "action-new-task",
-        label: "New task",
-        hint: "Open the task form",
-        group: "Actions",
-        icon: Plus,
-        run: () => go("/tasks?new=1"),
-      },
+      ...createActions,
       {
         id: "action-focus",
         label: "Start a focus session",
         group: "Actions",
         icon: Timer,
         run: () => go("/focus"),
-      },
-      {
-        id: "action-capture",
-        label: "Capture a thought",
-        hint: "Brain Dump",
-        group: "Actions",
-        icon: Brain,
-        run: () => go("/brain-dump"),
       },
       {
         id: "action-theme",
@@ -290,7 +293,7 @@ export function CommandPalette() {
                   setQuery(e.target.value);
                   setActiveIndex(0);
                 }}
-                placeholder="Search tasks, goals, or jump to a screen..."
+                placeholder="Search to-dos, goals, or jump to a screen..."
                 aria-label="Search commands"
                 // Combobox semantics. The keyboard already worked; a screen
                 // reader had no way to know the list existed or which row the

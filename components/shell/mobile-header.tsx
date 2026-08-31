@@ -9,7 +9,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
 import { fade, spring } from "@/lib/motion";
 import { useMounted } from "@/lib/use-mounted";
-import { primaryNav, type NavUser } from "@/lib/nav";
+import { navGroups, type NavUser } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 import { Brand } from "./brand";
@@ -82,15 +82,27 @@ export function MobileHeader({ className, user }: { className?: string; user: Na
                 <X />
               </Button>
             </div>
+            {/* The same groups the sidebar uses, from the same source, so the
+                app does not describe itself one way on a laptop and another on
+                a phone. */}
             <nav className="-mr-2 flex-1 overflow-y-auto pr-2" aria-label="Primary">
-              <ul className="flex flex-col gap-0.5">
-                {primaryNav.map((item) => (
-                  <li key={item.href}>
-                    <NavLink
-                      item={item}
-                      indicatorId="drawer-active-indicator"
-                      onNavigate={() => setOpen(false)}
-                    />
+              <ul className="flex flex-col gap-4">
+                {navGroups.map((group) => (
+                  <li key={group.label}>
+                    <h2 className="px-3 pb-1.5 text-footnote font-medium uppercase tracking-wide text-label-tertiary">
+                      {group.label}
+                    </h2>
+                    <ul className="flex flex-col gap-0.5">
+                      {group.items.map((item) => (
+                        <li key={item.href}>
+                          <NavLink
+                            item={item}
+                            indicatorId="drawer-active-indicator"
+                            onNavigate={() => setOpen(false)}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ul>

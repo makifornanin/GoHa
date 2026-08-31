@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
   CalendarClock,
+  Hourglass,
   ListChecks,
   MoreHorizontal,
   Play,
@@ -103,6 +104,7 @@ export function TodayView({
   weekStartsOn = 1,
   quote = null,
   inspiration = null,
+  takeaway = null,
   sabbath = null,
 }: {
   userName: string;
@@ -131,6 +133,8 @@ export function TodayView({
    * persisted server-side. The Morning Brief payload carries this same record.
    */
   inspiration?: DailyInspirationView | null;
+  /** What this reader already wrote about today's inspiration, if anything. */
+  takeaway?: string | null;
   /** Set on the owner's rest day (Guide 07, phase 4). */
   sabbath?: { message: string } | null;
 }) {
@@ -239,8 +243,9 @@ export function TodayView({
   }
 
   const taskMenu: DropdownItem[] = [
+    { label: "Plan my day", icon: Hourglass, onSelect: () => router.push("/planner") },
     { label: "View all to-dos", icon: ListChecks, onSelect: () => router.push("/tasks") },
-    { label: "New task with details", icon: CalendarClock, onSelect: () => router.push("/tasks?new=1") },
+    { label: "New to-do with details", icon: CalendarClock, onSelect: () => router.push("/tasks?new=1") },
     { type: "separator" },
     { label: "Start a focus session", icon: Play, onSelect: () => router.push("/focus") },
   ];
@@ -347,9 +352,9 @@ export function TodayView({
                     </span>
                     <Dropdown
                       align="end"
-                      menuLabel="Today's tasks options"
+                      menuLabel="Today's to-dos options"
                       trigger={
-                        <Button variant="ghost" size="icon" aria-label="Today's tasks options">
+                        <Button variant="ghost" size="icon" aria-label="Today's to-dos options">
                           <MoreHorizontal />
                         </Button>
                       }
@@ -359,9 +364,26 @@ export function TodayView({
                 </CardHeader>
                 <CardContent className="px-1 pb-2">
                   {data.todayTasks.length === 0 ? (
-                    <p className="mx-3 mb-3 rounded-xl bg-surface-secondary px-4 py-6 text-center text-callout text-label-secondary">
-                      Nothing scheduled for today yet.
-                    </p>
+                    /*
+                     * An empty day is a question, so answer it.
+                     *
+                     * "Nothing scheduled" told the truth and then stopped,
+                     * leaving the reader to work out for themselves where a
+                     * day comes from. The Day Planner is the answer, and this
+                     * is the moment it is worth knowing about.
+                     */
+                    <div className="mx-3 mb-3 rounded-xl bg-surface-secondary px-4 py-6 text-center">
+                      <p className="text-callout text-label-secondary">
+                        Nothing on today yet.
+                      </p>
+                      <Link
+                        href="/planner"
+                        className="touch-target mt-1.5 inline-flex items-center gap-1.5 text-callout font-medium text-blue hover:underline"
+                      >
+                        <Hourglass className="size-4" aria-hidden />
+                        Plan your day
+                      </Link>
+                    </div>
                   ) : (
                     <div className="flex flex-col">
                       <AnimatePresence initial={false}>
@@ -398,7 +420,7 @@ export function TodayView({
                     </div>
                   )}
 
-                  {/* Add tasks where they appear, not in a distant footer. */}
+                  {/* Add to-dos where they appear, not in a distant footer. */}
                   <div className="px-2 pt-2">
                     <QuickAddTask today={today} />
                   </div>
@@ -464,7 +486,7 @@ export function TodayView({
                     <h3 className="text-headline text-label">Today&apos;s Progress</h3>
                     <p className="mt-1 font-mono text-footnote tabular-nums text-label-secondary">
                       {data.totalToday === 0
-                        ? "No tasks scheduled today."
+                        ? "No to-dos scheduled today."
                         : `${data.completedToday} of ${data.totalToday} tasks done`}
                     </p>
                   </div>
@@ -477,7 +499,9 @@ export function TodayView({
                   day the SabbathBanner above already carries a rest-themed line,
                   so showing this too would put two pieces of inspiration on one
                   screen. */}
-              {sabbath ? null : <DailyInspirationCard inspiration={inspiration} />}
+              {sabbath ? null : (
+                <DailyInspirationCard inspiration={inspiration} takeaway={takeaway} />
+              )}
 
               <ActiveGoalsCard goals={data.activeGoals} />
 
@@ -534,7 +558,7 @@ function EmptyDay() {
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         <Link href="/tasks" className={buttonVariants({ size: "default" })}>
           <ListChecks className="size-4" aria-hidden />
-          Plan a task
+          Plan a to-do
         </Link>
         <Link href="/goals" className={buttonVariants({ variant: "secondary", size: "default" })}>
           Set a goal

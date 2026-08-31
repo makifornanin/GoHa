@@ -48,11 +48,22 @@ function codeLines(file: string): { line: string; n: number }[] {
     .split(/\r?\n/)
     .forEach((line, i) => {
       const t = line.trim();
-      if (t.startsWith("*") || t.startsWith("//")) return;
+      /*
+       * The block check MUST come first.
+       *
+       * A JSDoc closes with a line whose trimmed form is `*​/`, which also
+       * starts with `*`. With the startsWith test first, that line returned
+       * early and `inBlock` was never cleared, so EVERY line after the first
+       * JSDoc in a file was treated as comment and dropped. Guards asserting
+       * that some code exists then passed or failed on an almost empty string.
+       * Found when a new guard could not see an attribute that was plainly
+       * there.
+       */
       if (inBlock) {
         if (t.includes("*/")) inBlock = false;
         return;
       }
+      if (t.startsWith("*") || t.startsWith("//")) return;
       if (/^\{?\/\*/.test(t)) {
         if (!t.includes("*/")) inBlock = true;
         return;
@@ -117,6 +128,11 @@ describe("white text never sits on the accent blue", () => {
         "components/focus/focus-view.tsx",
         "components/goals/goals-view.tsx",
         "components/celebration.tsx",
+        // The mobile "+" FAB. It is ICON-ONLY (aria-label plus a <Plus/>), so
+        // the 3:1 graphic threshold applies and --blue clears it. It lived in
+        // mobile-bottom-nav.tsx, which is exempt just above for this same
+        // reason; the "+ Add" work moved it here, so the exemption moved too.
+        "components/shell/add-menu.tsx",
       ]),
     ).toEqual([]);
   });
@@ -145,26 +161,39 @@ describe("the 44px rule is structural", () => {
 });
 
 describe("one primary create action in the chrome", () => {
-  it("keeps Add Task out of the global top bar", () => {
+  it("keeps a create button out of the global top bar", () => {
     /*
-     * The sidebar's "New Task" sits about 78px below that bar, so a second one
-     * put two near-identical primary buttons in one viewport, and /tasks added
-     * a third in its page header.
+     * The sidebar's create button sits about 78px below that bar, so a second
+     * one put two near-identical primary buttons in one viewport, and /tasks
+     * added a third in its page header.
      */
     // Comments in that file explain the removal, so assert on CODE only.
     const code = codeLines(join(ROOT, "components/shell/app-header.tsx"))
       .map((l) => l.line)
       .join(String.fromCharCode(10));
-    expect(code).not.toContain("Add Task");
+    expect(code).not.toContain("AddMenu");
+    expect(code).not.toContain("Add to-do");
   });
 
   it("keeps every deliberate alternative path", () => {
+    /*
+     * Same guarantee as before the "+ Add" work, restated in its terms: every
+     * route to creating something still exists. The shell and the tab bar go
+     * through the shared menu; the pages that are ABOUT one kind of record keep
+     * their direct button, because a menu of one is a wasted click.
+     */
     const paths: [string, string][] = [
-      ["components/shell/app-sidebar.tsx", "New Task"],
-      ["components/tasks/tasks-view.tsx", "Add Task"],
-      ["components/shell/mobile-bottom-nav.tsx", "Add a task"],
-      ["components/shell/command-palette.tsx", "New task"],
-      ["components/tasks/task-calendar.tsx", "Add a task on"],
+      ["components/shell/app-sidebar.tsx", "AddMenu"],
+      ["components/shell/mobile-bottom-nav.tsx", "AddMenuFab"],
+      ["components/shell/command-palette.tsx", "addOptionsFor"],
+      // The goals board uses a DIRECT button, not the shared menu: the
+      // sidebar already carries a root-context Add a few pixels away, and
+      // two identical menus in one viewport is the duplication this whole
+      // rule exists to prevent.
+      ["components/goals/goals-view.tsx", "Add goal"],
+      ["components/goals/goal-detail-view.tsx", "AddMenu"],
+      ["components/tasks/tasks-view.tsx", "Add to-do"],
+      ["components/tasks/task-calendar.tsx", "Add a to-do on"],
     ];
     for (const [file, needle] of paths) {
       expect(readFileSync(join(ROOT, file), "utf8"), file).toContain(needle);
@@ -172,10 +201,54 @@ describe("one primary create action in the chrome", () => {
   });
 
   it("still reopens the create form when the URL asks again", () => {
-    // The soft-navigation fix: `useState` is an initializer and runs once.
-    expect(readFileSync(join(ROOT, "components/tasks/tasks-view.tsx"), "utf8")).toContain(
-      "lastCreateSignal",
-    );
+    /*
+     * The soft-navigation fix: `useState` is an initializer and runs once, so a
+     * prop that is still true after a soft navigation opens nothing.
+     *
+     * It now lives in ONE hook rather than being retyped per screen, which is
+     * the point: four surfaces answer `?new=1` since "+ Add" can send the user
+     * to any of them, and a re-implementation from memory loses either this fix
+     * or the parameter-spending one below.
+     */
+    const hook = readFileSync(join(ROOT, "lib/use-create-signal.ts"), "utf8");
+    expect(hook).toContain("lastCreateSignal");
+    // And it spends the parameter, or pressing Add twice does nothing.
+    expect(hook).toContain('params.delete("new")');
+
+    for (const file of [
+      "components/tasks/tasks-view.tsx",
+      "components/goals/goals-view.tsx",
+      "components/habits/habits-view.tsx",
+    ]) {
+      expect(readFileSync(join(ROOT, file), "utf8"), file).toContain("useCreateSignal");
+    }
+  });
+});
+
+describe("revealed inputs are focused by the commit, not by a frame", () => {
+  /*
+   * The subtask composer used `requestAnimationFrame` to focus the input it had
+   * just revealed. That is a wall clock, and the state update that mounts the
+   * input also unmounts the button that was clicked, so between the click and
+   * the frame NOTHING is focused: keystrokes land on `document.body` and vanish,
+   * and an Escape never reaches the composer's handler so it closes the panel.
+   *
+   * In jsdom `requestAnimationFrame` is a plain 60Hz interval, so a loaded test
+   * suite stretched that window past the typing. It read as corrupted input
+   * ("Second step" arriving as "ond step") rather than as a focus bug, and it
+   * was the entire cause of tests/subtask-composer.test.tsx being flaky.
+   *
+   * Proven, not assumed: with the frame deliberately starved to 250ms the old
+   * code failed 5 of 14 tests, including both the reported ones, and the fixed
+   * code passed 14/14.
+   */
+  it("does not focus the subtask composer from an animation frame", () => {
+    const code = codeLines(join(ROOT, "components/tasks/task-detail-panel.tsx"))
+      .map((l) => l.line)
+      .join(String.fromCharCode(10));
+    expect(code).not.toContain("requestAnimationFrame");
+    // The replacement: React applies this during the host mount.
+    expect(code).toContain("autoFocus");
   });
 });
 

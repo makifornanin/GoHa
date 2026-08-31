@@ -73,12 +73,24 @@ type FormProps = {
   habit?: HabitWithSchedule | null;
   lifeAreas: HabitLifeAreaOption[];
   goals: HabitGoalOption[];
+  defaultGoalId?: string | null;
+  defaultLifeAreaId?: string | null;
   onSubmit: (values: HabitFormInput) => Promise<ActionResult<Habit>>;
   onClose: () => void;
   nameRef: React.RefObject<HTMLInputElement | null>;
 };
 
-function HabitFormFields({ mode, habit, lifeAreas, goals, onSubmit, onClose, nameRef }: FormProps) {
+function HabitFormFields({
+  mode,
+  habit,
+  lifeAreas,
+  goals,
+  defaultGoalId,
+  defaultLifeAreaId,
+  onSubmit,
+  onClose,
+  nameRef,
+}: FormProps) {
   const [name, setName] = useState(() => habit?.name ?? "");
   const [description, setDescription] = useState(() => habit?.description ?? "");
   const [type, setType] = useState<(typeof HABIT_TYPE_VALUES)[number]>(() => habit?.type ?? "boolean");
@@ -90,8 +102,10 @@ function HabitFormFields({ mode, habit, lifeAreas, goals, onSubmit, onClose, nam
   const [higherIsBetter, setHigherIsBetter] = useState(() => habit?.higherIsBetter ?? true);
   const [color, setColor] = useState<LifeAreaColorKey>(() => toColorKey(habit?.color));
   const [icon, setIcon] = useState<LifeAreaIconKey>(() => toIconKey(habit?.icon));
-  const [lifeAreaId, setLifeAreaId] = useState(() => habit?.lifeAreaId ?? "");
-  const [goalId, setGoalId] = useState(() => habit?.goalId ?? "");
+  const [lifeAreaId, setLifeAreaId] = useState(
+    () => habit?.lifeAreaId ?? defaultLifeAreaId ?? "",
+  );
+  const [goalId, setGoalId] = useState(() => habit?.goalId ?? defaultGoalId ?? "");
   const [scheduleType, setScheduleType] = useState<HabitScheduleType>(() => scheduleTypeOf(habit));
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(() => habit?.schedule?.daysOfWeek ?? [1, 3, 5]);
   const [timesPerWeek, setTimesPerWeek] = useState(() => habit?.schedule?.timesPerPeriod ?? 3);
@@ -391,6 +405,8 @@ export function HabitFormModal({
   habit,
   lifeAreas,
   goals,
+  defaultGoalId,
+  defaultLifeAreaId,
   onSubmit,
   onClose,
 }: {
@@ -399,6 +415,9 @@ export function HabitFormModal({
   habit?: HabitWithSchedule | null;
   lifeAreas: HabitLifeAreaOption[];
   goals: HabitGoalOption[];
+  /** Preselected links when "+ Add > Habit" was opened from inside a goal. */
+  defaultGoalId?: string | null;
+  defaultLifeAreaId?: string | null;
   onSubmit: (values: HabitFormInput) => Promise<ActionResult<Habit>>;
   onClose: () => void;
 }) {
@@ -417,6 +436,8 @@ export function HabitFormModal({
         habit={habit}
         lifeAreas={lifeAreas}
         goals={goals}
+        defaultGoalId={defaultGoalId}
+        defaultLifeAreaId={defaultLifeAreaId}
         onSubmit={onSubmit}
         onClose={onClose}
         nameRef={nameRef}

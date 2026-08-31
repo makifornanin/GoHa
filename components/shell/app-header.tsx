@@ -43,9 +43,9 @@ export function AppHeader({ className }: { className?: string }) {
         <span className="hidden lg:inline">Focus Mode</span>
       </Button>
       {/*
-        No "Add Task" here.
+        No create button here.
 
-        The sidebar's "New Task" is the global create affordance and sits about
+        The sidebar's "+ Add" is the global create affordance and sits about
         78px below this bar in the same chrome, so a second one made two
         near-identical primary buttons compete inside one viewport; on /tasks
         the page header added a third. Creating a task is still reachable from

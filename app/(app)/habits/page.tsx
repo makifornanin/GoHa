@@ -7,10 +7,17 @@ import { getUserDatePrefs } from "@/lib/user-settings";
 
 export const metadata = { title: "Habits" };
 
-export default async function HabitsPage() {
+export default async function HabitsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string; goalId?: string; lifeAreaId?: string }>;
+}) {
   // Identity from the session; every query is user-scoped in the repositories.
   const user = await requireUser();
-  const { timeZone, weekStartsOn } = await getUserDatePrefs(user.id);
+  const [{ timeZone, weekStartsOn }, { new: newParam, goalId, lifeAreaId }] = await Promise.all([
+    getUserDatePrefs(user.id),
+    searchParams,
+  ]);
   const today = zonedToday(new Date(), timeZone);
 
   const [habits, entries, lifeAreas, goals] = await Promise.all([
@@ -33,6 +40,12 @@ export default async function HabitsPage() {
         today={today}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
+        // `?new=1` opens the create form straight away, so "+ Add > Habit"
+        // actually opens a form. Ownership of the prefilled ids is re-checked
+        // server-side on submit.
+        openCreateOnMount={newParam === "1"}
+        defaultGoalId={goalId}
+        defaultLifeAreaId={lifeAreaId}
       />
     </>
   );

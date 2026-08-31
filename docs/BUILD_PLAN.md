@@ -216,6 +216,128 @@ What the guards can and cannot see:
 
 ## Change log
 
+### 2026-08-31: V1 product and UX pass, the chain made visible
+
+The last major product pass before the V1 freeze. One coordinated change rather
+than a set of patches: the app had every part of Life Area -> Goal -> Subgoal ->
+To-do -> Subtask in the schema and almost none of it on screen.
+
+**Goal hierarchy.** Goal and Subgoal were the same table AND the same UI: one
+flat grid rendered parents and children as identical cards whose only relation
+was a small "Part of" line, so breaking a goal down properly made the board grow
+by four cards and read as four unrelated ambitions. The board now shows goals
+only, with their subgoals as an indented milestone list inside the card, and
+opening one goes to a real page at `/goals/[goalId]` with a breadcrumb, its
+milestones, its next actions, its habits and its recent progress. `lib/goal-tree.ts`
+owns every hierarchy rule (ancestors, descendants, depth, eligible parents) so
+no surface re-derives them.
+
+**Two real bugs found in the existing hierarchy code:**
+1. `listGoalsWithTaskCounts` counted only to-dos whose `goal_id` IS the goal, so
+   a parent whose work lived under its subgoals read 0% forever. Doing the right
+   thing made a goal look abandoned. Progress now rolls up through the tree.
+2. The archive dialog said "Sub-goals are archived with it" and `archiveGoal`
+   updated one row, leaving orphan cards pointing at a goal that was no longer
+   anywhere. Archiving now covers the descendants, resolved from the caller's
+   own goals and scoped again in the repository.
+
+**Navigation.** Twelve flat links became five verb-named groups (Plan / Do /
+Capture / Review / Account), shared by the sidebar and the mobile drawer from
+one source. The tab bar carries one destination per phase of the loop.
+
+**Universal Add.** "New Task" named the LAST rung of the chain as the only thing
+startable from the shell. `+ Add` asks the context what can be created and
+prefills the parents that context already established: inside a goal it offers
+Subgoal / To-do / Habit; inside a subgoal only To-do; inside a to-do only
+Subtask. A one-option context renders a labelled button, not a menu. The four
+screens that answer `?new=1` share `lib/use-create-signal.ts`, which carries
+both non-obvious parts (a soft navigation does not re-fire an initializer; the
+parameter must be spent or the second press does nothing).
+
+**Day Planner (`/planner`, migration 0021).** A capacity tool, deliberately not
+a calendar: no hour grid, no start times. 24 hours split into categories that
+are either Life-Area-backed (GoHa suggests real work for them) or planner-only
+(Sleep, Commute, Free time reserve capacity and are never offered to-dos). Two
+rules are structural rather than advisory: GoHa never invents a duration, so an
+unestimated to-do shows "?" and accepting it asks how long; and nothing reaches
+Today until the user confirms, at which point the ONLY write is `scheduled_for`
+on the real task rows, so a committed plan appears through the same derivation
+as everything else.
+
+`tasks.estimate_minutes` has existed since migration 0000 with no way to write
+to it: no Zod field, no control, no render. It now has both, which is what made
+the planner's arithmetic possible without a migration.
+
+**Daily Inspiration (Berean Standard Bible).** The World English Bible's
+1901-derived English was the readability problem. The BSB was placed in the
+PUBLIC DOMAIN on 30 April 2023 and the Free Use Bible API serves it with no key,
+no rate limit and no copyright restriction, so the readability improvement costs
+nothing legally and adds no paid dependency. GoHa now chooses the reference from
+a curated list of 67 and the provider supplies the wording, which is both safer
+(no scripture is ever typed from memory) and better content than a random draw
+over 31,086 verses.
+
+A live smoke test caught a bug the unit tests could not: prose verses arrive as
+strings, POETRY verses (Psalms, Proverbs, Isaiah, Lamentations, over half the
+list) arrive as `{ text, poem }` objects. Reading only strings returned an EMPTY
+verse and fell silently through to a random WEB verse, so mornings were being
+served census figures from Numbers. Fixed, regression-tested against the real
+shape, and all 67 references verified against the live API.
+
+**Takeaways (migration 0022).** One note per user per day about the day's
+inspiration, in its own table so `daily_inspirations` keeps its never-rewritten
+promise. Stored verbatim; nothing rewrites, summarises or improves it. Written
+on Today, read back in the weekly Review.
+
+**Onboarding.** Five screens that teach the MODEL rather than listing features.
+The two hierarchy screens use a worked example (Career -> Find a new job ->
+Finish my resume -> Rewrite the experience section), because "a goal is a
+meaningful outcome" teaches nothing and three concrete lines teach everything.
+
+**Smart Notifications audit. Two real defects, both fixed:**
+1. The anti-repeat never worked. `completeWorkerJob` snapshots the job row
+   BEFORE `prepareWorkerJob` runs, and preparing a smart reminder is what
+   CHOOSES its anchor and writes it. `notification_log.entity_id` was therefore
+   null for every reminder, `previousAnchorId` always read null, and all four of
+   a day's nudges named the same top-ranked to-do while others waited. Prepare
+   now returns the anchor it chose. No change to volume, timing, tone, payload
+   shape or the n8n contract.
+2. Smart reminders need a window between the two Daily Rhythm times. With those
+   unset, or set too close together, no slot is ever queued: the switch read
+   "on" and the feature was inert, with nothing on screen saying so. Settings
+   now calls the SAME `smartReminderWindow` the worker uses.
+
+**Terminology.** `docs/TERMINOLOGY.md` is the new tiebreaker: Life Area, Goal,
+Subgoal, To-do, Subtask, Habit. Applied across 31 files. Task Map and Smart Task
+Reminders are documented exceptions (a proper noun, and a name that crosses a
+boundary GoHa does not control). Two rules were added to the consistency sweep
+so it cannot half-drift back, and one of them immediately caught a "Task" label
+the string sweep had missed.
+
+- Key files: `lib/goal-tree.ts`, `lib/planner.ts`, `lib/add-menu.ts`,
+  `lib/use-create-signal.ts`, `lib/inspiration/verse-references.ts`,
+  `db/schema/planner.ts`, `db/repositories/planner.ts`,
+  `app/(app)/planner/*`, `app/(app)/goals/[goalId]/*`,
+  `components/planner/planner-view.tsx`, `components/goals/goal-detail-view.tsx`,
+  `components/shell/add-menu.tsx`, `components/ui/breadcrumbs.tsx`,
+  `components/today/takeaway-composer.tsx`, `docs/TERMINOLOGY.md`.
+- Migrations: `0021_day_planner` (3 tables, 1 enum), `0022_inspiration_takeaways`
+  (1 table). Both purely additive, both documented with rollback notes.
+  NEITHER APPLIED: the live database still has 30 tables, so `/planner` and
+  `/today` will fail against it until `pnpm db:migrate` is run with the
+  `neondb_owner` connection string.
+- Verification: `tsc --noEmit` clean, ESLint clean, consistency sweep clean
+  across 267 files, `drizzle-kit check` clean, Vitest 997/997 in isolation,
+  `next build` compiled successfully with 41 routes and no warnings. Route
+  probe against `next start`: every `(app)` route 307s to /login unauthenticated,
+  `/login` 200, `/api/health` ok, no server errors logged.
+- Known: `tests/subtask-composer.test.tsx` and `tests/automation-card.test.tsx`
+  flake under full-suite parallel load. Verified PRE-EXISTING by stashing the
+  component and reproducing on the original; both pass in isolation, repeatedly.
+- Not done: authenticated browser QA of the new surfaces, which needs the two
+  migrations applied first.
+
+
 ### 2026-08-27: Accessibility and consistency remediation
 - Goals was the last native `<input type="date">`, missed by two earlier rounds of exactly this work. It now uses the shared `DateField` with week presets, and the goals page threads the saved timezone and week start through so "today" is the user's today. Zero native date or time inputs remain outside the two shared primitives.
 - Contrast is now measured, not assumed. `--label-secondary` at 0.6 measured 3.44:1 on surface and 3.29:1 on canvas: it FAILED AA everywhere and is the token most secondary copy uses, which the first QA pass had not spotted. Raised to 0.75 light (5.15:1 / 4.82:1); dark was already clear at 0.6 and moved to 0.68 to clear the fill overlays. `--label-tertiary` went 0.3 -> 0.6 light and 0.3 -> 0.5 dark; at 0.3 it measured 1.72:1 while carrying whole sentences.

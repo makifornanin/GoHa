@@ -1,7 +1,7 @@
 import type { GoalWithCounts } from "@/db/repositories/goals";
 import type { DailyPriority, Task } from "@/db";
 import type { IsoDate } from "@/lib/date";
-import { calculateGoalProgress } from "@/lib/goal-progress";
+import { goalProgressBreakdown } from "@/lib/goal-tree";
 import { taskEffectiveDate } from "@/lib/task-buckets";
 import { taskPriorityConfig } from "@/lib/tasks";
 
@@ -20,7 +20,7 @@ export type TodayData = {
   todayTasks: Task[];
   /** Active tasks whose effective date is before today. */
   overdueTasks: Task[];
-  /** Today's tasks completed so far / total scheduled today (excludes cancelled). */
+  /** Today's to-dos completed so far / total scheduled today (excludes cancelled). */
   completedToday: number;
   totalToday: number;
   completionPercent: number;
@@ -82,16 +82,20 @@ export function deriveTodayData(params: {
 
   const completionPercent = totalToday === 0 ? 0 : Math.round((completedToday / totalToday) * 100);
 
+  /*
+   * Progress here ROLLS UP, exactly as it does on the goals board.
+   *
+   * This used each goal's own task counts, so a parent whose work lives under
+   * its subgoals read 0% on Today while the same goal read its real percentage
+   * on /goals. One number for one goal, in two places, disagreeing: the board
+   * was fixed and this was missed, which is worse than the original bug because
+   * it makes the app look like it cannot count.
+   */
   const activeGoals: ActiveGoalProgress[] = goals
     .filter((goal) => goal.status === "active")
     .map((goal) => ({
       goal,
-      percent: calculateGoalProgress({
-        status: goal.status,
-        progressMode: goal.progressMode,
-        manualProgress: goal.manualProgress,
-        tasks: { total: goal.totalTasks, completed: goal.completedTasks, cancelled: goal.cancelledTasks },
-      }).percent,
+      percent: goalProgressBreakdown(goals, goal.id).percent,
     }));
 
   const taskById = new Map(tasks.map((task) => [task.id, task]));

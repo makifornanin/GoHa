@@ -3,6 +3,7 @@ import {
   focusRepo,
   goalsRepo,
   habitsRepo,
+  inspirationsRepo,
   lifeAreasRepo,
   reviewsRepo,
   tasksRepo,
@@ -37,15 +38,22 @@ export default async function ReviewPage({
   const weekStart = requested > currentWeekStart ? currentWeekStart : requested;
   const bounds = weekBounds(weekStart);
 
-  const [tasks, habits, entries, sessions, goals, lifeAreas, review] = await Promise.all([
-    tasksRepo.listTasksForUser(user.id),
-    habitsRepo.listHabitsWithSchedule(user.id),
-    habitsRepo.listEntriesInRange(user.id, { from: bounds.start, to: bounds.end }),
-    focusRepo.listCompletedSessionsInRange(user.id, { from: bounds.start, to: bounds.end }),
-    goalsRepo.listGoalsWithTaskCounts(user.id, { includeArchived: true }),
-    lifeAreasRepo.listLifeAreas(user.id),
-    reviewsRepo.getWeeklyReview(user.id, weekStart),
-  ]);
+  const [tasks, habits, entries, sessions, goals, lifeAreas, review, inspirations] =
+    await Promise.all([
+      tasksRepo.listTasksForUser(user.id),
+      habitsRepo.listHabitsWithSchedule(user.id),
+      habitsRepo.listEntriesInRange(user.id, { from: bounds.start, to: bounds.end }),
+      focusRepo.listCompletedSessionsInRange(user.id, { from: bounds.start, to: bounds.end }),
+      goalsRepo.listGoalsWithTaskCounts(user.id, { includeArchived: true }),
+      lifeAreasRepo.listLifeAreas(user.id),
+      reviewsRepo.getWeeklyReview(user.id, weekStart),
+      // The week's inspirations and the notes written about them. Read-only
+      // history; the composer that WRITES a takeaway lives on Today.
+      inspirationsRepo.listWithTakeawaysInRange(user.id, {
+        from: bounds.start,
+        to: bounds.end,
+      }),
+    ]);
 
   const stats = deriveReviewStats({
     week: bounds,
@@ -70,6 +78,14 @@ export default async function ReviewPage({
     stats,
     review,
     lifeAreas,
+    inspirations: inspirations.map((entry) => ({
+      localDate: entry.localDate,
+      type: entry.type,
+      text: entry.text,
+      source: entry.source,
+      translation: entry.translation,
+      takeaway: entry.takeaway?.body ?? null,
+    })),
   };
 
   /*

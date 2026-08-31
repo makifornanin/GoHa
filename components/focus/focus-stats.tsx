@@ -78,7 +78,7 @@ export function FocusStats({
 
       {hasBreakdown ? (
         <div className="grid grid-cols-1 gap-6 rounded-2xl border border-separator-opaque bg-surface p-4 shadow-e1 md:grid-cols-3">
-          <Breakdown title="By task" icon={CheckCircle2} items={stats.byTask} />
+          <Breakdown title="By to-do" icon={CheckCircle2} items={stats.byTask} />
           <Breakdown title="By goal" icon={Flag} items={stats.byGoal} />
           <Breakdown title="By life area" icon={Shapes} items={stats.byLifeArea} />
         </div>

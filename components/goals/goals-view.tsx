@@ -2,7 +2,6 @@
 
 import { motion } from "motion/react";
 import { Plus, Target } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { Weekday } from "@/lib/date";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -15,68 +14,69 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import type { GoalWithCounts } from "@/db/repositories/goals";
-import type { LifeArea, Task } from "@/db";
+import type { LifeArea } from "@/db";
+import { descendantIds, goalProgressBreakdown } from "@/lib/goal-tree";
+import { useCreateSignal } from "@/lib/use-create-signal";
 import { GOAL_TIMEFRAME_ORDER, goalTimeframeConfig } from "@/lib/goals";
 import type { GoalTimeframe } from "@/db/schema/enums";
 import type { GoalFormInput } from "@/lib/validations/goal";
 import { cn } from "@/lib/utils";
 
 import { GoalCard } from "./goal-card";
-import { GoalDetailPanel } from "./goal-detail-panel";
 import { GoalFormModal, type LifeAreaOption, type ParentOption } from "./goal-form-modal";
 
 type TabKey = "all" | GoalTimeframe;
 
-/** Collect a goal's descendant ids so a goal can't be nested under its own child. */
-function descendantIds(goals: GoalWithCounts[], rootId: string): Set<string> {
-  const childrenByParent = new Map<string, string[]>();
-  for (const goal of goals) {
-    if (goal.parentGoalId) {
-      const list = childrenByParent.get(goal.parentGoalId) ?? [];
-      list.push(goal.id);
-      childrenByParent.set(goal.parentGoalId, list);
-    }
-  }
-  const result = new Set<string>();
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const child of childrenByParent.get(current) ?? []) {
-      if (!result.has(child)) {
-        result.add(child);
-        queue.push(child);
-      }
-    }
-  }
-  return result;
-}
-
+/**
+ * The goals board.
+ *
+ * It shows GOALS, and a goal's subgoals appear underneath it rather than beside
+ * it. The previous grid put every row of the table in one flat list, so "Find a
+ * new job" and "Finish resume" were two identical cards with no visible
+ * relationship except a small "Part of" line, and the board grew by four cards
+ * every time someone broke a goal down properly. Punishing the behaviour the
+ * app exists to encourage is the wrong incentive.
+ *
+ * Opening a goal now goes to `/goals/[goalId]`, a real page with a breadcrumb,
+ * its milestones, its next actions and its habits.
+ */
 export function GoalsView({
   goals,
   lifeAreas,
-  tasks = [],
   timeZone,
   weekStartsOn,
+  openCreateOnMount = false,
+  defaultParentGoalId,
+  defaultLifeAreaId,
 }: {
   goals: GoalWithCounts[];
   lifeAreas: LifeArea[];
-  tasks?: Task[];
   /** The user's saved timezone, so "today" is their today. */
   timeZone?: string;
   /** Their saved week start, so the picker's week matches theirs. */
   weekStartsOn?: Weekday;
+  /** `?new=1` from the Add menu or the command palette. */
+  openCreateOnMount?: boolean;
+  /** `?parentGoalId=` — the Add menu opened this asking for a subgoal. */
+  defaultParentGoalId?: string;
+  defaultLifeAreaId?: string;
 }) {
-  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("all");
-  const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<GoalWithCounts | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<string | null>(defaultParentGoalId ?? null);
   const [archiving, setArchiving] = useState<GoalWithCounts | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // "+ Add > Goal" (or Subgoal) from anywhere in the shell lands here with
+  // `?new=1`; the hook opens the form and spends the signal. See its comments.
+  const [formOpen, setFormOpen] = useCreateSignal(openCreateOnMount, "/goals", () => {
+    setEditing(null);
+    setCreatingUnder(defaultParentGoalId ?? null);
+  });
 
   const [optimisticGoals, removeOptimistically] = useOptimistic(
     goals,
-    (state, archivedId: string) => state.filter((goal) => goal.id !== archivedId),
+    (state, archivedIds: Set<string>) => state.filter((goal) => !archivedIds.has(goal.id)),
   );
 
   const lifeAreaMap = useMemo(
@@ -87,49 +87,45 @@ export function GoalsView({
     () => lifeAreas.map((area) => ({ id: area.id, name: area.name })),
     [lifeAreas],
   );
-  const goalTitleById = useMemo(
-    () => new Map(optimisticGoals.map((goal) => [goal.id, goal.title])),
-    [optimisticGoals],
-  );
 
-  const visibleGoals = optimisticGoals.filter(
-    (goal) => tab === "all" || goal.timeframe === tab,
-  );
+  /*
+   * Top-level goals only. Their subgoals are rendered inside the card that owns
+   * them, so a subgoal appears exactly once on this screen and always beneath
+   * its parent.
+   */
+  const topLevel = optimisticGoals.filter((goal) => !goal.parentGoalId);
+  const visibleGoals = topLevel.filter((goal) => tab === "all" || goal.timeframe === tab);
 
-  const subGoalCounts = useMemo(() => {
-    const map = new Map<string, number>();
+  const subgoalsByParent = useMemo(() => {
+    const map = new Map<string, GoalWithCounts[]>();
     for (const goal of optimisticGoals) {
-      if (goal.parentGoalId) map.set(goal.parentGoalId, (map.get(goal.parentGoalId) ?? 0) + 1);
+      if (!goal.parentGoalId) continue;
+      const list = map.get(goal.parentGoalId);
+      if (list) list.push(goal);
+      else map.set(goal.parentGoalId, [goal]);
     }
     return map;
   }, [optimisticGoals]);
 
-  const detailGoal = detailId ? optimisticGoals.find((g) => g.id === detailId) ?? null : null;
-  const detailSubGoals = useMemo(
-    () => (detailId ? optimisticGoals.filter((g) => g.parentGoalId === detailId) : []),
-    [optimisticGoals, detailId],
-  );
-  const detailTasks = useMemo(
-    () => (detailId ? tasks.filter((t) => t.goalId === detailId) : []),
-    [tasks, detailId],
-  );
-
+  /** Only top-level goals can be a parent, and never the goal being edited. */
   const parentOptions: ParentOption[] = useMemo(() => {
     const excluded = editing
       ? new Set<string>([editing.id, ...descendantIds(optimisticGoals, editing.id)])
       : new Set<string>();
     return optimisticGoals
-      .filter((goal) => !excluded.has(goal.id))
+      .filter((goal) => !goal.parentGoalId && !excluded.has(goal.id))
       .map((goal) => ({ id: goal.id, title: goal.title }));
   }, [optimisticGoals, editing]);
 
-  function openCreate() {
+  function openCreate(parentGoalId: string | null = null) {
     setEditing(null);
+    setCreatingUnder(parentGoalId);
     setFormOpen(true);
   }
 
   function openEdit(goal: GoalWithCounts) {
     setEditing(goal);
+    setCreatingUnder(null);
     setFormOpen(true);
   }
 
@@ -138,6 +134,7 @@ export function GoalsView({
     if (result.ok) {
       toast.success(`Created "${result.data.title}"`);
       setFormOpen(false);
+      setCreatingUnder(null);
     }
     return result;
   }
@@ -157,35 +154,48 @@ export function GoalsView({
     if (!goal) return;
     setArchiving(null);
     startTransition(async () => {
-      removeOptimistically(goal.id);
+      // Subgoals go with the parent, which is what the dialog has always said.
+      removeOptimistically(new Set([goal.id, ...descendantIds(optimisticGoals, goal.id)]));
       const result = await archiveGoalAction(goal.id);
       if (result.ok) toast.success(`Archived "${goal.title}"`);
       else toast.error(result.error);
     });
   }
 
-  const newGoalButton = (
-    <Button data-testid="new-goal" onClick={openCreate}>
-      <Plus />
-      Add Goal
-    </Button>
-  );
+  const creatingSubgoal = Boolean(creatingUnder);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="My Goals"
-        description="Track and manage your objectives across every life area and timeframe."
-        action={optimisticGoals.length > 0 ? newGoalButton : undefined}
+        title="Goals"
+        description="An outcome, broken into milestones, broken into to-dos you can actually do."
+        /*
+         * A direct button, NOT the shared menu.
+         *
+         * The sidebar already carries a root-context "+ Add" about 80px away,
+         * and putting a second root-context menu here made two identical
+         * controls with identical contents compete inside one viewport, which
+         * is the duplication the shell was reorganised to remove. A page about
+         * one kind of record gets the direct form, exactly as the subgoal page
+         * shows "Add to-do" rather than a menu of one.
+         */
+        action={
+          topLevel.length > 0 ? (
+            <Button data-testid="new-goal" onClick={() => openCreate(null)}>
+              <Plus />
+              Add goal
+            </Button>
+          ) : undefined
+        }
       />
 
-      {optimisticGoals.length === 0 ? (
+      {topLevel.length === 0 ? (
         <EmptyState
           icon={Target}
           title="No goals yet"
-          description="Goals turn your life areas into concrete objectives. Create your first one and choose whether its progress comes from tasks or is set by hand."
+          description="A goal is an outcome worth working toward, like “Find a new job”. You break it into subgoals, and those into to-dos that land on your day."
           action={
-            <Button data-testid="new-goal" onClick={openCreate}>
+            <Button data-testid="new-goal" onClick={() => openCreate(null)}>
               <Plus />
               Create your first goal
             </Button>
@@ -195,6 +205,11 @@ export function GoalsView({
         <div className="flex flex-col gap-4">
           <div className="overflow-x-auto border-b border-separator">
             <ul className="flex min-w-max gap-5" role="tablist" aria-label="Filter goals by timeframe">
+              <li>
+                <TabButton active={tab === "all"} onClick={() => setTab("all")}>
+                  All Goals
+                </TabButton>
+              </li>
               {GOAL_TIMEFRAME_ORDER.map((tf) => (
                 <li key={tf}>
                   <TabButton active={tab === tf} onClick={() => setTab(tf)}>
@@ -202,11 +217,6 @@ export function GoalsView({
                   </TabButton>
                 </li>
               ))}
-              <li>
-                <TabButton active={tab === "all"} onClick={() => setTab("all")}>
-                  All Goals
-                </TabButton>
-              </li>
             </ul>
           </div>
 
@@ -223,65 +233,60 @@ export function GoalsView({
             variants={listContainer}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
           >
             {visibleGoals.map((goal) => (
               <motion.div key={goal.id} variants={listItem} layout>
                 <GoalCard
                   goal={goal}
-                  lifeArea={goal.lifeAreaId ? lifeAreaMap.get(goal.lifeAreaId) ?? null : null}
-                  parentTitle={goal.parentGoalId ? goalTitleById.get(goal.parentGoalId) ?? null : null}
-                  subGoalCount={subGoalCounts.get(goal.id) ?? 0}
-                  onOpen={(g) => setDetailId(g.id)}
+                  progress={goalProgressBreakdown(optimisticGoals, goal.id)}
+                  subgoals={subgoalsByParent.get(goal.id) ?? []}
+                  lifeArea={goal.lifeAreaId ? (lifeAreaMap.get(goal.lifeAreaId) ?? null) : null}
                   onEdit={openEdit}
                   onArchive={setArchiving}
+                  onAddSubgoal={(g) => openCreate(g.id)}
                 />
               </motion.div>
             ))}
 
             <button
               type="button"
-              onClick={openCreate}
+              onClick={() => openCreate(null)}
+              data-testid="new-goal"
               className="group flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-gray-3 p-5 text-label-secondary transition-colors hover:border-blue/50 hover:bg-surface-hover"
             >
               <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-surface-secondary text-label-secondary transition-colors group-hover:bg-blue group-hover:text-white">
                 <Plus className="size-5" aria-hidden />
               </span>
-              <span className="text-headline text-label">Create New Goal</span>
+              <span className="text-headline text-label">New goal</span>
               <span className="mt-1 max-w-52 text-center text-callout">
-                Define a new objective and break it into steps.
+                Name an outcome, then break it into milestones.
               </span>
             </button>
           </motion.div>
         </div>
       )}
 
-      <GoalDetailPanel
-        goal={detailGoal}
-        subGoals={detailSubGoals}
-        tasks={detailTasks}
-        lifeAreas={lifeAreas}
-        onClose={() => setDetailId(null)}
-        onEdit={(goal) => {
-          setDetailId(null);
-          openEdit(goal);
-        }}
-        onOpenSubGoal={(goal) => setDetailId(goal.id)}
-        // Creating the task where it belongs: the To-dos form opens with this
-        // goal already selected, so the link is never forgotten.
-        onAddTask={(goal) => router.push(`/tasks?new=1&goalId=${goal.id}`)}
-      />
-
       <GoalFormModal
         open={formOpen}
         mode={editing ? "edit" : "create"}
         goal={editing}
+        level={creatingSubgoal ? "subgoal" : "goal"}
+        defaultParentGoalId={creatingUnder}
+        defaultLifeAreaId={
+          creatingUnder
+            ? (optimisticGoals.find((g) => g.id === creatingUnder)?.lifeAreaId ?? null)
+            : (defaultLifeAreaId ?? null)
+        }
         lifeAreas={lifeAreaOptions}
         parentOptions={parentOptions}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
         onSubmit={editing ? handleUpdate : handleCreate}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {
+          setFormOpen(false);
+          setCreatingUnder(null);
+        }}
       />
 
       <Modal
@@ -290,7 +295,7 @@ export function GoalsView({
         title="Archive this goal?"
         description={
           archiving
-            ? `"${archiving.title}" will be hidden from your active goals. Sub-goals are archived with it. You can restore it later; nothing is permanently deleted.`
+            ? `"${archiving.title}" and its subgoals will be hidden from your board. Your to-dos are kept. You can restore any of them from Settings; nothing is deleted.`
             : undefined
         }
       >

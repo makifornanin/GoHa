@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, getTableColumns, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { goalProgressUpdates, goals, tasks } from "../schema";
@@ -149,6 +149,30 @@ export async function archiveGoal(userId: string, id: string): Promise<Goal | nu
     .where(and(eq(goals.id, id), eq(goals.userId, userId)))
     .returning();
   return row ?? null;
+}
+
+/**
+ * Archive a goal AND the subgoals underneath it, in one statement.
+ *
+ * The confirmation dialog has always said "Sub-goals are archived with it", and
+ * until now that was simply untrue: `archiveGoal` touches one row, so the
+ * children stayed on the board as orphan cards whose "Part of ..." line pointed
+ * at a goal that was no longer anywhere. Callers pass the whole id set (the
+ * goal plus its descendants, resolved through `lib/goal-tree`), and the
+ * user-scoped `where` is what stops a forged id list from reaching another
+ * account's rows.
+ *
+ * Restoring stays per-goal on purpose. Un-archiving a parent should not drag
+ * back a subgoal that was retired separately months earlier; Settings > Archive
+ * lists every row individually so anything can be brought back on its own.
+ */
+export async function archiveGoals(userId: string, ids: string[]): Promise<Goal[]> {
+  if (ids.length === 0) return [];
+  return db
+    .update(goals)
+    .set({ isArchived: true, archivedAt: new Date() })
+    .where(and(eq(goals.userId, userId), inArray(goals.id, ids), eq(goals.isArchived, false)))
+    .returning();
 }
 
 export async function restoreGoal(userId: string, id: string): Promise<Goal | null> {

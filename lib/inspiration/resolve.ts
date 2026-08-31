@@ -1,8 +1,8 @@
 import { addDays, type IsoDate } from "@/lib/date";
 import { pickFallback } from "./fallback";
 import {
-  fetchBibleVerse,
   fetchQuote,
+  fetchVerse,
   isConcise,
   type InspirationContent,
   type InspirationType,
@@ -36,6 +36,14 @@ export type InspirationStore = {
   /** Texts this user has been shown on or after `since`, for freshness. */
   recentTexts(userId: string, since: IsoDate): Promise<string[]>;
   /**
+   * Sources (a verse reference, or an author) shown on or after `since`.
+   *
+   * Optional: the resolver treats an absent method as "nothing known", so a
+   * store written before verse-reference freshness still satisfies this
+   * interface and degrades to the previous behaviour rather than failing.
+   */
+  recentSources?(userId: string, since: IsoDate): Promise<string[]>;
+  /**
    * Insert, or return the row that beat us to it.
    *
    * The whole concurrency guarantee sits here: this MUST resolve conflicts on
@@ -67,10 +75,14 @@ export type ResolveDeps = {
   onProviderIssue?: (message: string) => void;
 };
 
-function fetcherFor(type: InspirationType, fetchImpl: typeof fetch | undefined) {
+function fetcherFor(
+  type: InspirationType,
+  fetchImpl: typeof fetch | undefined,
+  options: { avoidKeys?: ReadonlySet<string>; random?: () => number },
+) {
   return type === "quote"
     ? () => fetchQuote(fetchImpl ?? fetch)
-    : () => fetchBibleVerse(fetchImpl ?? fetch);
+    : () => fetchVerse(fetchImpl ?? fetch, undefined, options);
 }
 
 /**
@@ -85,8 +97,18 @@ async function tryProvider(
   type: InspirationType,
   recent: ReadonlySet<string>,
   deps: ResolveDeps,
+  recentSources: ReadonlySet<string>,
 ): Promise<InspirationContent | null> {
-  const fetchOne = fetcherFor(type, deps.fetchImpl);
+  /*
+   * The verse provider is told which REFERENCES were shown recently, not just
+   * which texts. GoHa picks the reference itself now, so freshness can be
+   * steered before the request instead of only judged after it: without this a
+   * repeat costs a whole round trip and a retry to discover.
+   */
+  const fetchOne = fetcherFor(type, deps.fetchImpl, {
+    avoidKeys: recentSources,
+    random: deps.random,
+  });
 
   for (let attempt = 1; attempt <= MAX_PROVIDER_ATTEMPTS; attempt++) {
     try {
@@ -138,17 +160,30 @@ export async function resolveDailyInspiration(
   // still owe the user an inspiration, so an empty set means "nothing known to
   // be recent" and the day proceeds.
   let recent: ReadonlySet<string>;
+  let recentSources: ReadonlySet<string>;
   try {
     recent = new Set(await deps.store.recentTexts(userId, since));
+    /*
+     * References, when the store can supply them.
+     *
+     * Optional on the interface so an older store (and every existing test
+     * double) keeps working: an absent method means "nothing known to be
+     * recent", which degrades to the previous behaviour rather than failing.
+     */
+    recentSources = new Set(
+      deps.store.recentSources ? await deps.store.recentSources(userId, since) : [],
+    );
   } catch (error) {
     deps.onProviderIssue?.(
       `recent history unavailable: ${error instanceof Error ? error.message : "unknown"}`,
     );
     recent = new Set();
+    recentSources = new Set();
   }
 
   const content =
-    (await tryProvider(type, recent, deps)) ?? pickFallback(type, [...recent], random);
+    (await tryProvider(type, recent, deps, recentSources)) ??
+    pickFallback(type, [...recent], random);
 
   /*
    * Whoever inserts first owns the day.

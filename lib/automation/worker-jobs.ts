@@ -81,6 +81,17 @@ export type PreparedWorkerJob =
       payload: unknown;
       delivery?: WorkerEmailDelivery;
       fallbackNotification: WorkerNotification;
+      /**
+       * The subject this payload was actually built around, when preparing is
+       * what decides it.
+       *
+       * Only the smart reminder needs this: its anchor task is CHOSEN at
+       * prepare time, whereas a deadline or focus job is materialized with its
+       * entity already fixed. Carrying it back means the delivery log records
+       * the task the message was about, rather than whatever the job row
+       * happened to hold when it was read. See `completeWorkerJob`.
+       */
+      entity?: { type: string; id: string };
     }
   | { state: "skip"; job: AutomationJob; reason: string };
 
@@ -621,12 +632,30 @@ export async function completeWorkerJob(
     return { status: "conflict", reason: "invalid_notification" };
   }
 
+  /*
+   * Log the subject the PAYLOAD was built around, not the one the job row held
+   * when it was read.
+   *
+   * `current` is a snapshot taken before `prepareWorkerJob` ran, and preparing
+   * a smart reminder is what CHOOSES its anchor task and writes it to the row.
+   * Reading `current.entityId` therefore recorded whatever was there
+   * beforehand, which for a smart reminder is null unless the worker happened
+   * to have called GET /jobs/{id} first. That request is optional: a worker
+   * that claims and then completes with `use_fallback` never makes it.
+   *
+   * The consequence was quiet and total. `notification_log.entity_id` stayed
+   * null, so `previousAnchorId` in the next slot always read null, so
+   * `selectAnchorTask` was never given anything to avoid and returned the
+   * top-ranked task every time. All four of a day's reminders named the SAME
+   * to-do while others sat waiting, which is precisely the behaviour that
+   * function exists to prevent.
+   */
   const claimed = await automationRepo.claimNotification(current.userId, {
     kind: current.kind,
     dedupeKey: current.dedupeKey,
     localDate: current.localDate,
-    entityType: current.entityType,
-    entityId: current.entityId,
+    entityType: prepared.entity?.type ?? current.entityType,
+    entityId: prepared.entity?.id ?? current.entityId,
     payload: {
       automationJobId: current.id,
       ...(notification ? { notification } : { deliveredBy: "workflow" }),
@@ -931,6 +960,10 @@ async function prepareSmartReminder(
    * between the read above and here means this job is no longer ours to send,
    * and the completion path will reject it on the same grounds. Losing the
    * anti-repeat hint is not worth failing a notification over.
+   *
+   * The anchor is ALSO returned below, and that is what the delivery log
+   * actually uses. Writing it here is what lets a later request see it; the
+   * return value is what makes the log correct in the same request.
    */
   if (job.leaseId) {
     await workerRepo.setJobEntity(job.id, job.leaseId, "task", anchor.id);
@@ -947,6 +980,7 @@ async function prepareSmartReminder(
     job,
     payload,
     fallbackNotification: fallback(text.title, text.body, text.url),
+    entity: { type: "task", id: anchor.id },
   };
 }
 

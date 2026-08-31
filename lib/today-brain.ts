@@ -257,7 +257,7 @@ export function deriveDaySignal(params: {
     const evening = params.hour >= 17;
     return {
       state: "done",
-      headline: habitsRemaining > 0 ? "Tasks done, habits left" : "Today is clear",
+      headline: habitsRemaining > 0 ? "To-dos done, habits left" : "Today is clear",
       detail:
         habitsRemaining > 0
           ? `${completedToday} of ${totalToday} done. ${habitsRemaining} habit${habitsRemaining === 1 ? "" : "s"} still to check in.`

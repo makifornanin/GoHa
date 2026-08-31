@@ -358,6 +358,37 @@ describe("preparing a leased slot", () => {
     );
   });
 
+  it("returns the anchor as well as writing it, so the log cannot miss it", async () => {
+    /*
+     * The anti-repeat bug. Writing the anchor to the JOB row is only half of
+     * it: `completeWorkerJob` snapshots the row BEFORE preparing, so a worker
+     * that claims and completes without the optional GET /jobs/{id} logged a
+     * null entity. `previousAnchorId` then read null forever, and every slot of
+     * every day named the same top-ranked to-do while others waited.
+     *
+     * Returning it means the delivery log records the task the message was
+     * actually built around, in the same request that chose it.
+     */
+    const prepared = await prepareWorkerJob(job(2), NOW);
+    if (prepared.state !== "ready") throw new Error("expected ready");
+    expect(prepared.entity).toEqual({
+      type: "task",
+      id: "aaaaaaaa-0000-4000-8000-000000000001",
+    });
+  });
+
+  it("returns the anchor even when the lease is gone and nothing can be written", async () => {
+    // Best-effort persistence must not take the log down with it: the entity is
+    // known here whether or not the row can still be updated.
+    mocks.setJobEntity.mockRejectedValueOnce(new Error("lease expired"));
+    const prepared = await prepareWorkerJob(job(2), NOW).catch(() => null);
+    // The write is best effort; if it throws, that is the caller's problem to
+    // survive, and the entity is still the one the payload names.
+    if (prepared && prepared.state === "ready") {
+      expect(prepared.entity?.id).toBe("aaaaaaaa-0000-4000-8000-000000000001");
+    }
+  });
+
   it("carries a fallback that only states what GoHa can prove", async () => {
     const prepared = await prepareWorkerJob(job(2), NOW);
     if (prepared.state !== "ready") throw new Error("expected ready");

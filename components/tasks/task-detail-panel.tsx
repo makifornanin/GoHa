@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Goal, LifeArea, Task } from "@/db";
 import { instantToZonedDateTimeInput, MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
+import { goalPickerOptions } from "@/lib/goal-tree";
 import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
 import { listEntrance, rowExit, spring } from "@/lib/motion";
 import {
@@ -84,7 +85,7 @@ export function TaskDetailPanel({
     <DetailPanel
       open={Boolean(task)}
       onClose={onClose}
-      title={task ? `Details for ${task.title}` : "Task details"}
+      title={task ? `Details for ${task.title}` : "To-do details"}
       /*
         The task's own name, in the header row with the close button.
         
@@ -220,7 +221,7 @@ function TaskTitleField({
     const result = await onSave(task.id, { ...toFormValues(task, timeZone), title: trimmed });
     if (!result.ok) {
       setTitle(task.title);
-      toast.error(result.error ?? "Could not rename that task.");
+      toast.error(result.error ?? "Could not rename that to-do.");
     }
   }
 
@@ -247,7 +248,7 @@ function TaskTitleField({
           e.currentTarget.blur();
         }
       }}
-      aria-label="Task title"
+      aria-label="To-do title"
       className={cn(
         "w-full min-w-0 rounded-lg bg-transparent px-1.5 py-0.5 text-title-3 text-label transition-colors hover:bg-fill-quaternary focus-visible:bg-surface focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
         isCompleted && "text-label-tertiary line-through",
@@ -317,7 +318,17 @@ function TaskDetailBody({
 
   function addSubtask() {
     const value = newSubtask.trim();
-    if (!value || addingSubtask) return;
+    /*
+     * Guarded on the VALUE alone, not on the in-flight flag.
+     *
+     * `addingSubtask` used to gate this too, which silently dropped the next
+     * step whenever someone typed faster than the round trip: the Enter did
+     * nothing, no error, no feedback, the text simply gone. The flag is not
+     * needed for what it was there to prevent, because the synchronous
+     * `setNewSubtask("")` below already blocks a double submit: a second Enter
+     * arrives with an empty field and returns on `!value`.
+     */
+    if (!value) return;
     /*
      * Cleared NOW, not after the round trip.
      *
@@ -345,10 +356,35 @@ function TaskDetailBody({
     });
   }
 
+  /**
+   * Reveal the composer. Focus is committed WITH the mount, not a frame later.
+   *
+   * This used to set `composing` and then focus the input from an animation
+   * frame, on the claim that the input mounts in the same commit. It does not:
+   * the input does not exist until the state update commits, so the frame was a
+   * guess at when that would be.
+   *
+   * That guess is a wall clock, and nothing else in the app is on it. The same
+   * update also unmounts the "+ Add subtask" button that was just clicked, so
+   * between the click and the frame NOTHING is focused. Anything typed in that
+   * window is dispatched at `document.body` and silently discarded, and an
+   * Escape in that window never reaches the composer's own handler, so it
+   * travels on to the panel's document listener and closes the whole task.
+   *
+   * Under load that window stretches: in jsdom an animation frame is a plain
+   * 60Hz interval, and a busy event loop delays it past the point the test has
+   * finished typing. That is why the subtask tests passed alone and failed in a
+   * full suite, and why the symptom looked like corrupted input ("Second step"
+   * arriving as "ond step") rather than a focus problem.
+   *
+   * `autoFocus` hands the ordering to React: it is applied during the host
+   * mount, in the same commit as `composing`, so there is no window at all. It
+   * is also the pattern the rest of the codebase already uses for a revealed
+   * input (see brain-dump-item.tsx and task-maps-workspace.tsx). The ref stays,
+   * because the post-save refocus above still uses it.
+   */
   function openComposer() {
     setComposing(true);
-    // The input mounts in the same commit, so focus waits a frame for it.
-    requestAnimationFrame(() => subtaskInputRef.current?.focus());
   }
 
   function cancelComposer() {
@@ -431,13 +467,16 @@ function TaskDetailBody({
         </DetailRow>
 
         <DetailRow label="Goal">
+          {/* Subgoals read as "Find a new job > Finish resume" rather than
+              sitting beside their parents as equals. A flat list made the
+              hierarchy impossible to use at the one moment it matters. */}
           <Select
             aria-label="Goal"
             value={task.goalId ?? ""}
             onChange={(v) => void patch({ goalId: v })}
             options={[
               { value: "", label: "No goal" },
-              ...goals.map((g) => ({ value: g.id, label: g.title })),
+              ...goalPickerOptions(goals, task.goalId).map((g) => ({ value: g.id, label: g.label })),
             ]}
           />
         </DetailRow>
@@ -455,7 +494,7 @@ function TaskDetailBody({
             }
           }}
           maxLength={TASK_DESCRIPTION_MAX}
-          placeholder="What is this task about?"
+          placeholder="What is this to-do about?"
           aria-label="Description"
           className="min-h-24"
         />
@@ -541,6 +580,8 @@ function TaskDetailBody({
             <Plus className="size-4 shrink-0 text-label-tertiary" aria-hidden />
             <Input
               ref={subtaskInputRef}
+              // Focused by the commit that mounts it. See `openComposer`.
+              autoFocus
               value={newSubtask}
               onChange={(e) => setNewSubtask(e.target.value)}
               onKeyDown={(e) => {
@@ -564,7 +605,16 @@ function TaskDetailBody({
               }}
               placeholder="What is the next step?"
               aria-label="Add a subtask"
-              disabled={addingSubtask}
+              /*
+               * NOT disabled while saving.
+               *
+               * Disabling a focused input BLURS it, so everything typed during
+               * the round trip went to the body and vanished, and the refocus
+               * after the save was a no-op because the element was still
+               * disabled at that moment. Breaking work down is exactly when
+               * people type in a burst. The Add button's spinner is what shows
+               * the save is running.
+               */
             />
             <Button
               size="sm"
@@ -624,7 +674,7 @@ function TaskDetailBody({
           }}
         >
           <Trash2 className="size-4" aria-hidden />
-          Delete task
+          Delete to-do
         </Button>
         <Button
           variant={isCompleted ? "secondary" : "default"}
@@ -633,7 +683,7 @@ function TaskDetailBody({
           {isCompleted ? (
             <>
               <RotateCcw className="size-4" aria-hidden />
-              Reopen task
+              Reopen to-do
             </>
           ) : (
             <>

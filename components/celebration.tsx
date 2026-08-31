@@ -116,7 +116,7 @@ export function Celebration({
             </p>
             <p className="mt-1.5 text-callout text-label-secondary">
               {milestone.kind === "goal"
-                ? "Every task under it is done."
+                ? "Every to-do under it is done."
                 : milestone.days >= 30
                   ? "A month unbroken. This one has stuck."
                   : "A full week. It is becoming a habit."}

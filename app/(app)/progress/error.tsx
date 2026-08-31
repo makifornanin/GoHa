@@ -25,7 +25,7 @@ export default function ProgressError({
       <h2 className="text-title-3 text-label">We couldn&apos;t load your progress</h2>
       <p className="mt-2 max-w-md text-body text-label-secondary">
         Something went wrong reaching the server. Nothing on this page is stored, so nothing is
-        lost: it is all derived from your tasks, sessions, and check-ins. Please try again.
+        lost: it is all derived from your to-dos, sessions, and check-ins. Please try again.
       </p>
       <Button className="mt-6" onClick={reset}>
         Try again

@@ -85,7 +85,7 @@ export function CompletionNoteModal({
       open={Boolean(task)}
       onClose={onClose}
       title="Completion reflection"
-      description="Optional feedback saved with this task."
+      description="Optional feedback saved with this to-do."
     >
       {task ? <NoteFields task={task} onSave={onSave} onClose={onClose} /> : null}
     </Modal>

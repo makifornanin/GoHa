@@ -4,6 +4,7 @@ import { MANILA_TZ, zonedLocalToInstant } from "@/lib/date";
 import {
   TASK_COMPLETION_NOTE_MAX,
   TASK_DESCRIPTION_MAX,
+  TASK_ESTIMATE_MAX_MINUTES,
   TASK_PRIORITY_VALUES,
   TASK_STATUS_VALUES,
   TASK_TITLE_MAX,
@@ -73,6 +74,44 @@ const optionalScheduledTime = z
     ]),
   );
 
+/**
+ * How long this is expected to take, in minutes. Optional, and null when blank.
+ *
+ * The column and the check constraint have existed since the first migration;
+ * nothing ever wrote to them, because the value had no way in. The Day Planner
+ * is what needs it, and it needs it to be TRUSTWORTHY: an estimate GoHa
+ * invented would silently corrupt the one number the planner exists to get
+ * right. So blank stays blank, and the planner asks rather than guesses.
+ *
+ * The upper bound matches the planner's own frame. Anything longer than a day
+ * is not an estimate, it is a project, and the honest answer to it is a subgoal.
+ */
+const optionalEstimateMinutes = z
+  .union([z.string(), z.number()])
+  .nullable()
+  .optional()
+  .transform((value) => {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim();
+    return text.length > 0 ? text : null;
+  })
+  .transform((value, ctx): number | null => {
+    if (value === null) return null;
+    const minutes = Number(value);
+    if (!Number.isFinite(minutes) || !Number.isInteger(minutes) || minutes <= 0) {
+      ctx.addIssue({ code: "custom", message: "Choose how long this should take." });
+      return z.NEVER;
+    }
+    if (minutes > TASK_ESTIMATE_MAX_MINUTES) {
+      ctx.addIssue({
+        code: "custom",
+        message: "That is longer than a day. Break it into smaller to-dos.",
+      });
+      return z.NEVER;
+    }
+    return minutes;
+  });
+
 export function makeTaskFormSchema(timeZone: string = MANILA_TZ) {
   return z.object({
     title: z
@@ -93,6 +132,7 @@ export function makeTaskFormSchema(timeZone: string = MANILA_TZ) {
     scheduledFor: optionalScheduledFor,
     scheduledTime: optionalScheduledTime,
     dueAt: optionalDueAt(timeZone),
+    estimateMinutes: optionalEstimateMinutes,
   });
 }
 

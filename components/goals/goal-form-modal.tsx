@@ -1,5 +1,6 @@
 "use client";
 
+import { Target } from "lucide-react";
 import { useRef, useState } from "react";
 
 import type { ActionResult } from "@/app/(app)/goals/actions";
@@ -11,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MANILA_TZ, zonedToday, type Weekday } from "@/lib/date";
+import { goalLevel, type GoalLevel } from "@/lib/goal-tree";
 import {
   DEFAULT_TIMEFRAME,
   GOAL_DESCRIPTION_MAX,
@@ -18,6 +20,7 @@ import {
   GOAL_STATUS_ORDER,
   GOAL_TIMEFRAME_ORDER,
   GOAL_TITLE_MAX,
+  goalLevelConfig,
   goalProgressModeConfig,
   goalStatusConfig,
   goalTimeframeConfig,
@@ -54,6 +57,13 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
 type FormProps = {
   mode: "create" | "edit";
   goal?: Goal | null;
+  /**
+   * Which level is being created. Only meaningful for `create`; an edit reads
+   * the level off the goal itself, because that is the truth on the row.
+   */
+  level: GoalLevel;
+  defaultParentGoalId?: string | null;
+  defaultLifeAreaId?: string | null;
   lifeAreas: LifeAreaOption[];
   parentOptions: ParentOption[];
   /** The user's saved timezone, so "today" is their today. */
@@ -68,6 +78,9 @@ type FormProps = {
 function GoalFormFields({
   mode,
   goal,
+  level,
+  defaultParentGoalId,
+  defaultLifeAreaId,
   lifeAreas,
   parentOptions,
   timeZone = MANILA_TZ,
@@ -81,8 +94,22 @@ function GoalFormFields({
   const today = zonedToday(new Date(), timeZone);
   const [title, setTitle] = useState(() => goal?.title ?? "");
   const [description, setDescription] = useState(() => goal?.description ?? "");
-  const [lifeAreaId, setLifeAreaId] = useState(() => goal?.lifeAreaId ?? "");
-  const [parentGoalId, setParentGoalId] = useState(() => goal?.parentGoalId ?? "");
+  const [lifeAreaId, setLifeAreaId] = useState(() => goal?.lifeAreaId ?? defaultLifeAreaId ?? "");
+  const [parentGoalId, setParentGoalId] = useState(
+    () => goal?.parentGoalId ?? defaultParentGoalId ?? "",
+  );
+  /*
+   * The parent this form was OPENED with, if any.
+   *
+   * "+ Add > Subgoal" from inside a goal already answered "under what", so
+   * asking again in a dropdown is the app forgetting where the user just was.
+   * The relationship is shown as context instead. It is still sent with the
+   * form and still re-checked server-side; only the control is gone.
+   */
+  const lockedParent = mode === "create" && defaultParentGoalId
+    ? (parentOptions.find((option) => option.id === defaultParentGoalId) ?? null)
+    : null;
+  const meta = goalLevelConfig[mode === "edit" && goal ? goalLevel(goal) : level];
   const [timeframe, setTimeframe] = useState<GoalTimeframe>(() => goal?.timeframe ?? DEFAULT_TIMEFRAME);
   const [status, setStatus] = useState<GoalStatus>(() => goal?.status ?? "not_started");
   const [progressMode, setProgressMode] = useState<GoalProgressMode>(() => goal?.progressMode ?? "auto");
@@ -149,7 +176,9 @@ function GoalFormFields({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={GOAL_TITLE_MAX}
-          placeholder="e.g. Run a half marathon"
+          placeholder={
+            meta.label === "Subgoal" ? "e.g. Finish my resume" : "e.g. Find a new job"
+          }
           aria-invalid={Boolean(fieldErrors.title)}
           aria-describedby={fieldErrors.title ? "goal-title-error" : undefined}
           disabled={submitting}
@@ -171,7 +200,11 @@ function GoalFormFields({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={GOAL_DESCRIPTION_MAX}
-          placeholder="What does success look like?"
+          placeholder={
+            meta.label === "Subgoal"
+              ? "What has to be true for this milestone to be done?"
+              : "Why does this matter, and what does success look like?"
+          }
           aria-invalid={Boolean(fieldErrors.description)}
           disabled={submitting}
         />
@@ -194,17 +227,35 @@ function GoalFormFields({
           <FieldError id="goal-life-area-error" message={fieldErrors.lifeAreaId} />
         </div>
         <div>
-          <Label htmlFor="goal-parent">Parent goal</Label>
-          <Select
-            id="goal-parent"
-            value={parentGoalId}
-            onChange={setParentGoalId}
-            disabled={submitting}
-            options={[
-              { value: "", label: "None (top-level goal)" },
-              ...parentOptions.map((option) => ({ value: option.id, label: option.title })),
-            ]}
-          />
+          <Label htmlFor="goal-parent">Part of</Label>
+          {lockedParent ? (
+            <>
+              {/* Context, not a question. The relationship travels with the
+                  form via the hidden input below. */}
+              <p className="flex min-h-9 items-center gap-1.5 rounded-lg bg-fill-quaternary px-3 text-body text-label">
+                <Target className="size-3.5 shrink-0 text-label-tertiary" aria-hidden />
+                <span className="truncate">{lockedParent.title}</span>
+              </p>
+              <input type="hidden" name="parentGoalId" value={parentGoalId} />
+              <p className="mt-1 text-footnote text-label-tertiary">
+                {goalLevelConfig.subgoal.meaning}
+              </p>
+            </>
+          ) : (
+            <Select
+              id="goal-parent"
+              value={parentGoalId}
+              onChange={setParentGoalId}
+              disabled={submitting}
+              options={[
+                { value: "", label: "Nothing (this is a goal)" },
+                ...parentOptions.map((option) => ({
+                  value: option.id,
+                  label: option.title,
+                })),
+              ]}
+            />
+          )}
           <FieldError id="goal-parent-error" message={fieldErrors.parentGoalId} />
         </div>
       </div>
@@ -336,7 +387,7 @@ function GoalFormFields({
           Cancel
         </Button>
         <Button type="submit" loading={submitting}>
-          {mode === "create" ? "Create goal" : "Save changes"}
+          {mode === "create" ? `Create ${meta.label.toLowerCase()}` : "Save changes"}
         </Button>
       </div>
     </form>
@@ -353,6 +404,9 @@ export function GoalFormModal({
   open,
   mode,
   goal,
+  level = "goal",
+  defaultParentGoalId,
+  defaultLifeAreaId,
   lifeAreas,
   parentOptions,
   timeZone,
@@ -363,6 +417,12 @@ export function GoalFormModal({
   open: boolean;
   mode: "create" | "edit";
   goal?: Goal | null;
+  /** Which level a NEW record is. Ignored when editing; the row decides. */
+  level?: GoalLevel;
+  /** Preselected parent, e.g. "Add subgoal" from inside a goal. */
+  defaultParentGoalId?: string | null;
+  /** Preselected life area, inherited from the parent goal when there is one. */
+  defaultLifeAreaId?: string | null;
   lifeAreas: LifeAreaOption[];
   parentOptions: ParentOption[];
   /** The user's saved timezone, so "today" is their today. */
@@ -373,23 +433,23 @@ export function GoalFormModal({
   onClose: () => void;
 }) {
   const titleRef = useRef<HTMLInputElement>(null);
+  const meta = goalLevelConfig[mode === "edit" && goal ? goalLevel(goal) : level];
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === "create" ? "New goal" : "Edit goal"}
-      description={
-        mode === "create"
-          ? "Define an objective and how its progress is measured."
-          : undefined
-      }
+      title={mode === "create" ? `New ${meta.label.toLowerCase()}` : `Edit ${meta.label.toLowerCase()}`}
+      description={mode === "create" ? meta.meaning : undefined}
       initialFocus={() => titleRef.current}
       className="sm:max-w-xl"
     >
       <GoalFormFields
         mode={mode}
         goal={goal}
+        level={level}
+        defaultParentGoalId={defaultParentGoalId}
+        defaultLifeAreaId={defaultLifeAreaId}
         lifeAreas={lifeAreas}
         parentOptions={parentOptions}
         timeZone={timeZone}

@@ -99,7 +99,7 @@ export function FocusView({
       </AnimatePresence>
 
       <div className="relative z-10 flex flex-col gap-8">
-        <PageHeader title="Focus" description="One task, one timer. Real focus time, saved." />
+        <PageHeader title="Focus" description="One to-do, one timer. Real focus time, saved." />
 
         {session ? (
           // Keyed by session id: the note field and the "already alerted" flags
@@ -187,7 +187,7 @@ function FocusSetup({
           onChange={setTaskId}
           disabled={pending}
           options={[
-            { value: "", label: "No specific task" },
+            { value: "", label: "No specific to-do" },
             ...candidateTasks.map((task) => ({ value: task.id, label: task.title })),
           ]}
         />

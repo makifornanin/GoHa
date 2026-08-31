@@ -6,6 +6,7 @@ import {
   focusRepo,
   goalsRepo,
   habitsRepo,
+  inspirationsRepo,
   lifeAreasRepo,
   tasksRepo,
 } from "@/db";
@@ -93,6 +94,16 @@ export default async function TodayPage() {
    */
   const inspiration = isSabbath ? null : await getDailyInspiration(user.id, today);
 
+  /*
+   * What the reader already wrote about it, if anything.
+   *
+   * Read alongside the inspiration rather than fetched by the card: the card is
+   * a Server Component and a client-side fetch there would draw the dashboard
+   * first and pop the note in afterwards, which is exactly the attention-pulling
+   * behaviour that card is designed to avoid.
+   */
+  const takeaway = isSabbath ? null : await inspirationsRepo.getTakeaway(user.id, today);
+
   // --- Momentum, derived from records already written elsewhere ---
   const views = buildHabitViews({ habits, entries: habitEntries, today, weekStartsOn, timeZone });
   const bestCurrent = views.reduce(
@@ -162,6 +173,7 @@ export default async function TodayPage() {
               }
             : null
         }
+        takeaway={takeaway?.body ?? null}
         sabbath={isSabbath ? { message: SABBATH_MESSAGE } : null}
       />
     </>

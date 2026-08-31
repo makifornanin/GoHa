@@ -62,7 +62,7 @@ function setup(tasks: Task[] = []) {
 describe("quick add from a day", () => {
   it("passes the clicked day through exactly", async () => {
     const { onCreateOn } = setup();
-    await userEvent.click(screen.getByRole("button", { name: "Add a task on 2026-08-15" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add a to-do on 2026-08-15" }));
     // The literal string, not a Date: anything that parsed and reformatted here
     // could land the task on the 14th or the 16th depending on the zone.
     expect(onCreateOn).toHaveBeenCalledWith("2026-08-15");
@@ -72,14 +72,14 @@ describe("quick add from a day", () => {
     setup();
     // Six weeks of days, each individually addressable. The old `+` only
     // appeared on hover, so on a touch screen there was no way to reach it.
-    expect(screen.getByRole("button", { name: `Add a task on ${TODAY}` })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Add a task on 2026-08-01" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Add a task on 2026-08-31" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Add a to-do on ${TODAY}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add a to-do on 2026-08-01" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add a to-do on 2026-08-31" })).toBeTruthy();
   });
 
   it("is reachable by keyboard", async () => {
     const { onCreateOn } = setup();
-    const cell = screen.getByRole("button", { name: "Add a task on 2026-08-15" });
+    const cell = screen.getByRole("button", { name: "Add a to-do on 2026-08-15" });
     cell.focus();
     expect(document.activeElement).toBe(cell);
     await userEvent.keyboard("{Enter}");
@@ -89,7 +89,7 @@ describe("quick add from a day", () => {
   it("carries the day across a month change", async () => {
     const { onCreateOn } = setup();
     await userEvent.click(screen.getByRole("button", { name: /next month/i }));
-    await userEvent.click(screen.getByRole("button", { name: "Add a task on 2026-09-10" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add a to-do on 2026-09-10" }));
     expect(onCreateOn).toHaveBeenCalledWith("2026-09-10");
   });
 });
@@ -107,7 +107,7 @@ describe("existing tasks", () => {
 
   it("still allows adding to a day that already has work on it", async () => {
     const { onCreateOn } = setup([makeTask()]);
-    await userEvent.click(screen.getByRole("button", { name: `Add a task on ${TODAY}` }));
+    await userEvent.click(screen.getByRole("button", { name: `Add a to-do on ${TODAY}` }));
     expect(onCreateOn).toHaveBeenCalledWith(TODAY);
   });
 

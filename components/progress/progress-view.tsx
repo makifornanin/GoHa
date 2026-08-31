@@ -118,7 +118,7 @@ export function ProgressView({ data }: { data: ProgressData }) {
         <EmptyState
           icon={Target}
           title="Nothing to chart yet"
-          description="Complete a task, run a focus session, or check in on a habit. This page fills itself in from what you do, so there is nothing to set up."
+          description="Complete a to-do, run a focus session, or check in on a habit. This page fills itself in from what you do, so there is nothing to set up."
         />
       </div>
     );
@@ -169,7 +169,7 @@ export function ProgressView({ data }: { data: ProgressData }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
           icon={CheckCircle2}
-          label="Tasks done"
+          label="To-dos done"
           value={String(summary.tasksCompleted)}
           delta={<Delta value={deltaPercent(summary.tasksCompleted, summary.tasksCompletedPrev)} />}
         />
@@ -223,7 +223,7 @@ export function ProgressView({ data }: { data: ProgressData }) {
           <CardContent>
             {totalCompletions === 0 ? (
               <p className="rounded-xl bg-fill-quaternary px-4 py-8 text-center text-callout text-label-secondary">
-                No tasks completed in this window yet.
+                No to-dos completed in this window yet.
               </p>
             ) : (
               <BarSeries points={completionPoints} unit=" tasks" />

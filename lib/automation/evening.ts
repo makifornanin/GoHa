@@ -57,7 +57,7 @@ const OPEN = new Set(["todo", "in_progress"]);
 /**
  * `detail=counts` strips every title and description (Guide 02, step 1.4).
  *
- * Task titles and goal names are intimate data, and this payload is sent to a
+ * To-do titles and goal names are intimate data, and this payload is sent to a
  * third-party model every evening. The switch exists so that is a deliberate
  * choice rather than a default nobody looked at.
  */

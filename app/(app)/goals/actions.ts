@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { goalsRepo, lifeAreasRepo, type Goal } from "@/db";
+import { descendantIds, PARENT_REJECTION_MESSAGE } from "@/lib/goal-tree";
 import { requireUser } from "@/lib/session";
 import {
   goalFormSchema,
@@ -18,6 +19,22 @@ export type ActionResult<T> =
   | { ok: false; error: string; fieldErrors?: GoalFieldErrors };
 
 const GENERIC_ERROR = "Something went wrong saving that. Please try again.";
+
+/**
+ * A goal change is felt beyond /goals.
+ *
+ * `/goals/[goalId]` is a dynamic segment, so revalidating the list path alone
+ * left every detail page showing the values it was rendered with, and Today
+ * reads active goals and their progress. The route LITERAL (brackets and all)
+ * is passed rather than a resolved id, which is how Next is told to invalidate
+ * every page of that segment: one edit moves the goal's own page and its
+ * parent's, whose rolled-up progress just changed too.
+ */
+function revalidateGoalSurfaces() {
+  revalidatePath("/goals");
+  revalidatePath("/goals/[goalId]", "page");
+  revalidatePath("/today");
+}
 
 /**
  * Verify that any referenced life area / parent goal belong to the caller
@@ -39,17 +56,27 @@ async function validateReferences(
 
   if (values.parentGoalId) {
     if (goalId && values.parentGoalId === goalId) {
-      fieldErrors.parentGoalId = "A goal cannot be its own parent.";
+      fieldErrors.parentGoalId = PARENT_REJECTION_MESSAGE.self;
     } else {
       const parent = await goalsRepo.getGoal(userId, values.parentGoalId);
       if (!parent) {
         fieldErrors.parentGoalId = "Choose one of your goals.";
+      } else if (parent.parentGoalId) {
+        /*
+         * Two levels, and the server is where that is enforced.
+         *
+         * The form only ever offers eligible parents, but the form is not the
+         * boundary: this action is reachable directly, and a third level would
+         * put work at a depth no breadcrumb, rollup or planner in the app is
+         * built to read. Rejecting here means the tree can never acquire one.
+         */
+        fieldErrors.parentGoalId = PARENT_REJECTION_MESSAGE.too_deep;
       } else if (goalId) {
         // Would assigning this parent create a cycle? It does if the goal being
         // edited is itself an ancestor of the proposed parent.
         const parentAncestors = await goalsRepo.collectAncestorIds(userId, values.parentGoalId);
         if (parentAncestors.has(goalId)) {
-          fieldErrors.parentGoalId = "That would create a loop in your goal hierarchy.";
+          fieldErrors.parentGoalId = PARENT_REJECTION_MESSAGE.cycle;
         }
       }
     }
@@ -77,7 +104,7 @@ export async function createGoalAction(input: GoalFormInput): Promise<ActionResu
 
   try {
     const goal = await goalsRepo.createGoal(user.id, parsed.data);
-    revalidatePath("/goals");
+    revalidateGoalSurfaces();
     return { ok: true, data: goal };
   } catch (error) {
     console.error("createGoalAction failed", error);
@@ -136,7 +163,7 @@ export async function updateGoalAction(
       );
     }
 
-    revalidatePath("/goals");
+    revalidateGoalSurfaces();
     return { ok: true, data: goal };
   } catch (error) {
     console.error("updateGoalAction failed", error);
@@ -144,17 +171,37 @@ export async function updateGoalAction(
   }
 }
 
-export async function archiveGoalAction(id: string): Promise<ActionResult<{ id: string }>> {
+/**
+ * Archive a goal and everything nested under it.
+ *
+ * The dialog promised this and the code did not deliver it: only the named row
+ * was archived, so its subgoals stayed on the board pointing at a parent that
+ * had vanished. The descendant set is resolved from the caller's OWN goals
+ * (`listGoals` is user-scoped) and the repository update is scoped again, so
+ * the id list can only ever name rows this account already owns.
+ *
+ * To-dos are untouched. `tasks.goal_id` is `set null` on delete and nothing
+ * here deletes, so the work survives the ambition being shelved, which is the
+ * whole point of archiving instead of deleting (CLAUDE.md section 7).
+ */
+export async function archiveGoalAction(
+  id: string,
+): Promise<ActionResult<{ id: string; archivedCount: number }>> {
   const user = await requireUser();
 
   const idResult = goalIdSchema.safeParse(id);
   if (!idResult.success) return { ok: false, error: "That goal could not be found." };
 
   try {
-    const goal = await goalsRepo.archiveGoal(user.id, idResult.data);
+    const goal = await goalsRepo.getGoal(user.id, idResult.data);
     if (!goal) return { ok: false, error: "That goal could not be found." };
-    revalidatePath("/goals");
-    return { ok: true, data: { id: goal.id } };
+
+    const all = await goalsRepo.listGoals(user.id);
+    const ids = [goal.id, ...descendantIds(all, goal.id)];
+    const archived = await goalsRepo.archiveGoals(user.id, ids);
+
+    revalidateGoalSurfaces();
+    return { ok: true, data: { id: goal.id, archivedCount: archived.length } };
   } catch (error) {
     console.error("archiveGoalAction failed", error);
     return { ok: false, error: "Could not archive that goal. Please try again." };

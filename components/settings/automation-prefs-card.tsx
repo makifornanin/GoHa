@@ -1,10 +1,11 @@
 "use client";
 
-import { BellRing } from "lucide-react";
+import { BellRing, TriangleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { updateAutomationPrefsAction } from "@/app/(app)/settings/actions";
+import { smartReminderWindow } from "@/lib/automation/smart-reminder";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -85,13 +86,22 @@ function ToggleRow({
  */
 export function AutomationPrefsCard({
   prefs,
+  morningTime,
+  eveningTime,
   className,
 }: {
   prefs: AutomationPrefs;
+  /** Daily Rhythm times, so this card can say when a toggle cannot fire. */
+  morningTime: string | null;
+  eveningTime: string | null;
   className?: string;
 }) {
   const [value, setValue] = useState(prefs);
   const [pending, startTransition] = useTransition();
+
+  // The worker's own rule, not a copy of it: the same function decides whether
+  // any slot exists, so this warning cannot drift from the actual behaviour.
+  const hasReminderWindow = smartReminderWindow({ morningTime, eveningTime }) !== null;
 
   function persist(next: AutomationPrefs) {
     const previous = value;
@@ -180,6 +190,33 @@ export function AutomationPrefsCard({
           disabled={pending}
           onChange={(next) => persist({ ...value, smartRemindersEnabled: next })}
         />
+
+        {/*
+          A switch that says "on" and can never fire is worse than one that is
+          off, because the user believes it is working.
+
+          Smart reminders live BETWEEN the two Daily Rhythm times: two hours
+          after the morning brief, two hours before the evening summary. Without
+          both times there is no window and no slot is ever queued; with times
+          too close together (08:00 and 09:00, say) the window is empty for the
+          same reason. The feature was silently inert in both cases and nothing
+          on this screen said so. It is the SAME function the worker uses, so
+          this cannot drift from what actually happens.
+        */}
+        {value.smartRemindersEnabled && !hasReminderWindow ? (
+          <p
+            role="status"
+            className="flex gap-2 rounded-xl border border-orange/30 bg-orange/10 px-3 py-2.5 text-callout text-label"
+          >
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-orange" aria-hidden />
+            <span>
+              These cannot be sent yet.{" "}
+              {morningTime && eveningTime
+                ? "Your morning and evening times are too close together to leave room between them."
+                : "Set both a morning and an evening time under Daily Rhythm first."}
+            </span>
+          </p>
+        ) : null}
 
         <div className="space-y-1.5">
           <label htmlFor="pref-quote" className="text-subhead text-label-secondary">

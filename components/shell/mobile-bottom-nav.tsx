@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { usePathname } from "next/navigation";
 
+import { AddMenuFab } from "@/components/shell/add-menu";
 import { mobileNav, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,6 @@ function BottomItem({ item }: { item: NavItem }) {
 
 /** Mobile tab bar: `glass-thin` chrome with a blue primary center action. */
 export function MobileBottomNav({ className }: { className?: string }) {
-  const router = useRouter();
   return (
     <nav
       aria-label="Primary"
@@ -39,14 +38,8 @@ export function MobileBottomNav({ className }: { className?: string }) {
     >
       <BottomItem item={mobileNav[0]} />
       <BottomItem item={mobileNav[1]} />
-      <button
-        type="button"
-        aria-label="Add a task"
-        onClick={() => router.push("/tasks?new=1")}
-        className="-mt-6 flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-blue text-white shadow-e2 transition-transform active:scale-[0.96]"
-      >
-        <Plus className="size-6" aria-hidden />
-      </button>
+      {/* Opens the same menu the sidebar does, upward so it clears the bar. */}
+      <AddMenuFab />
       <BottomItem item={mobileNav[2]} />
       <BottomItem item={mobileNav[3]} />
     </nav>

@@ -291,6 +291,6 @@ export async function deleteTaskAction(id: string): Promise<ActionResult<{ id: s
     return { ok: true, data: { id: idResult.data } };
   } catch (error) {
     console.error("deleteTaskAction failed", error);
-    return { ok: false, error: "Could not delete that task. Please try again." };
+    return { ok: false, error: "Could not delete that to-do. Please try again." };
   }
 }

@@ -23,6 +23,7 @@ import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { buildHabitViews, todayHabitViews } from "@/lib/habit-view";
 import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
 import { isStreakMilestone, streakAfterLogging } from "@/lib/milestones";
+import { useCreateSignal } from "@/lib/use-create-signal";
 import type { HabitFormInput } from "@/lib/validations/habit";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,9 @@ export function HabitsView({
   today,
   timeZone,
   weekStartsOn = 1,
+  openCreateOnMount = false,
+  defaultGoalId,
+  defaultLifeAreaId,
 }: {
   habits: HabitWithSchedule[];
   entries: HabitEntry[];
@@ -48,9 +52,16 @@ export function HabitsView({
   today: string;
   timeZone?: string;
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** `?new=1` from the Add menu or the command palette. */
+  openCreateOnMount?: boolean;
+  /** Links the Add menu already knew, e.g. "+ Add > Habit" inside a goal. */
+  defaultGoalId?: string;
+  defaultLifeAreaId?: string;
 }) {
-  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useCreateSignal(openCreateOnMount, "/habits", () =>
+    setEditingId(null),
+  );
   const [archiving, setArchiving] = useState<HabitWithSchedule | null>(null);
   const [milestone, setMilestone] = useState<Milestone | null>(null);
   const [, startTransition] = useTransition();
@@ -193,7 +204,7 @@ export function HabitsView({
         }}
       >
         <Plus />
-        New Habit
+        Add habit
       </Button>
     </>
   );
@@ -294,6 +305,8 @@ export function HabitsView({
         habit={editingHabit}
         lifeAreas={lifeAreaOptions}
         goals={goalOptions}
+        defaultGoalId={defaultGoalId}
+        defaultLifeAreaId={defaultLifeAreaId}
         onSubmit={editingHabit ? handleUpdate : handleCreate}
         onClose={() => setFormOpen(false)}
       />
