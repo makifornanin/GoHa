@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import type { Goal, HabitEntry, LifeArea } from "@/db";
 import type { HabitWithSchedule } from "@/db/repositories/habits";
 import { buildHabitViews, todayHabitViews } from "@/lib/habit-view";
-import { entityColorKey, lifeAreaColorConfig } from "@/lib/life-areas";
+import { entityColorKey, entityTint, resolveAreaColor } from "@/lib/life-areas";
 import { isStreakMilestone, streakAfterLogging } from "@/lib/milestones";
 import { useCreateSignal } from "@/lib/use-create-signal";
 import type { HabitFormInput } from "@/lib/validations/habit";
@@ -249,10 +249,16 @@ export function HabitsView({
               <ul className="flex flex-col">
                 {scheduledToday.map((view) => {
                   const area = view.habit.lifeAreaId ? lifeAreaById.get(view.habit.lifeAreaId) : null;
-                  const color = lifeAreaColorConfig[colorOf(view.habit)];
+                  const color = entityTint(resolveAreaColor(view.habit.color, view.habit.id));
                   return (
                     <li key={view.habit.id} className="relative flex min-h-10 flex-wrap items-center gap-3 rounded-xl px-3 py-1.5 transition-colors hover:bg-surface-hover [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator">
-                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", color.tile)}>
+                      <span
+                        className={cn(
+                          "flex size-8 shrink-0 items-center justify-center rounded-md",
+                          color.tile.className,
+                        )}
+                        style={color.tile.style}
+                      >
                         <LifeAreaIcon iconKey={view.habit.icon} className="size-4" />
                       </span>
                       {/* `min-w-36` is what makes the row's `flex-wrap` actually

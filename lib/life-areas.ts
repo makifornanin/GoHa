@@ -267,6 +267,49 @@ export const COLOR_PRESETS: readonly { label: string; hex: string }[] = [
   { label: "Sand", hex: "#b09372" },
 ];
 
+/**
+ * The handful offered before anyone asks for more.
+ *
+ * Six is about what a row can hold at 390px without shrinking the targets, and
+ * about as many as anyone compares at once. Chosen to be distinguishable from
+ * each other rather than to mean anything: nothing in GoHa reads a category's
+ * colour as a category, so "green" carries no promise about health and "blue"
+ * none about work.
+ *
+ * Derived from COLOR_PRESETS by label so the two can never drift apart.
+ */
+export const RECOMMENDED_COLOR_LABELS = [
+  "Blue",
+  "Teal",
+  "Green",
+  "Amber",
+  "Violet",
+  "Slate",
+] as const;
+
+export const RECOMMENDED_COLORS: readonly { label: string; hex: string }[] =
+  RECOMMENDED_COLOR_LABELS.map(
+    (label) => COLOR_PRESETS.find((preset) => preset.label === label)!,
+  );
+
+/**
+ * The icons shown before the library is opened.
+ *
+ * A spread across the groups rather than the first eight of one, so the
+ * collapsed row can answer most categories without expanding: something for
+ * work, study, body, money, home, planning and a neutral default.
+ */
+export const COMMON_ICON_KEYS: readonly LifeAreaIconKey[] = [
+  "target",
+  "briefcase",
+  "growth",
+  "heart",
+  "fitness",
+  "wallet",
+  "home",
+  "sparkles",
+];
+
 const HEX_PATTERN = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 /** Whether a stored value is a custom colour rather than one of the old keys. */
@@ -349,4 +392,30 @@ export function resolveAreaColor(
   const key = resolveColorKey(color, id);
   const config = lifeAreaColorConfig[key];
   return { kind: "preset", fill: config.fill, tile: config.tile, dot: config.dot };
+}
+
+/**
+ * How to paint a resolved entity colour, without ever emitting a raw CSS string.
+ *
+ * Preset colours keep their Tailwind classes, so nothing about an entity saved
+ * before custom colours existed changes. A custom colour has no class to apply,
+ * so it becomes an inline style built from a value `normalizeHex` has already
+ * validated as `#rrggbb`: the hex itself for the foreground, and the same hex at
+ * 15% for the tinted background, which is what the preset `tile` classes do.
+ *
+ * `solid` is for dots, bars and segments; `tile` is for the icon chips that need
+ * a readable glyph on a tint.
+ */
+export function entityTint(resolved: ReturnType<typeof resolveAreaColor>): {
+  solid: { className: string; style?: { backgroundColor: string } };
+  tile: { className: string; style?: { backgroundColor: string; color: string } };
+} {
+  if (resolved.dot && resolved.tile) {
+    return { solid: { className: resolved.dot }, tile: { className: resolved.tile } };
+  }
+  return {
+    solid: { className: "", style: { backgroundColor: resolved.fill } },
+    // `26` is 15% alpha in hex, matching the /15 the preset tiles use.
+    tile: { className: "", style: { backgroundColor: `${resolved.fill}26`, color: resolved.fill } },
+  };
 }

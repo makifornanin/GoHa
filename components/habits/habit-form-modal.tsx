@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { lifeAreaIconMap } from "@/components/life-areas/icon";
+import { ColorPicker } from "@/components/ui/color-picker";
+import { IconPicker } from "@/components/ui/icon-picker";
 import {
   HABIT_DESCRIPTION_MAX,
   HABIT_NAME_MAX,
@@ -24,12 +25,8 @@ import {
   type HabitScheduleType,
 } from "@/lib/habits";
 import {
-  LIFE_AREA_COLOR_KEYS,
-  LIFE_AREA_ICON_KEYS,
-  lifeAreaColorConfig,
   toColorKey,
   toIconKey,
-  type LifeAreaColorKey,
   type LifeAreaIconKey,
 } from "@/lib/life-areas";
 import {
@@ -100,7 +97,7 @@ function HabitFormFields({
   });
   const [unit, setUnit] = useState(() => habit?.unit ?? "");
   const [higherIsBetter, setHigherIsBetter] = useState(() => habit?.higherIsBetter ?? true);
-  const [color, setColor] = useState<LifeAreaColorKey>(() => toColorKey(habit?.color));
+  const [color, setColor] = useState<string>(() => habit?.color ?? toColorKey(undefined));
   const [icon, setIcon] = useState<LifeAreaIconKey>(() => toIconKey(habit?.icon));
   const [lifeAreaId, setLifeAreaId] = useState(
     () => habit?.lifeAreaId ?? defaultLifeAreaId ?? "",
@@ -344,46 +341,19 @@ function HabitFormFields({
         </div>
       </div>
 
-      <fieldset disabled={submitting}>
-        <legend className="mb-2 text-label-md text-on-surface-variant">Color &amp; icon</legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Color">
-          {LIFE_AREA_COLOR_KEYS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={color === key}
-              aria-label={lifeAreaColorConfig[key].label}
-              onClick={() => setColor(key)}
-              className={cn(
-                "flex size-8 items-center justify-center rounded-full ring-2 ring-offset-2 ring-offset-surface-container-lowest transition-all",
-                color === key ? "ring-on-surface" : "ring-transparent hover:ring-outline-variant",
-              )}
-            >
-              <span className={cn("size-5 rounded-full", lifeAreaColorConfig[key].swatch)} aria-hidden />
-            </button>
-          ))}
+      <fieldset disabled={submitting} className="flex flex-col gap-4">
+        <div>
+          <legend className="mb-1.5 text-label-md text-on-surface-variant">Color</legend>
+          <ColorPicker
+            value={color}
+            entityId={habit?.id ?? "new-habit"}
+            ariaLabel="Color"
+            onChange={setColor}
+          />
         </div>
-        <div className="mt-3 grid grid-cols-6 gap-2" role="radiogroup" aria-label="Icon">
-          {LIFE_AREA_ICON_KEYS.map((key) => {
-            const Icon = lifeAreaIconMap[key];
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={icon === key}
-                aria-label={key}
-                onClick={() => setIcon(key)}
-                className={cn(
-                  "flex aspect-square items-center justify-center rounded-lg border transition-colors",
-                  icon === key ? "border-primary bg-primary/10 text-primary" : "border-outline-variant text-on-surface-variant hover:border-primary",
-                )}
-              >
-                <Icon className="size-5" aria-hidden />
-              </button>
-            );
-          })}
+        <div>
+          <p className="mb-1.5 text-label-md text-on-surface-variant">Icon</p>
+          <IconPicker value={icon} ariaLabel="Icon" onChange={setIcon} />
         </div>
       </fieldset>
 

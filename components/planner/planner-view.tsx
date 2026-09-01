@@ -45,11 +45,11 @@ import type { DayPlanAllocation, DayPlanItem, LifeArea, Task } from "@/db";
 import type { GoalStatus } from "@/db/schema/enums";
 import type { Weekday } from "@/lib/date";
 import {
-  LIFE_AREA_COLOR_KEYS,
-  lifeAreaColorConfig,
-  resolveColorKey,
-  type LifeAreaColorKey,
+  resolveAreaColor,
+  toIconKey,
 } from "@/lib/life-areas";
+import { ColorPicker } from "@/components/ui/color-picker";
+import { IconPicker } from "@/components/ui/icon-picker";
 import { listContainer, listItem, spring } from "@/lib/motion";
 import {
   ALLOCATION_STEP_MINUTES,
@@ -78,17 +78,28 @@ type FocusActual = { taskId: string | null; seconds: number; sessions: number };
  *
  * Three sources, most deliberate first: a colour the user picked for this
  * category, the colour of the life area behind it, then one derived from the
- * category's own id so that an untouched plan is still legible rather than a
- * row of grey bars. Same vocabulary as Life Areas throughout, so "Health" looks
- * like Health wherever it appears.
+ * category's own id so an untouched plan is still legible rather than a row of
+ * grey bars. Same vocabulary as Life Areas throughout, so "Health" looks like
+ * Health wherever it appears.
+ *
+ * Returns the RESOLVED shape rather than a palette key, because a category may
+ * now carry a custom hex that no key can name. `fill` is always a usable CSS
+ * colour; `dot`/`tile` are Tailwind classes and are null for a custom one,
+ * which is what `swatchStyle` below exists to cover.
  */
-function categoryColorKey(
-  allocation: Pick<Allocation, "id" | "color">,
-  area: LifeArea | null,
-): LifeAreaColorKey {
-  if (allocation.color) return resolveColorKey(allocation.color, allocation.id);
-  if (area) return resolveColorKey(area.color, area.id);
-  return resolveColorKey(null, allocation.id);
+function categoryColor(allocation: Pick<Allocation, "id" | "color">, area: LifeArea | null) {
+  if (allocation.color) return resolveAreaColor(allocation.color, allocation.id);
+  if (area) return resolveAreaColor(area.color, area.id);
+  return resolveAreaColor(null, allocation.id);
+}
+
+type ResolvedColor = ReturnType<typeof categoryColor>;
+
+/** Class for a preset, inline style for a custom hex. Never a raw CSS string. */
+function swatch(resolved: ResolvedColor): { className: string; style?: { backgroundColor: string } } {
+  return resolved.dot
+    ? { className: resolved.dot }
+    : { className: "", style: { backgroundColor: resolved.fill } };
 }
 
 /**
@@ -425,7 +436,7 @@ export function PlannerView({
                   key={allocation.id}
                   allocation={allocation}
                   area={area}
-                  colorKey={categoryColorKey(allocation, area)}
+                  color={categoryColor(allocation, area)}
                   load={categoryLoad(allocation, allocItems)}
                   actual={actuals.byAllocation.get(allocation.id)}
                   items={allocItems}
@@ -667,13 +678,12 @@ function DaySummary({
             const area = allocation.lifeAreaId
               ? (lifeAreaById.get(allocation.lifeAreaId) ?? null)
               : null;
+            const seg = swatch(categoryColor(allocation, area));
             return (
               <motion.span
                 key={allocation.id}
-                className={cn(
-                  "h-full border-r border-surface last:border-r-0",
-                  lifeAreaColorConfig[categoryColorKey(allocation, area)].dot,
-                )}
+                className={cn("h-full border-r border-surface last:border-r-0", seg.className)}
+                style={seg.style}
                 initial={{ width: 0 }}
                 animate={{ width: `${(allocation.minutes / scale) * 100}%` }}
                 transition={spring.smooth}
@@ -714,16 +724,15 @@ function DaySummary({
             const area = allocation.lifeAreaId
               ? (lifeAreaById.get(allocation.lifeAreaId) ?? null)
               : null;
+            const legend = swatch(categoryColor(allocation, area));
             return (
               <li
                 key={allocation.id}
                 className="flex items-center gap-1.5 text-footnote text-label-secondary"
               >
                 <span
-                  className={cn(
-                    "size-2 shrink-0 rounded-full",
-                    lifeAreaColorConfig[categoryColorKey(allocation, area)].dot,
-                  )}
+                  className={cn("size-2 shrink-0 rounded-full", legend.className)}
+                  style={legend.style}
                   aria-hidden
                 />
                 {allocation.label}
@@ -866,7 +875,7 @@ function CommitBar({
 function CategoryCard({
   allocation,
   area,
-  colorKey,
+  color,
   load,
   actual,
   items,
@@ -886,7 +895,7 @@ function CategoryCard({
 }: {
   allocation: Allocation;
   area: LifeArea | null;
-  colorKey: LifeAreaColorKey;
+  color: ResolvedColor;
   load: ReturnType<typeof categoryLoad>;
   actual: CategoryActual | undefined;
   items: DayPlanItem[];
@@ -917,7 +926,7 @@ function CategoryCard({
    */
   const canLogActual = isToday;
 
-  const color = lifeAreaColorConfig[colorKey];
+  const chip = swatch(color);
   const actualMinutes = actual?.actualMinutes ?? 0;
   const focusMinutes = actual?.focusMinutes ?? 0;
   const manualMinutes = actual?.manualMinutes ?? 0;
@@ -930,9 +939,10 @@ function CategoryCard({
           <h3 className="flex min-w-0 items-center gap-2 text-headline text-label">
             <span
               className={cn(
-                "flex size-6 shrink-0 items-center justify-center rounded-md",
-                color.tile,
+                "flex size-6 shrink-0 items-center justify-center rounded-md text-white",
+                color.tile ?? "",
               )}
+              style={color.tile ? undefined : { backgroundColor: color.fill }}
             >
               <LifeAreaIcon iconKey={allocation.icon ?? area?.icon ?? null} className="size-3.5" />
             </span>
@@ -965,10 +975,11 @@ function CategoryCard({
             <div
               className={cn(
                 "h-full rounded-full transition-[width] duration-300",
-                load.overMinutes > 0 ? "bg-orange" : color.dot,
+                load.overMinutes > 0 ? "bg-orange" : chip.className,
               )}
               style={{
                 width: `${Math.min(100, (load.plannedMinutes / Math.max(1, load.capacityMinutes)) * 100)}%`,
+                ...(load.overMinutes > 0 ? {} : chip.style),
               }}
             />
           </div>
@@ -1539,7 +1550,8 @@ function CategoryEditorBody({
   const [newAreaId, setNewAreaId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [paletteFor, setPaletteFor] = useState<number | null>(null);
+  /** Which row has its appearance panel open. One at a time, so the list stays short. */
+  const [styling, setStyling] = useState<number | null>(null);
 
   const capacity = dayCapacity(draft);
   const usedAreaIds = new Set(draft.map((d) => d.lifeAreaId).filter(Boolean));
@@ -1656,15 +1668,25 @@ function CategoryEditorBody({
 
       <ul className="flex flex-col gap-2">
         {draft.map((row, index) => {
-          const colorKey = row.color
-            ? resolveColorKey(row.color, row.id ?? row.label)
-            : resolveColorKey(null, row.id ?? row.label);
+          const resolved = row.color
+            ? resolveAreaColor(row.color, row.id ?? row.label)
+            : resolveAreaColor(null, row.id ?? row.label);
+          const dot = swatch(resolved);
           return (
             <li
               key={row.id ?? `${row.label}-${index}`}
               className="rounded-xl border border-separator-opaque px-3 py-2"
             >
-              <div className="flex items-center gap-2">
+              {/*
+                Wraps on a phone.
+
+                Reorder, colour, name, a stepper, a total and a delete is more
+                controls than 390px holds in one line: measured at 60px of name
+                field, which clipped "Personal" and "Free time". The stepper
+                group drops to its own line below the width where they all fit,
+                and the name keeps a floor so it never shrinks to nothing again.
+              */}
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex shrink-0 flex-col">
                   <button
                     type="button"
@@ -1686,26 +1708,31 @@ function CategoryEditorBody({
                   </button>
                 </div>
 
+                {/* One control for both colour and icon: the chip shows the
+                    current pair and opens the pickers for that row. */}
                 <button
                   type="button"
-                  onClick={() => setPaletteFor(paletteFor === index ? null : index)}
-                  aria-label={`Choose a colour for ${row.label}`}
-                  aria-expanded={paletteFor === index}
+                  onClick={() => setStyling(styling === index ? null : index)}
+                  aria-label={`Colour and icon for ${row.label}`}
+                  aria-expanded={styling === index}
                   className={cn(
-                    "size-6 shrink-0 cursor-pointer rounded-md transition-transform hover:scale-110",
-                    lifeAreaColorConfig[colorKey].dot,
+                    "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-white transition-transform hover:scale-105 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40",
+                    dot.className,
                   )}
-                />
+                  style={dot.style}
+                >
+                  <LifeAreaIcon iconKey={row.icon} className="size-4" />
+                </button>
 
                 <Input
                   value={row.label}
                   onChange={(e) => patch(index, { label: e.target.value })}
                   maxLength={40}
                   aria-label={`Name of category ${index + 1}`}
-                  className="h-8 min-w-0 flex-1"
+                  className="h-8 min-w-[7rem] flex-1"
                 />
 
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="ml-auto flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setMinutes(index, row.minutes - ALLOCATION_STEP_MINUTES)}
@@ -1729,7 +1756,7 @@ function CategoryEditorBody({
                   <button
                     type="button"
                     onClick={() => {
-                      setPaletteFor(null);
+                      setStyling(null);
                       setDraft((rows) => rows.filter((_, i) => i !== index));
                     }}
                     aria-label={`Remove ${row.label}`}
@@ -1740,29 +1767,29 @@ function CategoryEditorBody({
                 </div>
               </div>
 
-              {paletteFor === index ? (
-                <div
-                  className="mt-2 flex flex-wrap gap-1.5"
-                  role="group"
-                  aria-label={`Colour for ${row.label}`}
-                >
-                  {LIFE_AREA_COLOR_KEYS.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-label={key}
-                      aria-pressed={colorKey === key}
-                      onClick={() => {
-                        patch(index, { color: key });
-                        setPaletteFor(null);
-                      }}
-                      className={cn(
-                        "size-6 cursor-pointer rounded-full transition-transform hover:scale-110",
-                        lifeAreaColorConfig[key].dot,
-                        colorKey === key ? "ring-2 ring-label ring-offset-2 ring-offset-surface" : "",
-                      )}
+              {styling === index ? (
+                <div className="mt-3 flex flex-col gap-3 border-t border-separator pt-3">
+                  <div>
+                    <p className="mb-1.5 text-caption uppercase tracking-wide text-label-tertiary">
+                      Colour
+                    </p>
+                    <ColorPicker
+                      value={row.color}
+                      entityId={row.id ?? row.label}
+                      ariaLabel={`Colour for ${row.label}`}
+                      onChange={(next) => patch(index, { color: next })}
                     />
-                  ))}
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-caption uppercase tracking-wide text-label-tertiary">
+                      Icon
+                    </p>
+                    <IconPicker
+                      value={toIconKey(row.icon)}
+                      ariaLabel={`Icon for ${row.label}`}
+                      onChange={(next) => patch(index, { icon: next })}
+                    />
+                  </div>
                 </div>
               ) : null}
             </li>

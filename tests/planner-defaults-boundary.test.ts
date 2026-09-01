@@ -213,3 +213,22 @@ describe("no repository uses interactive transactions", () => {
     expect(stripComments(read("db/repositories/planner.ts"))).toContain("db.batch(");
   });
 });
+
+/**
+ * The category editor row on a phone.
+ *
+ * Reorder, colour, name, stepper, total and delete is more than 390px holds in
+ * one line. Measured at 60px of name field, which clipped "Personal" and "Free
+ * time" into unreadable stubs. The row wraps and the name keeps a floor.
+ */
+describe("the category editor row survives a narrow screen", () => {
+  const view = read("components/planner/planner-view.tsx");
+
+  it("wraps rather than crushing the name field", () => {
+    expect(view).toContain("flex flex-wrap items-center gap-2");
+  });
+
+  it("gives the name a minimum width", () => {
+    expect(view).toContain('className="h-8 min-w-[7rem] flex-1"');
+  });
+});

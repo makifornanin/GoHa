@@ -13,6 +13,8 @@ import {
   DEFAULT_ICON_KEY,
   LIFE_AREA_COLOR_KEYS,
   LIFE_AREA_ICON_KEYS,
+  isHexColor,
+  normalizeHex,
 } from "@/lib/life-areas";
 
 function optionalUuid(message: string) {
@@ -53,7 +55,19 @@ export const habitFormSchema = z
       .optional()
       .transform((v) => (v && v.length > 0 ? v : null)),
     higherIsBetter: z.boolean().default(true),
-    color: z.enum(LIFE_AREA_COLOR_KEYS).default(DEFAULT_COLOR_KEY),
+    /*
+     * A legacy key OR a `#rrggbb` custom colour, exactly as a life area accepts.
+     * The column is already `text`, so widening the accepted range needed no
+     * migration, and every habit saved as "teal" keeps validating as before.
+     */
+    color: z
+      .string()
+      .default(DEFAULT_COLOR_KEY)
+      .refine(
+        (value) => LIFE_AREA_COLOR_KEYS.includes(value as never) || isHexColor(value),
+        "Choose a colour from the palette, or enter one like #4a7ab5.",
+      )
+      .transform((value) => normalizeHex(value) ?? value),
     icon: z.enum(LIFE_AREA_ICON_KEYS).default(DEFAULT_ICON_KEY),
     lifeAreaId: optionalUuid("Choose a valid life area."),
     goalId: optionalUuid("Choose a valid goal."),

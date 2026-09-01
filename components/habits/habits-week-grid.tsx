@@ -5,7 +5,7 @@ import { Archive, Flame, Pencil } from "lucide-react";
 import { formatIsoDateMedium } from "@/lib/date";
 import { dayCellConfig, WEEKDAY_ABBR } from "@/lib/habits";
 import type { HabitView } from "@/lib/habit-view";
-import { lifeAreaColorConfig, type LifeAreaColorKey } from "@/lib/life-areas";
+import { entityTint, resolveAreaColor, type LifeAreaColorKey } from "@/lib/life-areas";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
  */
 export function HabitsWeekGrid({
   views,
-  colorOf,
   onEdit,
   onArchive,
 }: {
@@ -95,7 +94,7 @@ export function HabitsWeekGrid({
           <tbody>
             {views.map((view) => {
               const { habit, streaks, weekCells } = view;
-              const color = lifeAreaColorConfig[colorOf(habit)];
+              const color = entityTint(resolveAreaColor(habit.color, habit.id));
               return (
                 <tr key={habit.id} className="group border-b border-separator last:border-0">
                   <td className="py-3 pr-2">
@@ -107,7 +106,11 @@ export function HabitsWeekGrid({
                       // steal taps from (unlike the colour swatch rows).
                       className="hit-44 flex max-w-full cursor-pointer items-center gap-2 text-left"
                     >
-                      <span className={cn("size-2 shrink-0 rounded-full", color.dot)} aria-hidden />
+                      <span
+                        className={cn("size-2 shrink-0 rounded-full", color.solid.className)}
+                        style={color.solid.style}
+                        aria-hidden
+                      />
                       <span className="truncate text-body text-label hover:text-blue">
                         {habit.name}
                       </span>
