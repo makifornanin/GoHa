@@ -1,11 +1,11 @@
 # Graph Report - C:\Users\Mark\GoHa App  (2026-09-01)
 
 ## Corpus Check
-- 31 files · ~652,247 words
+- 31 files · ~655,651 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3229 nodes · 7634 edges · 195 communities (171 shown, 24 thin omitted)
+- 3237 nodes · 7625 edges · 207 communities (178 shown, 29 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 200 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -153,24 +153,36 @@
 - Next.Config.Ts: Next.Config.Ts
 - Static assets
 - Test suite
-- App routes
-- App routes
-- App routes
-- App routes
-- App routes
-- Database layer
-- End-to-end tests
-- End-to-end tests
-- Eslint.Config.Mjs: Eslint.Config.Mjs
+- Test suite
 - Database layer
 - Database layer
-- Community 185
+- Database layer
+- Static assets
+- Test suite
+- App routes
+- App routes
+- App routes
+- App routes
+- App routes
+- App routes
+- Postcss.Config.Mjs: Postcss.Config.Mjs
+- Static assets
+- Community 174
+- Database layer
+- Database layer
+- Database layer
+- Database layer
+- Database layer
 - Database layer
 - Community 191
-- End-to-end tests
+- Community 195
+- Community 197
+- Community 202
+- Community 203
+- Community 204
 
 ## God Nodes (most connected - your core abstractions)
-1. `cn()` - 170 edges
+1. `cn()` - 164 edges
 2. `addDays()` - 52 edges
 3. `Button()` - 51 edges
 4. `requireUser()` - 49 edges
@@ -178,8 +190,8 @@
 6. `startOfWeek()` - 39 edges
 7. `authenticateAutomation()` - 38 edges
 8. `getUserDatePrefs()` - 36 edges
-9. `Weekday` - 33 edges
-10. `IsoDate` - 33 edges
+9. `IsoDate` - 33 edges
+10. `Weekday` - 33 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `create-next-app Bootstrap README` --references--> `GoHa Tech Stack (Next.js 16, Drizzle, Neon, Better Auth)`  [AMBIGUOUS]
@@ -190,8 +202,8 @@
   docs/DESIGN_SYSTEM.md → design/stitch_goha_productivity_system_dashboard/serene_lifecycle/DESIGN.md
 - `Fixed-Fluid Hybrid Grid on an 8px Unit` --semantically_similar_to--> `The Proximity Law (group gap at least 3x inner gap)`  [INFERRED] [semantically similar]
   design/stitch_goha_productivity_system_dashboard/serene_lifecycle/DESIGN.md → docs/GOHA_DESIGN_SPEC.md
-- `EstimateChip()` --calls--> `cn()`  [EXTRACTED]
-  components/tasks/task-form-modal.tsx → lib/utils.ts
+- `ActionButton()` --calls--> `cn()`  [EXTRACTED]
+  components/tasks/task-card.tsx → lib/utils.ts
 
 ## Import Cycles
 - None detected.
@@ -237,139 +249,139 @@
 - **Execution funnel: capture, rank, commit to one task, then start a focus session** — design_stitch_goha_productivity_system_dashboard_today_dashboard_screen_quick_add_task, design_stitch_goha_productivity_system_dashboard_today_dashboard_screen_top_3_actions, design_stitch_goha_productivity_system_dashboard_today_dashboard_screen_todays_focus_card, design_stitch_goha_productivity_system_dashboard_today_dashboard_screen_start_focus_session [INFERRED 0.85]
 - **Time Horizon Filtering Flow: Views Rail, Counts, Header, Upcoming Section** — design_stitch_goha_productivity_system_dashboard_to_do_lists_screen_views_rail, design_stitch_goha_productivity_system_dashboard_to_do_lists_screen_view_count_badges, design_stitch_goha_productivity_system_dashboard_to_do_lists_screen_today_header, design_stitch_goha_productivity_system_dashboard_to_do_lists_screen_upcoming_section, design_stitch_goha_productivity_system_dashboard_to_do_lists_screen_date_derived_buckets [INFERRED 0.85]
 
-## Communities (195 total, 24 thin omitted)
+## Communities (207 total, 29 thin omitted)
 
 ### Community 0 - "Domain logic"
 Cohesion: 0.05
-Nodes (70): acceptSuggestionAction(), ActionResult, addFreeformItemAction(), addPlanToTodayAction(), logActualMinutesAction(), moveItemAction(), removePlanItemAction(), renameFreeformItemAction() (+62 more)
+Nodes (63): ActionResult, saveTakeawayAction(), TakeawayComposer(), IsoDate, getDailyInspiration(), FALLBACK_POOL, pickFallback(), QUOTES (+55 more)
 
 ### Community 1 - "Domain logic"
 Cohesion: 0.05
-Nodes (64): guardSignUp(), handlers, json(), pendingClaims, POST(), sendWelcomeEmail(), settleClaim(), ActionResult (+56 more)
+Nodes (42): ActionResult, archiveBrainDumpItemAction(), captureBrainDumpItemAction(), convertBrainDumpItemAction(), deleteBrainDumpItemAction(), restoreBrainDumpItemAction(), setBrainDumpColorAction(), updateBrainDumpItemAction() (+34 more)
 
 ### Community 2 - "Domain logic"
-Cohesion: 0.05
-Nodes (60): ActionResult, discardFocusSessionAction(), endFocusSessionAction(), extendFocusSessionAction(), extendMinutesSchema, idSchema, noteSchema, pauseFocusSessionAction() (+52 more)
+Cohesion: 0.07
+Nodes (50): ActionResult, archiveGoalAction(), createGoalAction(), revalidateGoalSurfaces(), updateGoalAction(), validateReferences(), GoalDetailView(), GoalProgressEntry (+42 more)
 
 ### Community 3 - "UI components"
-Cohesion: 0.06
-Nodes (55): getDailyInspiration(), FALLBACK_POOL, pickFallback(), QUOTES, VERSES, BIBLE_API_URL, bibleApiSchema, BSB_API_BASE (+47 more)
+Cohesion: 0.08
+Nodes (35): metadata, LogoutButton(), BarSeries(), SeriesPoint, Sparkline(), ChartDataTable(), TableRow, TabButton() (+27 more)
 
 ### Community 4 - "Domain logic"
-Cohesion: 0.08
-Nodes (46): CalendarPage(), manilaToday(), Weekday, weekdayOf(), DayCellStateName, HabitMeasure, HabitOutcome, HabitOutcomeInput (+38 more)
-
-### Community 5 - "Domain logic"
-Cohesion: 0.08
-Nodes (36): BrainDumpPage(), metadata, FocusPage(), GoalsPage(), metadata, HabitsPage(), metadata, metadata (+28 more)
-
-### Community 6 - "UI components"
-Cohesion: 0.12
-Nodes (34): account, session, user, verification, automationRequests, automationTokens, notificationLog, brainDumpItems (+26 more)
-
-### Community 7 - "UI components"
 Cohesion: 0.06
 Nodes (54): App Shell Navigation, Brain Dump Screen, Quick Capture Area, Thought Conversion Actions, GoHa Design Tokens, Calendar Schedule Screen, Daily Focus Insight Card, Event Prep Subtasks (+46 more)
 
+### Community 5 - "Domain logic"
+Cohesion: 0.08
+Nodes (43): CalendarPage(), weekdayOf(), countsTowardExpected(), DayCellStateName, HabitMeasure, HabitOutcome, HabitOutcomeInput, isCompleteOutcome() (+35 more)
+
+### Community 6 - "UI components"
+Cohesion: 0.08
+Nodes (40): HabitsPage(), metadata, metadata, metadata, TodayPage(), DateRolloverRefresh(), addMonths(), contextWeekStart() (+32 more)
+
+### Community 7 - "UI components"
+Cohesion: 0.10
+Nodes (37): cancelTaskAction(), completeTaskAction(), createSubtaskAction(), createTaskAction(), deleteTaskAction(), goalJustCompleted(), reopenTaskAction(), revalidateTaskSurfaces() (+29 more)
+
 ### Community 8 - "Design references"
 Cohesion: 0.07
-Nodes (36): ActionResult, archiveBrainDumpItemAction(), captureBrainDumpItemAction(), convertBrainDumpItemAction(), deleteBrainDumpItemAction(), restoreBrainDumpItemAction(), setBrainDumpColorAction(), updateBrainDumpItemAction() (+28 more)
+Nodes (32): updateAutomationPrefsAction(), updatePreferencesAction(), updateProfileAction(), updateRhythmAction(), updateThemeAction(), ActionResult, ArchivedItem, ArchivedKind (+24 more)
 
 ### Community 9 - "Domain logic"
-Cohesion: 0.09
-Nodes (41): ActionResult, cancelTaskAction(), completeTaskAction(), createSubtaskAction(), createTaskAction(), deleteTaskAction(), goalJustCompleted(), reopenTaskAction() (+33 more)
+Cohesion: 0.17
+Nodes (25): account, session, user, verification, brainDumpItems, BrainDumpConvertedType, BrainDumpStatus, GoalProgressMode (+17 more)
 
 ### Community 10 - "Database layer"
 Cohesion: 0.09
-Nodes (33): Milestone, HabitLogControl(), LogHabit, LogInput, SettingsLink(), ActiveGoalsCard(), BrainCard(), STATE_STYLE (+25 more)
+Nodes (30): ActionResult, TaskRow(), CompletionNoteModal(), SubtaskTitle(), TaskDetailBody(), TaskDetailHandlers, TaskTitleField(), toFormValues() (+22 more)
 
 ### Community 11 - "Database layer"
-Cohesion: 0.07
-Nodes (32): TaskRow(), ActionButton(), TaskCard(), TaskLifeAreaRef, SubtaskTitle(), TaskDetailBody(), TaskDetailHandlers, TaskTitleField() (+24 more)
-
-### Community 12 - "Database layer"
-Cohesion: 0.07
-Nodes (41): NumericControl(), BriefGoal, BriefHabit, BriefTask, MorningBriefPayload, OPEN, toBriefTask(), toMorningPayload() (+33 more)
-
-### Community 13 - "Domain logic"
-Cohesion: 0.10
-Nodes (29): AppLayout(), metadata, LogoutButton(), HierarchyDiagram(), HierarchyRow, AppHeader(), AppSidebar(), Brand() (+21 more)
-
-### Community 14 - "App routes"
-Cohesion: 0.11
-Nodes (35): ActionResult, archiveLifeAreaAction(), createLifeAreaAction(), restoreLifeAreaAction(), updateLifeAreaAction(), LifeAreasPage(), metadata, LifeAreaCard() (+27 more)
-
-### Community 15 - "Package.Json: Package.Json"
-Cohesion: 0.05
-Nodes (38): dailyPriorities, Account, AutomationJob, DailyInspirationRow, DailyPriority, NewAutomationJob, NewAutomationRequest, NewAutomationToken (+30 more)
-
-### Community 16 - "Domain logic"
-Cohesion: 0.10
-Nodes (37): DateField(), DateFieldProps, describeDate(), monthGrid(), monthLabel(), shiftMonth(), WEEKDAY_LABELS, materializeWeeklyJobs() (+29 more)
-
-### Community 17 - "Domain logic"
-Cohesion: 0.07
-Nodes (26): metadata, LoginPage(), metadata, metadata, AuthForm(), COMMON, loginSchema, PasswordMeter() (+18 more)
-
-### Community 18 - "Database layer"
 Cohesion: 0.05
 Nodes (39): better-auth, class-variance-authority, clsx, drizzle-orm, lucide-react, motion, @neondatabase/serverless, next (+31 more)
 
-### Community 19 - "Domain logic"
+### Community 12 - "Database layer"
+Cohesion: 0.13
+Nodes (29): dynamic, POST(), readClaimBody(), runtime, dynamic, POST(), runtime, dynamic (+21 more)
+
+### Community 13 - "Domain logic"
+Cohesion: 0.08
+Nodes (33): PushDelivery, PushSubscriptionRecord, ValidatedPushEndpoint, createPushSender(), decodedBase64Url(), DEFAULT_PUSH_TTL_SECONDS, defaultSender, ignoreMutationFailure() (+25 more)
+
+### Community 14 - "App routes"
+Cohesion: 0.08
+Nodes (21): metadata, metadata, COMMON, loginSchema, PasswordMeter(), registerSchema, scorePassword(), ForgotPasswordForm() (+13 more)
+
+### Community 15 - "Package.Json: Package.Json"
 Cohesion: 0.08
 Nodes (32): dbNodeToFlow(), EDGE_OPTIONS, GohaNode, GohaNodeData, GohaNodeView(), ImportTasksDialog(), LegendEditor(), LegendKey() (+24 more)
 
-### Community 20 - "Package.Json: Package.Json"
+### Community 16 - "Domain logic"
 Cohesion: 0.10
 Nodes (34): "account", "brain_dump_items", "daily_priorities", "focus_sessions", "goal_progress_updates", "goals", "habit_entries", "habit_schedules" (+26 more)
 
-### Community 21 - "Database layer"
-Cohesion: 0.08
-Nodes (32): PushSubscriptionRecord, createPushSender(), decodedBase64Url(), DEFAULT_PUSH_TTL_SECONDS, defaultSender, ignoreMutationFailure(), isInvalidLocalSubscription(), MAX_PUSH_PAYLOAD_BYTES (+24 more)
+### Community 17 - "Domain logic"
+Cohesion: 0.05
+Nodes (36): Account, AutomationJob, DailyInspirationRow, NewAutomationJob, NewAutomationRequest, NewAutomationToken, NewBrainDumpItem, NewDailyInspiration (+28 more)
 
-### Community 22 - "Database layer"
+### Community 18 - "Database layer"
+Cohesion: 0.12
+Nodes (29): ActionResult, clearPairingCookie(), createPushPairingAction(), endpointInputSchema, getCurrentPushStateAction(), getStagedPairingStateAction(), listPushOverviewAction(), presentedPairingHash() (+21 more)
+
+### Community 19 - "Domain logic"
 Cohesion: 0.06
 Nodes (36): drizzle-kit, eslint, eslint-config-next, jsdom, devDependencies, drizzle-kit, eslint, eslint-config-next (+28 more)
 
-### Community 23 - "App routes"
+### Community 20 - "Package.Json: Package.Json"
+Cohesion: 0.13
+Nodes (25): Celebration(), CONFIG, Milestone, PARTICLES, ActiveGoalsCard(), DailyInspirationCard(), DailyInspirationView, PROVIDER_CREDIT (+17 more)
+
+### Community 21 - "Database layer"
 Cohesion: 0.06
-Nodes (8): createDb(), Database, db, getDb(), invites, FocusSessionStatus, focusSessions, Invite
+Nodes (10): automationRequests, automationTokens, dailyQuotes, notificationLog, AutomationScope, QuoteSource, AutomationRequest, AutomationToken (+2 more)
+
+### Community 22 - "Database layer"
+Cohesion: 0.23
+Nodes (26): dynamic, POST(), dynamic, GET(), dynamic, GET(), dynamic, GET() (+18 more)
+
+### Community 23 - "App routes"
+Cohesion: 0.14
+Nodes (25): metadata, ProgressPage(), HabitHeatmap(), LEVEL_CLASS, WEEKDAY_INITIAL, Delta(), ProgressData, ProgressView() (+17 more)
 
 ### Community 24 - "App routes"
-Cohesion: 0.13
-Nodes (28): metadata, ProgressPage(), HabitHeatmap(), LEVEL_CLASS, WEEKDAY_INITIAL, ProgressData, ProgressView(), HabitWithSchedule (+20 more)
-
-### Community 25 - "App routes"
-Cohesion: 0.10
-Nodes (26): FormProps, HabitFormFields(), HabitGoalOption, HabitLifeAreaOption, scheduleTypeOf(), HabitsWeekGrid(), RowAction(), dayCellConfig (+18 more)
-
-### Community 26 - "Domain logic"
-Cohesion: 0.23
-Nodes (25): dynamic, POST(), dynamic, GET(), dynamic, GET(), dynamic, GET() (+17 more)
-
-### Community 27 - "Database layer"
 Cohesion: 0.10
 Nodes (3): ThemeToggle(), Button(), disabledPalette
 
-### Community 28 - "UI components"
+### Community 25 - "App routes"
 Cohesion: 0.15
-Nodes (25): dynamic, POST(), readClaimBody(), runtime, dynamic, POST(), runtime, ALLOWED_FIELDS (+17 more)
+Nodes (24): metadata, CalendarData, CalendarView(), FocusDay, HabitDay, habitOutcomeDisplay, Layer, TaskCalendar() (+16 more)
+
+### Community 26 - "Domain logic"
+Cohesion: 0.08
+Nodes (18): acquireDeliveryAttempt(), activeSubscriptionWhere(), boundedErrorCode(), boundedStatus(), countActiveSubscriptions(), DeliveryAttemptClaim, listActiveSubscriptions(), markDeliveryAccepted() (+10 more)
+
+### Community 27 - "Database layer"
+Cohesion: 0.07
+Nodes (9): createDb(), Database, db, getDb(), TaskInput, dailyPriorities, TaskStatus, DailyPriority (+1 more)
+
+### Community 28 - "UI components"
+Cohesion: 0.11
+Nodes (23): FormProps, HabitFormModal(), HabitGoalOption, HabitLifeAreaOption, NumericControl(), dayCellConfig, DayCellState, HABIT_DESCRIPTION_MAX (+15 more)
 
 ### Community 29 - "App routes"
-Cohesion: 0.16
-Nodes (22): metadata, CalendarData, CalendarView(), FocusDay, HabitDay, habitOutcomeDisplay, Layer, TaskCalendar() (+14 more)
-
-### Community 30 - "Domain logic"
 Cohesion: 0.07
 Nodes (29): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+21 more)
 
+### Community 30 - "Domain logic"
+Cohesion: 0.13
+Nodes (22): GoalDetailPage(), calculateGoalProgress(), clampPercent(), EMPTY_TASK_COUNTS, GoalProgressResult, GoalProgressSource, GoalTaskCounts, ancestorPath() (+14 more)
+
 ### Community 31 - "Domain logic"
 Cohesion: 0.11
-Nodes (23): getCurrentPushStateAction(), listPushOverviewAction(), PushOverview, sendTestPushAction(), unsubscribePushAction(), IphoneSetupPage(), metadata, IphoneSetupClient() (+15 more)
+Nodes (24): ActionResult, AutomationOverview, createAutomationTokenAction(), deleteAutomationTokenAction(), idSchema, listAutomationAction(), qrSvgFor(), RequestSummary (+16 more)
 
 ### Community 32 - "Tsconfig.Json: Tsconfig.Json"
-Cohesion: 0.13
-Nodes (23): FormProps, GoalProgressMode, GoalStatus, GoalTimeframe, DEFAULT_TIMEFRAME, GOAL_DESCRIPTION_MAX, GOAL_PROGRESS_MAX, GOAL_PROGRESS_MIN (+15 more)
+Cohesion: 0.11
+Nodes (25): addDaysIso(), Allocation, ALLOCATION_MIN_MINUTES, ALLOCATION_STEP_MINUTES, AREA_MATCH_BONUS, CapacityStatus, capacitySummary(), CategoryActual (+17 more)
 
 ### Community 33 - "App routes"
 Cohesion: 0.09
@@ -388,390 +400,418 @@ Cohesion: 0.08
 Nodes (12): addAllocation(), AllocationInput, FocusActual, getOrCreatePlan(), getPlan(), getPlanContents(), PlanWithContents, syncAllocations() (+4 more)
 
 ### Community 37 - "UI components"
-Cohesion: 0.09
-Nodes (14): activeSubscriptionWhere(), boundedErrorCode(), boundedStatus(), countActiveSubscriptions(), DeliveryAttemptClaim, listActiveSubscriptions(), markDeliveryAccepted(), markDeliveryPermanentFailure() (+6 more)
-
-### Community 38 - "Database layer"
-Cohesion: 0.14
-Nodes (21): CommandTarget, loadCommandIndexAction(), AddMenu(), AddMenuFab(), ICON, Command, CommandPalette(), fuzzyScore() (+13 more)
-
-### Community 39 - "Domain logic"
-Cohesion: 0.11
-Nodes (22): updatePreferencesAction(), updateProfileAction(), updateRhythmAction(), updateThemeAction(), ActionResult, ArchivedItem, ArchivedKind, deleteArchivedAction() (+14 more)
-
-### Community 40 - "Domain logic"
-Cohesion: 0.10
-Nodes (21): Celebration(), CONFIG, PARTICLES, DurationPicker(), DetailPanel(), DetailRow(), SegmentedControl(), SegmentedOption (+13 more)
-
-### Community 41 - "Domain logic"
 Cohesion: 0.08
 Nodes (11): getHabitSchedule(), HabitInput, HabitScheduleInput, listHabits(), listHabitsWithSchedule(), upsertHabitSchedule(), habitEntries, habitSchedules (+3 more)
 
-### Community 42 - "Domain logic"
+### Community 38 - "Database layer"
 Cohesion: 0.11
-Nodes (20): ActionResult, prose, ReviewInput, reviewSchema, metadata, ReviewPage(), ReviewData, prepareReview() (+12 more)
+Nodes (20): DateBucket, toZonedDate(), deriveReviewStats(), ReviewWeek, ACTIVE_STATUSES, isInBucket(), TaskDateFields, taskEffectiveDate() (+12 more)
 
-### Community 43 - "UI components"
-Cohesion: 0.15
-Nodes (21): ActionResult, clearPairingCookie(), createPushPairingAction(), disconnectPushDeviceAction(), endpointInputSchema, getStagedPairingStateAction(), listPushDevicesAction(), presentedPairingHash() (+13 more)
+### Community 39 - "Domain logic"
+Cohesion: 0.17
+Nodes (18): dynamic, GET(), metadata, ReviewPage(), exportMyDataAction(), DataCard(), DateField(), DateFieldProps (+10 more)
 
-### Community 44 - "Domain logic"
-Cohesion: 0.13
-Nodes (21): acquireDeliveryAttempt(), createPinnedPushAgent(), endpointValidationFailureIsTransient(), FORBIDDEN_HOST_SUFFIXES, hasPrefix(), hostnameIsForbidden(), isPublicIpAddress(), isPublicIpv4() (+13 more)
+### Community 40 - "Domain logic"
+Cohesion: 0.12
+Nodes (20): GoalsPage(), metadata, ActionResult, prose, reopenWeeklyReviewAction(), ReviewInput, reviewSchema, saveWeeklyReviewAction() (+12 more)
 
-### Community 45 - "Database layer"
-Cohesion: 0.13
-Nodes (13): reopenWeeklyReviewAction(), saveWeeklyReviewAction(), BarSeries(), SeriesPoint, Sparkline(), ChartDataTable(), TableRow, EmptyState() (+5 more)
+### Community 41 - "Domain logic"
+Cohesion: 0.17
+Nodes (19): clearHabitEntryAction(), logHabitEntryAction(), HabitLogControl(), LogHabit, LogInput, EntryAction, HabitsView(), HabitsWeekGrid() (+11 more)
 
-### Community 46 - "Domain logic"
+### Community 42 - "Domain logic"
 Cohesion: 0.14
 Nodes (21): ActionResult, DEFAULT_TIMEZONE, isValidTimeZone(), TIMEZONE_OPTIONS, TimezoneOption, AutomationPrefsInput, automationPrefsSchema, deadlineLeadSchema (+13 more)
 
-### Community 47 - "Package.Json: Package.Json"
-Cohesion: 0.10
-Nodes (16): countNodesInMap(), deleteTaskMapEdge(), deleteTaskMapNode(), getTaskMap(), getTaskMapGraph(), inLiveMap(), TaskMapNodeInput, updateNodePositions() (+8 more)
+### Community 43 - "UI components"
+Cohesion: 0.08
+Nodes (18): PushDevice, PushOverview, enable, getStagedState, OVERVIEW, refresh, replace, signOut (+10 more)
 
-### Community 48 - "Design references"
-Cohesion: 0.14
+### Community 44 - "Domain logic"
+Cohesion: 0.08
+Nodes (21): getOwnerId(), isOwner(), appSettingsRepo, automationRepo, brainDumpRepo, dailyPrioritiesRepo, goalsRepo, habitsRepo (+13 more)
+
+### Community 45 - "Database layer"
+Cohesion: 0.10
+Nodes (22): BriefGoal, BriefHabit, BriefTask, MorningBriefPayload, OPEN, toBriefTask(), toMorningPayload(), EveningHabit (+14 more)
+
+### Community 46 - "Domain logic"
+Cohesion: 0.15
 Nodes (22): draw(), hashSeed(), parseClock(), selectAnchorTask(), SMART_REMINDER_COOLDOWN_KINDS, SMART_REMINDER_COOLDOWN_MINUTES, SMART_REMINDER_SLOTS, SMART_REMINDER_STAGES (+14 more)
 
-### Community 49 - "Domain logic"
+### Community 47 - "Package.Json: Package.Json"
+Cohesion: 0.12
+Nodes (22): createEmailEventSender(), defaultEmailEventDependencies(), EMAIL_EVENT_SECRET_HEADER, EMAIL_EVENT_TIMEOUT_MS, EmailEvent, EmailEventConfig, EmailEventConfigurationError, EmailEventDependencies (+14 more)
+
+### Community 48 - "Design references"
 Cohesion: 0.08
 Nodes (25): scripts, build, check:consistency, db:backup, db:check, db:diagnose, db:generate, db:merge-accounts (+17 more)
 
-### Community 50 - "Domain logic"
-Cohesion: 0.17
-Nodes (18): dynamic, GET(), buildDuePayload(), deadlineKey(), DueItem, DuePayload, FOCUS_OVERRUN_GRACE_SECONDS, FocusOverrunItem (+10 more)
-
-### Community 51 - "App routes"
+### Community 49 - "Domain logic"
 Cohesion: 0.16
 Nodes (18): json(), POST(), stageSchema, PUSH_PAIRING_COOKIE, pushPairingCookieOptions(), createPairingSecret(), hashPairingSecret(), isPairingUsableForUser() (+10 more)
 
+### Community 50 - "Domain logic"
+Cohesion: 0.14
+Nodes (21): AppLayout(), ActionResult, baseUrl(), createInviteAction(), createSchema, deleteInviteAction(), idSchema, InviteSummary (+13 more)
+
+### Community 51 - "App routes"
+Cohesion: 0.15
+Nodes (17): ActionResult, archiveLifeAreaAction(), createLifeAreaAction(), restoreLifeAreaAction(), updateLifeAreaAction(), LifeAreasPage(), metadata, LifeAreaCard() (+9 more)
+
 ### Community 52 - "Database layer"
-Cohesion: 0.17
-Nodes (22): ActionResult, archiveHabitAction(), clearHabitEntryAction(), createHabitAction(), habitColumns(), logHabitEntryAction(), revalidateHabitSurfaces(), scheduleColumns() (+14 more)
+Cohesion: 0.13
+Nodes (22): ActionResult, ALLOCATION_MAX_MINUTES, AcceptItemInput, acceptItemSchema, allocationInputSchema, AllocationInputValues, allocationMinutes, categoryLabel (+14 more)
 
 ### Community 53 - "Database layer"
-Cohesion: 0.09
-Nodes (9): collectAncestorIds(), getGoal(), GoalInput, GoalUpdate, GoalWithCounts, NOTE: an earlier version used correlated subqueries, Goal, GoalProgressUpdate (+1 more)
+Cohesion: 0.14
+Nodes (18): AutomationJob, claimDueJobs(), completeJob(), failJob(), failUndeliveredJob(), leasedJob(), leasedJobBeforeDelivery(), markDeliveryStarted() (+10 more)
 
 ### Community 54 - "Documentation"
 Cohesion: 0.11
 Nodes (24): Settings & Preferences Screen (GoHa Design Mockup), Persistent Left Sidebar Navigation, Appearance Card (Light/Dark theme previews, Match System Settings), Avatar with Change Photo Action, GoHa Brand Lockup (Life Operating System), Calm Neutral Card Visual Language (off-white canvas, white rounded cards, sage/amber accents), Default Focus Timers (Focus Session 25 min, Short Break 5 min), Display Name Field (+16 more)
 
 ### Community 55 - "Domain logic"
+Cohesion: 0.11
+Nodes (19): dynamic, KIND_LABEL, BRAIN_DUMP_MAX, brainDumpCaptureSchema, ClaimLogInput, claimLogSchema, CreateTokenInput, DEDUPE_KEY_MAX (+11 more)
+
+### Community 56 - "Domain logic"
 Cohesion: 0.20
 Nodes (18): RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_SECONDS, RateDecision, rateLimitDecision(), windowStart(), AuthedAutomation, AutomationFailure, UNAUTHORIZED (+10 more)
 
-### Community 56 - "Domain logic"
-Cohesion: 0.09
-Nodes (19): getOwnerId(), isOwner(), appSettingsRepo, automationRepo, brainDumpRepo, dailyPrioritiesRepo, habitsRepo, inspirationsRepo (+11 more)
-
 ### Community 57 - "Domain logic"
+Cohesion: 0.14
+Nodes (17): ActionResult, addDailyPriorityAction(), idSchema, planMyDayAction(), removeDailyPriorityAction(), BrainCard(), STATE_STYLE, EmptyDay() (+9 more)
+
+### Community 58 - "Documentation"
+Cohesion: 0.11
+Nodes (14): countNodesInMap(), deleteTaskMapEdge(), deleteTaskMapNode(), getTaskMap(), getTaskMapGraph(), inLiveMap(), TaskMapNodeInput, updateNodePositions() (+6 more)
+
+### Community 59 - "Test suite"
 Cohesion: 0.10
 Nodes (23): Fixed-Fluid Hybrid Grid on an 8px Unit, Intentional Calm Philosophy, Manrope Type Scale (display 300 to label 600), Serene Lifecycle Design System, Tonal Layering with Ambient Shadows (paper stack), Phase 0: Discovery and Design Audit, Nightshift Motion (springSnappy, springSmooth, easeOutExpo), Nightshift Design System (retired) (+15 more)
 
-### Community 58 - "Documentation"
-Cohesion: 0.18
-Nodes (19): smartReminderKey(), activeSettingsForKind(), CompletionResult, fallback(), materializeAndClaimJobs(), materializeSmartReminders(), PreparedWorkerJob, prepareEvening() (+11 more)
+### Community 60 - "Domain logic"
+Cohesion: 0.15
+Nodes (18): createPinnedPushAgent(), endpointValidationFailureIsTransient(), FORBIDDEN_HOST_SUFFIXES, hasPrefix(), hostnameIsForbidden(), isPublicIpAddress(), isPublicIpv4(), isPublicIpv6() (+10 more)
 
-### Community 59 - "Test suite"
+### Community 61 - "App routes"
+Cohesion: 0.18
+Nodes (17): CommandTarget, loadCommandIndexAction(), AddMenu(), AddMenuFab(), ICON, Command, CommandPalette(), fuzzyScore() (+9 more)
+
+### Community 62 - "Design references"
+Cohesion: 0.12
+Nodes (12): ActionButton(), TaskCard(), TaskLifeAreaRef, TaskChecklistItem(), Checkbox(), DetailPanel(), DetailRow(), formatClockLabel() (+4 more)
+
+### Community 63 - "App routes"
+Cohesion: 0.11
+Nodes (18): Dropdown(), DropdownItem, isSelectable(), clamp(), Progress(), ProgressRing(), Tone, toneBar (+10 more)
+
+### Community 64 - "App routes"
+Cohesion: 0.16
+Nodes (17): buildDuePayload(), deadlineKey(), DueItem, DuePayload, FOCUS_OVERRUN_GRACE_SECONDS, FocusOverrunItem, focusOverrunKey(), OPEN (+9 more)
+
+### Community 65 - "UI components"
 Cohesion: 0.12
 Nodes (21): Next.js Agent Rules (breaking-change warning), Architecture Rules (Server Components, Server Actions), UUID Identifiers and Drizzle Kit Migration Rules, Repository Layer Seam under db/, Session-Derived Identity and User Scoping, GoHa Tech Stack (Next.js 16, Drizzle, Neon, Better Auth), Asia/Manila Timezone Rules, db:diagnose Read-Only Health Check (+13 more)
 
-### Community 60 - "Domain logic"
-Cohesion: 0.19
-Nodes (16): GoalDetailPage(), ancestorPath(), childrenByParent(), descendantIds(), descendants(), eligibleParents(), goalDepth(), GoalNodeInput (+8 more)
+### Community 66 - "Database layer"
+Cohesion: 0.12
+Nodes (10): CategoryCard(), categoryColor(), CategoryEditorBody(), DaySummary(), DraftAllocation, FocusActual, GoalRef, PlannerView() (+2 more)
 
-### Community 61 - "App routes"
-Cohesion: 0.11
-Nodes (11): ActionResult, completeOnboardingAction(), Step, WelcomeOnboarding(), Modal(), panelVariants, completeOnboardingAction, STEP_COUNT (+3 more)
-
-### Community 62 - "Design references"
+### Community 67 - "Design references"
 Cohesion: 0.14
 Nodes (21): To-Do Lists Screen (Stitch Design), Task as Hub: Entry Points into Goals, Life Areas, Task Map, and Focus, Date Derived Time Buckets Instead of Static Bucket Fields, Density Progression: Focused Cards Now, Compact Rows Later, Global Navigation Sidebar (Today, Goals, To-dos, Task Map, Focus, Habits, Calendar, Brain Dump, Life Areas, Review, Progress, Settings), Linked Goal Chip (Launch SaaS MVP, Investor Relations), Inline Add Task to Today Affordance, This Month / This Week Rail Labels Wrapping and Overflowing the Rail (+13 more)
 
-### Community 63 - "App routes"
-Cohesion: 0.13
-Nodes (15): AutomationOverview, deleteAutomationTokenAction(), revokeAutomationTokenAction(), TokenSummary, AutomationCard(), ENDPOINTS, EXPIRY_OPTIONS, KIND_LABEL (+7 more)
+### Community 68 - "Design references"
+Cohesion: 0.18
+Nodes (16): endFocusSessionAction(), startFocusSessionAction(), FocusPage(), metadata, FocusView(), focusRepo, ABANDON_MAX_SECONDS, aggregateFocus() (+8 more)
 
-### Community 64 - "App routes"
-Cohesion: 0.14
-Nodes (15): archiveTaskMapAction(), createTaskMapAction(), deleteTaskMapAction(), restoreTaskMapAction(), updateTaskMapAction(), metadata, TaskOption, ArchivedRow() (+7 more)
-
-### Community 65 - "UI components"
+### Community 69 - "Tooling scripts"
 Cohesion: 0.13
 Nodes (10): geistMono, inter, metadata, viewport, manifest(), MotionProvider(), ServiceWorkerRegistrar(), ThemeProvider() (+2 more)
 
-### Community 66 - "Database layer"
-Cohesion: 0.10
-Nodes (3): AutomationRequest, AutomationToken, NotificationLogEntry
+### Community 70 - "Tooling scripts"
+Cohesion: 0.18
+Nodes (15): DurationPicker(), ExtendControl(), SegmentedControl(), SegmentedOption, ABANDON_AFTER_SECONDS, FOCUS_EXTEND_MAX_MINUTES, FOCUS_EXTEND_MIN_MINUTES, FOCUS_EXTEND_PRESETS_MINUTES (+7 more)
 
-### Community 67 - "Design references"
-Cohesion: 0.16
-Nodes (12): dynamic, POST(), runtime, WorkerDeliveryCounts, WorkerDeliveryDisposition, CompleteWorkerInput, completeWorkerJob(), truncate() (+4 more)
+### Community 71 - "Domain logic"
+Cohesion: 0.20
+Nodes (13): lifeAreaIconMap, ColorPicker(), IconPicker(), COLOR_PRESETS, COMMON_ICON_KEYS, hexLuminance(), ICON_GROUPS, LifeAreaIconKey (+5 more)
 
-### Community 68 - "Design references"
-Cohesion: 0.17
-Nodes (15): AutomationJob, claimDueJobs(), completeJob(), failJob(), failUndeliveredJob(), leasedJob(), leasedJobBeforeDelivery(), markDeliveryStarted() (+7 more)
+### Community 72 - "Components.Json: Components.Json"
+Cohesion: 0.11
+Nodes (7): collectAncestorIds(), getGoal(), GoalInput, GoalUpdate, NOTE: an earlier version used correlated subqueries, Goal, GoalProgressUpdate
 
-### Community 69 - "Tooling scripts"
+### Community 73 - "Tooling scripts"
 Cohesion: 0.19
 Nodes (19): Today Dashboard Screen (Stitch design), GoHa Brand Lockup and Life Operating System Tagline, Full Day Arc: morning greeting through evening reflection on one surface, Evening Reflection Entry Point, Time of Day Greeting and Date Header, Habits Checklist Widget, Life Score Ring Widget (82%), Navigation Module Set (Today, Goals, To-dos, Task Map, Focus, Habits, Calendar, Brain Dump, Life Areas, Review, Progress, Settings) (+11 more)
 
-### Community 70 - "Tooling scripts"
+### Community 74 - "Design references"
 Cohesion: 0.14
 Nodes (19): Weekly Review & Reflection Screen (Stitch Design), GoHa App Shell (Sidebar + Top Bar Layout), Complete Review Submit Action, Visual Language: warm cream canvas, white rounded cards, sage green accent, semantic icon colours (amber sun, red warning), Reflection Prompt: Focus for next week? (top 3 core intentions), Habit Consistency Metric (85% with progress bar), Life Score Trend Bar Chart (5 weekly bars, current 9.2 highlighted), Review Step: Plan Next Week (time-block major priorities) (+11 more)
 
-### Community 71 - "Domain logic"
+### Community 75 - "App routes"
 Cohesion: 0.19
 Nodes (13): globalSetup(), PORT, { url: testDatabaseUrl }, QaMigrationTarget, resolveQaMigrationTarget(), DestructiveUrlSource, loadEnvFile(), requireTestDatabase() (+5 more)
 
-### Community 72 - "Components.Json: Components.Json"
+### Community 76 - "App routes"
+Cohesion: 0.21
+Nodes (16): activeSettingsForKind(), CompleteWorkerInput, CompletionResult, fallback(), PreparedWorkerJob, prepareEvening(), prepareGraveyard(), prepareMorning() (+8 more)
+
+### Community 77 - "Domain logic"
 Cohesion: 0.14
 Nodes (12): forceJson, outDir, url, BACKUP_FORMAT, BACKUP_TABLES, path, problems, warnings (+4 more)
 
-### Community 73 - "Tooling scripts"
-Cohesion: 0.24
-Nodes (11): dynamic, GET(), hashDate(), pickDailyQuote(), pickRestDayQuote(), QuoteLike, sourcesFor(), resolveRestDayQuote() (+3 more)
+### Community 78 - "UI components"
+Cohesion: 0.14
+Nodes (16): archiveTaskMapAction(), createTaskMapAction(), deleteTaskMapAction(), restoreTaskMapAction(), updateTaskMapAction(), TaskOption, ArchivedRow(), CreateMapModal() (+8 more)
 
-### Community 74 - "Design references"
-Cohesion: 0.23
-Nodes (14): ActionResult, addDailyPriorityAction(), idSchema, planMyDayAction(), asPgError(), CHECK_VIOLATION, CONSTRAINTS, isCheckViolation() (+6 more)
-
-### Community 75 - "App routes"
+### Community 79 - "Design references"
 Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
-### Community 76 - "App routes"
+### Community 80 - "Design references"
 Cohesion: 0.16
 Nodes (13): db, url, loadEnv(), loadEnvFile(), requireEnv(), db, parsed, target (+5 more)
 
-### Community 77 - "Domain logic"
+### Community 81 - "Domain logic"
 Cohesion: 0.18
 Nodes (18): GoHa Brand Lockup: Life Operating System, Life Area Chip with Icon (Health & Fitness, Career, Finance, Learning), Module Navigation Set (Today, Goals, To-dos, Task Map, Focus, Habits, Calendar, Brain Dump, Life Areas, Review, Progress, Settings), Habits & Routines Screen (Stitch design), Action List Card (checkable habits tagged by life area), Two-Column Card Grid on Off-White Canvas, Habit Detail Card (Code practice, Minimum vs Ideal, routine + cadence), Habit-to-Goal Linkage (Goal: Launch MVP) (+10 more)
 
-### Community 78 - "UI components"
-Cohesion: 0.13
-Nodes (16): BRAIN_DUMP_MAX, brainDumpCaptureSchema, ClaimLogInput, claimLogSchema, CreateTokenInput, DEDUPE_KEY_MAX, isoDateSchema, PushQuotesInput (+8 more)
-
-### Community 79 - "Design references"
-Cohesion: 0.15
-Nodes (11): updateAutomationPrefsAction(), AutomationPrefs, AutomationPrefsCard(), QUOTE_OPTIONS, SABBATH_OPTIONS, SettingsCard(), SettingsSection(), Select() (+3 more)
-
-### Community 80 - "Design references"
-Cohesion: 0.16
-Nodes (17): Goals Management Screen (Stitch Design), Add Goal Primary Action, Card Footer Metrics Row (task ratio, subgoal count, notes, due date), Per-Card Overflow Menu (kebab), Create New Goal Dashed Placeholder Card, Goal Breakdown Design Intent, Goal Card Component, Responsive Three-Column Goal Card Grid (+9 more)
-
-### Community 81 - "Domain logic"
-Cohesion: 0.19
-Nodes (17): Life Areas Dashboard Screen (Stitch design), Per-Area Colour Coding (green Career/Growth, tan Health/Family, lavender Finance/Projects/Life Admin), Area Progress Bar (labelled track with trailing percentage), Compact Life Area Card variant (icon, name, big Life Score %, Goals and Tasks count pills), Expanded Life Area Card variant (Career: progress bar plus Active Goals / Pending Tasks / Completion stats), Goals / Tasks Count Pill (flag and check icons with numeric roll-up), Life Area Card Grid (mixed-width masonry-style layout), Life Area Taxonomy (Career, Health, Finance, Growth, Family, Projects, Life Admin) (+9 more)
-
 ### Community 82 - "Domain logic"
 Cohesion: 0.20
-Nodes (12): assignLayers(), Bounds, findFreeSpot(), LAYOUT_COLUMN_GAP, LAYOUT_ROW_GAP, LayoutEdge, layoutMap(), LayoutNode (+4 more)
+Nodes (14): completeWorkerJob(), failWorkerJob(), AUTOMATION_JOB_LEASE_MS, AUTOMATION_JOB_MAX_ATTEMPTS, dueDailySchedule(), dueWeeklySchedule(), isPushJobKind(), isSameJobLocalDate() (+6 more)
 
 ### Community 83 - "Database layer"
-Cohesion: 0.18
-Nodes (14): ActionResult, createAutomationTokenAction(), idSchema, listAutomationAction(), qrSvgFor(), RequestSummary, resolveBaseUrl(), SentSummary (+6 more)
+Cohesion: 0.22
+Nodes (15): DEFAULT_COLOR_KEY, DEFAULT_ICON_KEY, hashToIndex(), isHexColor(), LIFE_AREA_COLOR_KEYS, LIFE_AREA_DESCRIPTION_MAX, LIFE_AREA_ICON_KEYS, LIFE_AREA_NAME_MAX (+7 more)
 
 ### Community 84 - "Design references"
 Cohesion: 0.16
-Nodes (10): getForDate(), insertIfAbsent(), InspirationWithTakeaway, listWithTakeawaysInRange(), Row, store, toRecord(), dailyInspirations (+2 more)
+Nodes (17): Goals Management Screen (Stitch Design), Add Goal Primary Action, Card Footer Metrics Row (task ratio, subgoal count, notes, due date), Per-Card Overflow Menu (kebab), Create New Goal Dashed Placeholder Card, Goal Breakdown Design Intent, Goal Card Component, Responsive Three-Column Goal Card Grid (+9 more)
 
 ### Community 85 - "Design references"
+Cohesion: 0.19
+Nodes (17): Life Areas Dashboard Screen (Stitch design), Per-Area Colour Coding (green Career/Growth, tan Health/Family, lavender Finance/Projects/Life Admin), Area Progress Bar (labelled track with trailing percentage), Compact Life Area Card variant (icon, name, big Life Score %, Goals and Tasks count pills), Expanded Life Area Card variant (Career: progress bar plus Active Goals / Pending Tasks / Completion stats), Goals / Tasks Count Pill (flag and check icons with numeric roll-up), Life Area Card Grid (mixed-width masonry-style layout), Life Area Taxonomy (Career, Health, Finance, Growth, Family, Projects, Life Admin) (+9 more)
+
+### Community 86 - "Domain logic"
+Cohesion: 0.20
+Nodes (12): assignLayers(), Bounds, findFreeSpot(), LAYOUT_COLUMN_GAP, LAYOUT_ROW_GAP, LayoutEdge, layoutMap(), LayoutNode (+4 more)
+
+### Community 87 - "Test suite"
+Cohesion: 0.16
+Nodes (10): getForDate(), insertIfAbsent(), InspirationWithTakeaway, listWithTakeawaysInRange(), Row, store, toRecord(), dailyInspirations (+2 more)
+
+### Community 88 - "Domain logic"
 Cohesion: 0.17
 Nodes (16): Life Score / Progress Analytics Screen (Stitch design), Rounded Card Grid Layout Pattern, Focus Sessions Stat Tile (12 completed), Goals Advanced Stat Tile (3 moved forward), Life Area Colour and Icon Coding, Life Score Radial Gauge (78, 'Strong', +4 from last month), Life Score Composite Metric, Life Score Trend Area/Line Chart (Weeks 1-4, 50-100 axis) (+8 more)
 
-### Community 86 - "Domain logic"
+### Community 89 - "Domain logic"
 Cohesion: 0.18
 Nodes (16): Task Map Explorer Screen (Stitch design), Active Nav Item Treatment (Task Map selected), Active Node State with Inline Progress, Labelled Yes / No Branch Edges, Floating Canvas Toolbar, Dashboard Redesign (example task map), Decision Node (hexagon), Focus Mode Entry Point from Task Map (+8 more)
 
-### Community 87 - "Test suite"
-Cohesion: 0.13
-Nodes (10): browserSubscription(), createPairingAction, disconnectDeviceAction, getCurrentStateAction, installPushBrowser(), listDevicesAction, listOverviewAction, sendTestAction (+2 more)
+### Community 90 - "Database layer"
+Cohesion: 0.39
+Nodes (12): guardSignUp(), metadata, RegisterPage(), createInviteCode(), formatInviteCode(), hashInviteCode(), INVITE_PREFIX_LENGTH, inviteCodePrefix() (+4 more)
 
-### Community 88 - "Domain logic"
+### Community 91 - "App routes"
+Cohesion: 0.22
+Nodes (14): ActionResult, archiveHabitAction(), createHabitAction(), habitColumns(), revalidateHabitSurfaces(), scheduleColumns(), updateHabitAction(), validateReferences() (+6 more)
+
+### Community 92 - "Design references"
+Cohesion: 0.16
+Nodes (9): ActionResult, completeOnboardingAction(), HierarchyDiagram(), HierarchyRow, Step, WelcomeOnboarding(), completeOnboardingAction, push (+1 more)
+
+### Community 93 - "Documentation"
 Cohesion: 0.26
 Nodes (15): addEdgeAction(), addNodeAction(), assertMapEditable(), deleteEdgeAction(), deleteNodeAction(), fail(), importTasksAction(), layoutMapAction() (+7 more)
 
-### Community 89 - "Domain logic"
-Cohesion: 0.13
-Nodes (3): TaskInput, TaskStatus, Task
+### Community 95 - "Design references"
+Cohesion: 0.28
+Nodes (9): hashDate(), pickDailyQuote(), pickRestDayQuote(), QuoteLike, sourcesFor(), resolveRestDayQuote(), POOL, quote() (+1 more)
 
-### Community 90 - "Database layer"
-Cohesion: 0.22
-Nodes (13): ActionResult, archiveGoalAction(), createGoalAction(), revalidateGoalSurfaces(), updateGoalAction(), validateReferences(), GoalsView(), PARENT_REJECTION_MESSAGE (+5 more)
+### Community 96 - "Design references"
+Cohesion: 0.26
+Nodes (13): discardFocusSessionAction(), extendFocusSessionAction(), pauseFocusSessionAction(), resumeFocusSessionAction(), saveFocusNoteAction(), ActiveTimer(), FocusSetup(), NoteStatus (+5 more)
 
-### Community 91 - "App routes"
-Cohesion: 0.21
-Nodes (9): GoalDetailView(), GoalProgressEntry, parentOptionsFor(), progressHint(), GoalFormFields(), GoalFormModal(), Breadcrumbs(), Crumb (+1 more)
-
-### Community 92 - "Design references"
+### Community 97 - "Domain logic"
 Cohesion: 0.18
 Nodes (14): App Shell: persistent sidebar + top bar layout, Primary Sidebar Navigation (Today, Goals, To-dos, Task Map, Focus, Habits, Calendar, Brain Dump, Life Areas, Review, Progress, Settings), Time Block Item (Deep Work Block, 9:00 AM - 12:00 PM, left accent bar), Top Bar Actions (Focus Mode, Add Task, notifications, theme toggle, avatar), Two-pane calendar layout: wide month overview plus narrow always-visible agenda rail, Quick Action Primary Button, Active Navigation State (Life Areas pill highlighted sage), Add Task Global Action (top bar, filled accent button) (+6 more)
 
-### Community 93 - "Documentation"
+### Community 98 - "Database layer"
 Cohesion: 0.22
 Nodes (14): Atomic Writable-CTE Brain Dump Conversion, Date-Derived Task Views (no stored bucket), listGoalsWithTaskCounts Correlated-Subquery Bug, Phase 10: Brain Dump, Phase 5: Goals with Hierarchy and Progress, Phase 6: Tasks / To-dos, Phase 7: Today Dashboard, brain_dump_items table (polymorphic conversion) (+6 more)
 
-### Community 94 - "Test suite"
-Cohesion: 0.26
-Nodes (10): failWorkerJob(), AUTOMATION_JOB_LEASE_MS, AUTOMATION_JOB_MAX_ATTEMPTS, dueDailySchedule(), dueWeeklySchedule(), isPushJobKind(), isSameJobLocalDate(), PUSH_JOB_KINDS (+2 more)
+### Community 99 - "Database layer"
+Cohesion: 0.20
+Nodes (8): materializeAndClaimJobs(), isSabbathDate(), SABBATH_MESSAGE, SabbathContext, WEEK, at(), mocks, task()
 
-### Community 95 - "Design references"
-Cohesion: 0.26
-Nodes (9): LifeAreaIcon(), lifeAreaIconMap, IconPicker(), COLOR_PRESETS, ICON_GROUPS, LIFE_AREA_COLOR_KEYS, LIFE_AREA_ICON_KEYS, LifeAreaIconKey (+1 more)
+### Community 100 - "Database layer"
+Cohesion: 0.21
+Nodes (8): handlers, json(), pendingClaims, POST(), sendWelcomeEmail(), settleClaim(), mocks, USER
 
-### Community 96 - "Design references"
+### Community 101 - "Test suite"
+Cohesion: 0.19
+Nodes (13): acceptSuggestionAction(), addFreeformItemAction(), addPlanToTodayAction(), logActualMinutesAction(), moveItemAction(), removePlanItemAction(), renameFreeformItemAction(), revalidatePlannerSurfaces() (+5 more)
+
+### Community 102 - "Design references"
+Cohesion: 0.19
+Nodes (9): schema, auth, DEPLOYMENT_URL, PASSWORD_RESET_TTL_SECONDS, PRODUCTION_URL, emailEventSender(), getCurrentUser(), getSession (+1 more)
+
+### Community 103 - "Documentation"
 Cohesion: 0.19
 Nodes (13): Brain Dump Quick Capture Screen (design mockup), Image and Voice Attachment Affordances, Brain Dump Module, Capture Composer Textarea, Dump It Submit Action, Frictionless Capture Principle, Global Top Bar (search, Focus Mode, Add Task, theme, avatar), GoHa Navigation Map (Today, Goals, To-dos, Task Map, Focus, Habits, Calendar, Brain Dump, Life Areas, Review, Progress, Settings) (+5 more)
 
-### Community 97 - "Domain logic"
+### Community 104 - "UI components"
 Cohesion: 0.26
 Nodes (13): Focus Session Screen (Stitch design), Active Task: Finalize Q4 Presentation, Complete Task Action (checkmark), Circular Countdown Timer with Progress Ring (24:15), Distraction Dump Card, Distraction-Free Single-Purpose Layout, Duration Preset Pills (15/25/45/60 min plus custom), Feedback Notes Card (+5 more)
 
-### Community 98 - "Database layer"
-Cohesion: 0.17
-Nodes (3): LifeAreaInput, LifeAreaWithCounts, habits
-
-### Community 99 - "Database layer"
+### Community 105 - "Documentation"
 Cohesion: 0.18
 Nodes (7): getOrCreateUserSettings(), getUserSettings(), UserSettingsInput, QuoteSourcePref, ThemePreference, userSettings, UserSettings
 
-### Community 100 - "Database layer"
+### Community 106 - "UI components"
+Cohesion: 0.17
+Nodes (8): FocusSession, FocusTimerState, useFocusTimer, discardAction, endAction, saveNoteAction, startAction, stats
+
+### Community 107 - "UI components"
 Cohesion: 0.24
 Nodes (12): Calendar Schedule Screen (GoHa design mockup), Calendar Header: month title, prev/Today/next stepper, Month|Week|Day segmented control, Daily Focus Card with narrative summary and progress bar, Day-cell Event Chips (colour-coded by item type; strikethrough = completed), Event Agenda Item with nested prep-task checklist (Job Interview - Acme Corp, 10:00 AM, Video Call), Habit Agenda Item (Read 20 pages, 'Habit - Anytime', repeat icon), Month Grid (Sun-Sat, 6 rows, leading/trailing days muted), Task Agenda Items with checkbox and overdue emphasis (Submit Expense Report, Due 5:00 PM; Draft Proposal) (+4 more)
 
-### Community 101 - "Test suite"
+### Community 108 - "Test suite"
 Cohesion: 0.20
 Nodes (12): e2e/audit.spec.ts Browser-Driven Route Audit, Focus Duration Derived from Timestamps, Focus startSchema optional-vs-nullish Bug, Schedule-Aware Habit Streak Engine, ThemeToggle Hydration Mismatch (perceived lag), Phase 8: Habits, Phase 9: Focus Mode, focus_sessions table (+4 more)
 
-### Community 102 - "Design references"
+### Community 109 - "Documentation"
+Cohesion: 0.36
+Nodes (9): asPgError(), CHECK_VIOLATION, CONSTRAINTS, isCheckViolation(), isUniqueViolation(), PgErrorShape, sqlState(), UNIQUE_VIOLATION (+1 more)
+
+### Community 110 - "Database layer"
+Cohesion: 0.27
+Nodes (8): disconnectPushDeviceAction(), listPushDevicesAction(), BENEFITS, deviceCountLabel(), NotificationDevicesCard(), Pairing, shortDate(), displayDeviceLabel()
+
+### Community 111 - "End-to-end tests"
 Cohesion: 0.24
 Nodes (11): Expansion (V1b) Scope, MVP (V1a) Scope, Out of Scope for GoHa (no AI, automations, billing), Working Style and Quality Gates, Two-Stage Delivery on One Complete Schema, Phase 12: Calendar, Review, Progress (not started), Phase 13: Settings and Polish Pass, Phase 1: Scaffold and App Shell (+3 more)
 
-### Community 103 - "Documentation"
+### Community 112 - "Tooling scripts"
+Cohesion: 0.20
+Nodes (5): FocusStats(), FocusStatsData, FocusBreakdown, ROOT, stats
+
+### Community 113 - "Tooling scripts"
 Cohesion: 0.24
 Nodes (4): Meridiem, parse(), serialize(), TimeField()
 
-### Community 104 - "UI components"
+### Community 116 - "Database layer"
 Cohesion: 0.20
 Nodes (10): UI States and Design Fidelity Rules, Reserved Electric Cyan Accent (light equals meaning), Today as the Reference Screen, Violet Secondary for Progress and Data, 44x44 Minimum Tap Target, Glass on Chrome Only, Never on Rows, Liquid Glass Material Tiers (blur plus saturate 180%), Mandatory Reduced-Transparency and @supports Fallbacks (+2 more)
 
-### Community 105 - "Documentation"
-Cohesion: 0.22
-Nodes (8): GoalCard(), LifeAreaRef, LifeAreaOption, ParentOption, TabButton(), TabKey, listContainer, listItem
-
-### Community 106 - "UI components"
-Cohesion: 0.20
-Nodes (3): dailyQuotes, QuoteSource, DailyQuote
-
-### Community 107 - "UI components"
+### Community 117 - "Database layer"
 Cohesion: 0.22
 Nodes (6): fillEmptyReviewDraft(), getWeeklyReview(), ReviewDraftFields, WeeklyReviewInput, weeklyReviews, WeeklyReview
 
-### Community 108 - "Test suite"
+### Community 118 - "End-to-end tests"
 Cohesion: 0.20
 Nodes (4): consoleProblems, Finding, findings, IGNORED
 
-### Community 109 - "Documentation"
+### Community 119 - "Package.Json: Package.Json"
 Cohesion: 0.29
 Nodes (6): CONFIRM_KEY, endpointId(), ProductionMigrationTarget, resolveProductionMigrationTarget(), db, target
 
-### Community 110 - "Database layer"
+### Community 120 - "UI components"
 Cohesion: 0.22
 Nodes (7): args, commit, findAccount(), fromEmail, OWNED_TABLES, sql, toEmail
 
-### Community 111 - "End-to-end tests"
-Cohesion: 0.33
-Nodes (7): calculateGoalProgress(), clampPercent(), EMPTY_TASK_COUNTS, GoalProgressResult, GoalProgressSource, GoalTaskCounts, auto()
+### Community 121 - "Documentation"
+Cohesion: 0.39
+Nodes (6): LoginPage(), metadata, AuthForm(), DEFAULT_REDIRECT, hasUnsafeCharacters(), safeRedirectPath()
 
-### Community 112 - "Tooling scripts"
+### Community 122 - "Domain logic"
 Cohesion: 0.25
 Nodes (7): "automation_jobs", "push_deliveries", "public"."user", "public"."notification_log", "public"."push_subscriptions", "push_pairing_sessions", "push_subscriptions"
 
-### Community 113 - "Tooling scripts"
-Cohesion: 0.36
-Nodes (6): clamp(), Progress(), ProgressRing(), Tone, toneBar, toneStroke
-
-### Community 114 - "App routes"
+### Community 123 - "Tooling scripts"
 Cohesion: 0.32
 Nodes (7): "automation_requests", "automation_tokens", "daily_quotes", "notification_log", "public"."user", "public"."user", "public"."automation_tokens"
 
-### Community 115 - "Domain logic"
+### Community 124 - "Tooling scripts"
 Cohesion: 0.29
 Nodes (7): IGNORED, Problem, problems, ROUTES, timings, visit(), watch()
 
-### Community 116 - "Database layer"
+### Community 125 - "Tooling scripts"
 Cohesion: 0.25
 Nodes (7): engines, node, pnpm, name, packageManager, private, version
 
-### Community 117 - "Database layer"
+### Community 126 - "Test suite"
+Cohesion: 0.29
+Nodes (6): ActionResult, extendMinutesSchema, idSchema, noteSchema, startSchema, FOCUS_EXTEND_SECONDS
+
+### Community 127 - "Test suite"
+Cohesion: 0.38
+Nodes (7): HabitFormFields(), scheduleTypeOf(), LifeAreaFormFields(), nextUnusedColorKey(), toColorKey(), toIconKey(), toHabitFieldErrors()
+
+### Community 128 - "Claude.Md: Claude.Md"
 Cohesion: 0.33
 Nodes (7): Sage Blue-Green Accent with Earth-Tone Categories, life_areas table, user table (Better Auth account record), user_settings table, Circular Checkbox Filled with the Life Area Color, Label Opacity System (rgba labels, not hex grays), Apple System Colors (separate light and dark values)
 
-### Community 118 - "End-to-end tests"
+### Community 129 - "Vercel.Json: Vercel.Json"
 Cohesion: 0.33
 Nodes (6): EXTS, files, ROOT, RULES, SEARCH_DIRS, walk()
 
-### Community 119 - "Package.Json: Package.Json"
+### Community 130 - "UI components"
 Cohesion: 0.29
 Nodes (3): parsed, sql, url
 
-### Community 120 - "UI components"
+### Community 131 - "End-to-end tests"
 Cohesion: 0.29
 Nodes (5): DOMAIN_TABLES, sql, TEST_EMAIL, TEST_PASSWORD, { url: testDbUrl, source }
 
-### Community 121 - "Documentation"
+### Community 132 - "Proxy.Ts: Proxy.Ts"
 Cohesion: 0.38
 Nodes (6): codeLines(), EXTS, FILES, findAll(), ROOT, walk()
 
-### Community 122 - "Domain logic"
-Cohesion: 0.33
-Nodes (3): at(), mocks, task()
-
-### Community 123 - "Tooling scripts"
+### Community 133 - "Test suite"
 Cohesion: 0.33
 Nodes (6): GoHa Conceptual Chain (Life Area to Reflect), One Connected System (no duplicate dashboard data), GoHa (Goals, Habits, and ACTION), The Connected Chain (user to task maps), Database Constraints as the Second Integrity Layer, Deletion Behavior (cascade, set null, archive)
 
-### Community 124 - "Tooling scripts"
+### Community 134 - "Test suite"
 Cohesion: 0.40
 Nodes (3): TaskDetailPanel(), makeTask(), setup()
 
-### Community 125 - "Tooling scripts"
+### Community 135 - "Test suite"
 Cohesion: 0.33
 Nodes (5): sin1, crons, framework, regions, $schema
 
-### Community 127 - "Test suite"
+### Community 138 - "Database layer"
 Cohesion: 0.40
 Nodes (3): AUTH_PATHS, config, EXACT_PUBLIC_PATHS
 
-### Community 129 - "Vercel.Json: Vercel.Json"
+### Community 140 - "Next.Config.Ts: Next.Config.Ts"
 Cohesion: 0.40
 Nodes (3): AUTH, mocks, P256DH
 
-### Community 130 - "UI components"
+### Community 141 - "Static assets"
 Cohesion: 0.40
 Nodes (4): automationOverview, people, pushOverview, settings
 
-### Community 132 - "Proxy.Ts: Proxy.Ts"
+### Community 143 - "Test suite"
 Cohesion: 0.67
 Nodes (3): dynamic, GET(), withTimeout()
 
-### Community 133 - "Test suite"
+### Community 144 - "Database layer"
 Cohesion: 0.50
 Nodes (3): "inspiration_takeaways", "public"."user", "public"."daily_inspirations"
 
-### Community 134 - "Test suite"
+### Community 145 - "Database layer"
 Cohesion: 0.67
 Nodes (4): Phase 11: Task Maps (React Flow), task_map_edges table, task_map_nodes table, task_maps table (React Flow canvases)
 
-### Community 135 - "Test suite"
+### Community 147 - "Static assets"
 Cohesion: 0.50
 Nodes (3): CSP, nextConfig, SECURITY_HEADERS
 
-### Community 141 - "Static assets"
+### Community 153 - "App routes"
 Cohesion: 1.00
 Nodes (3): File/Document Icon (Next.js scaffold asset), Globe/World Icon (Next.js scaffold asset), Browser Window Icon (Next.js scaffold asset)
 
@@ -804,9 +844,9 @@ Nodes (3): File/Document Icon (Next.js scaffold asset), Globe/World Icon (Next.j
   design/stitch_goha_productivity_system_dashboard/weekly_review_reflection/screen.png · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **751 isolated node(s):** `TaskLifeAreaRef`, `TaskDetailHandlers`, `FormProps`, `TaskGoalOption`, `TaskLifeAreaOption` (+746 more)
+- **754 isolated node(s):** `ActionResult`, `CapacityStatus`, `PlanEntry`, `PlannerCategoryKind`, `SuggestionReason` (+749 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **29 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
