@@ -1,4 +1,4 @@
-import { CalendarDays, CheckCircle2, CircleOff, Clock, Flag, Shapes } from "lucide-react";
+import { CalendarDays, CheckCircle2, CircleOff, Clock, Flag, Shapes, StickyNote } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import type { FocusSession } from "@/db";
@@ -98,11 +98,11 @@ export function FocusStats({
                 return (
                   <li
                     key={session.id}
-                    className="relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-1.5 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator"
+                    className="relative flex min-h-10 items-start gap-3 rounded-xl px-3 py-2 [&:not(:last-child)]:after:absolute [&:not(:last-child)]:after:bottom-0 [&:not(:last-child)]:after:left-3 [&:not(:last-child)]:after:right-0 [&:not(:last-child)]:after:h-px [&:not(:last-child)]:after:bg-separator"
                   >
                     <span
                       className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-full",
+                        "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full",
                         abandoned ? "bg-surface-secondary text-label-tertiary" : "bg-green/15 text-green",
                       )}
                     >
@@ -116,8 +116,25 @@ export function FocusStats({
                         {formatZonedDateTimeMedium(session.startedAt, timeZone)}
                         {abandoned ? " · abandoned" : ""}
                       </p>
+                      {/*
+                        The note, where the person who wrote it goes looking.
+
+                        It was being saved correctly all along and simply never
+                        rendered again after the session ended: the field only
+                        existed inside the running timer, so finishing a session
+                        made the writing disappear and it read as a save bug.
+                        Shown in full rather than truncated, because a session
+                        note is usually one or two lines and the point of it is
+                        to be re-read.
+                      */}
+                      {session.note ? (
+                        <p className="mt-1 flex items-start gap-1.5 whitespace-pre-wrap break-words rounded-lg bg-surface-secondary px-2.5 py-1.5 text-footnote text-label-secondary">
+                          <StickyNote className="mt-0.5 size-3.5 shrink-0 text-label-tertiary" aria-hidden />
+                          <span className="min-w-0">{session.note}</span>
+                        </p>
+                      ) : null}
                     </div>
-                    <span className="shrink-0 font-mono text-footnote tabular-nums text-label">
+                    <span className="mt-0.5 shrink-0 font-mono text-footnote tabular-nums text-label">
                       {formatDurationHm(session.durationSeconds ?? 0)}
                     </span>
                   </li>

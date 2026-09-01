@@ -1614,3 +1614,138 @@ simultaneously. Each slot is now floored to the minute after its predecessor, so
 a window that cannot hold four distinct minutes places as many as it genuinely
 can instead of inventing duplicates. Windows of three minutes and wider are
 byte-identical to before.
+
+---
+
+## Day Planner redesign, focus notes, toast position (2026-09-01)
+
+Status: completed locally. Verified with typecheck, lint + consistency sweep,
+87 test files / 1091 tests, and `pnpm build`. Migration 0023 is NOT yet applied
+to production.
+
+### What the planner was getting wrong
+
+Three things made it feel like GoHa was deciding the day rather than helping
+with it, and all three were in the model, not the styling.
+
+`NON_ACTIONABLE` was a hardcoded list of category names (sleep, meals, commute,
+family, chores...) that silently refused to hold work. It made a user's own
+category behave differently from another user's identical one for reasons
+nothing on screen explained.
+
+`suggestionsFor` FILTERED by life area. A planner-only category could only be
+offered to-dos that no life area claimed, so a category someone invented called
+"Deep work" was almost always empty, and the emptiness read as a bug.
+
+`day_plan_items.task_id` was NOT NULL, so every entry had to be a real to-do.
+Planning an hour of "Client work" meant first creating a to-do nobody wanted,
+which is the tax that made the categories feel rigid.
+
+### What replaced it
+
+`NON_ACTIONABLE`, `isActionable` and `autoFill` are gone. Every category is now
+the same kind of thing, and nothing is placed anywhere without the user pressing
+something. The life-area match became a score bonus (`AREA_MATCH_BONUS`) rather
+than a filter, so a category still ranks its own work first but never hides the
+rest. Suggestions are pull-based: the list is not rendered until asked for.
+
+Entries are now a linked to-do OR the user's own line of text, enforced by
+`day_plan_items_task_or_label`. Reserved time is deliberately not a third row
+type: a category with minutes and no entries already means "these hours are
+spoken for", and an empty row saying the same would be a line nobody can name.
+
+### Defaults are a template, in one direction
+
+`planner_default_categories` holds the user's normal day. Seeding copies
+template to day, only into a date with no categories yet, and `saveAsDefaults
+Action` is the ONLY writer of the template. Editing Tuesday cannot reach it.
+That boundary is the feature's whole safety property, so it is asserted in
+`tests/planner-defaults-boundary.test.ts` rather than left to review.
+
+### Planned vs actual
+
+`focusActualsForDate` groups completed focus sessions by task for the date;
+`dayActuals` maps task to category through THIS day's entries. Focus on a to-do
+that is not in the plan, or with no to-do at all, is reported as unassigned and
+never absorbed. Attributing it to whichever category looked plausible would be
+the same invented placement the rest of this pass removed.
+
+### Focus notes were never a save bug
+
+The reported symptom was "notes are not being saved". They were: autosaved while
+the timer runs, flushed before the finishing write, and `finishFocusSession`
+already treated `undefined` as "leave the column alone". What was missing is
+that nothing ever rendered a note again. The field existed only inside the
+running timer, so ending a session made the writing disappear, which is
+indistinguishable from a lost save. `focus-stats.tsx` now shows it in Recent
+sessions. A database-only test would have passed throughout, so
+`tests/focus-notes.test.tsx` pins the visible half as well as the stored one.
+
+### Toast position, fourth attempt
+
+BOTTOM-RIGHT sat on Settings' selects and ate their clicks. TOP-RIGHT covered
+page-header actions. TOP-CENTRE dropped a panel into the middle of what the
+reader was looking at. The pattern is structural: GoHa right-aligns its actions
+everywhere, so the right rail is never safe, and the top band is where the page
+names itself. BOTTOM-CENTRE is what is left, and it is also where this kind of
+notification is conventionally looked for. The stack is capped at three and kept
+collapsed, which addresses the actual mechanism of the bottom-right failure
+rather than the corner itself.
+
+### Migration 0023
+
+Additive and widening only, so it is safe to apply while the current build is
+live: a new `planner_default_categories` table, `day_plan_items.task_id` loses
+NOT NULL, three nullable columns (`day_plan_items.label`,
+`day_plan_allocations.color`, `day_plan_allocations.icon`), and one check
+constraint that every existing row already satisfies. No data is rewritten and
+no column is dropped.
+
+### Freeform actual tracking (2026-09-01, same pass)
+
+The first cut of the redesign tracked actuals for linked to-dos only, and said
+so as a limitation. That was the wrong call: the whole point of a freeform entry
+is that "Gym" and "Netflix" are real parts of a day that will never be to-dos,
+and a planner that can only measure the half of the day that happens to be
+to-dos is measuring the wrong half.
+
+Two sources of actual time now, and they cannot overlap:
+
+  LINKED    derived from completed focus sessions, never stored
+  FREEFORM  `day_plan_items.actual_minutes`, typed by the user
+
+`day_plan_items_actual_manual_only` makes a linked row carrying a manual value
+UNSTORABLE. That is what turns "never persisted redundantly" from an intention
+into a fact, and it is also why the category sum is safe: double counting would
+have to be stored first, and it cannot be.
+
+No second timer was built. Focus Mode stays the only automatic tracker; manual
+time is a number the user states, during the day or after it.
+
+Null and zero are deliberately different. Null is "not recorded yet" and shows
+as `--`; zero is "I did none of it" and is a real answer. Clearing returns an
+entry to null rather than to zero.
+
+Recording is refused for a future local date. Tomorrow can be planned in full,
+but a plan that already claims time was spent on it is not a plan. The date is
+resolved server-side from the entry's own `day_plans` row, so a forged parameter
+cannot talk the action into it; the UI also just does not render the control.
+
+### Tracked and Focused are two numbers, not one
+
+The day summary reads Allocated / Planned work / Tracked / Focused. Tracked is
+focus plus manual; Focused is focus alone.
+
+Keeping both costs one grid column and buys the distinction between a
+measurement and an estimate. A single figure called "Focused" that silently
+included hand-typed minutes would restate a guess as a measurement, which is the
+kind of quiet dishonesty a tracking feature cannot afford.
+
+### 0023 was rewritten rather than followed by an 0024
+
+Confirmed unapplied on production (34 tables, 23 migrations, none of the new
+objects present) before touching it. The old `0023_fluffy_red_ghost` files and
+its journal entry were removed and a single `0023_fluffy_paibok` regenerated, so
+the release carries one migration rather than two and `drizzle-kit check` passes.
+Still additive and widening only: nothing is dropped and no existing row is
+rewritten.

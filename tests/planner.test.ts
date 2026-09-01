@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ALLOCATION_MIN_MINUTES,
   MINUTES_IN_DAY,
-  autoFill,
   capacitySummary,
   categoryLoad,
+  dayActuals,
   dayCapacity,
+  entryTitle,
   formatDuration,
-  isActionable,
   needsEstimate,
   scoreCandidate,
   STARTER_CATEGORIES,
@@ -34,6 +33,8 @@ function allocation(over: Partial<Allocation> = {}): Allocation {
     label: "Work",
     minutes: 8 * 60,
     sortOrder: 0,
+    color: null,
+    icon: null,
     ...over,
   };
 }
@@ -120,33 +121,6 @@ describe("category load", () => {
   });
 });
 
-describe("non-actionable categories", () => {
-  it("does not offer work for sleep, commute or free time", () => {
-    for (const label of ["Sleep", "commute", "Free time", "Meals"]) {
-      expect(isActionable({ kind: "planner", label })).toBe(false);
-      expect(
-        suggestionsFor({
-          allocation: allocation({ label }),
-          candidates: [task()],
-          acceptedTaskIds: new Set(),
-          activeGoalIds: new Set(),
-          goalLifeArea: new Map(),
-          today: TODAY,
-        }),
-      ).toEqual([]);
-    }
-  });
-
-  it("always treats a life-area category as actionable", () => {
-    // Even one named "Rest": the user filed goals under it, so it holds work.
-    expect(isActionable({ kind: "life_area", label: "Rest" })).toBe(true);
-  });
-
-  it("treats an invented category like Study as actionable", () => {
-    expect(isActionable({ kind: "planner", label: "Study" })).toBe(true);
-  });
-});
-
 describe("suggestions", () => {
   const base = {
     acceptedTaskIds: new Set<string>(),
@@ -178,38 +152,67 @@ describe("suggestions", () => {
     expect(result.map((s) => s.task.id)).toEqual(["t2"]);
   });
 
-  it("matches a life-area category to that area's work", () => {
+  it("puts a life-area category's own work first, without hiding the rest", () => {
+    /*
+     * This used to be a hard filter, and the filter is what made the planner
+     * feel controlling: a category could only ever be offered work that already
+     * matched it, so the list was often empty and the reason was invisible.
+     * Ranking says the same thing out loud and leaves the choice with the user.
+     */
     const result = suggestionsFor({
       ...base,
       allocation: allocation({ kind: "life_area", lifeAreaId: "career", label: "Career" }),
       candidates: [
-        task({ id: "career-task", lifeAreaId: "career" }),
         task({ id: "health-task", lifeAreaId: "health" }),
+        task({ id: "career-task", lifeAreaId: "career" }),
         task({ id: "loose-task" }),
       ],
     });
-    expect(result.map((s) => s.task.id)).toEqual(["career-task"]);
+    expect(result[0]?.task.id).toBe("career-task");
+    expect(result.map((s) => s.task.id).sort()).toEqual([
+      "career-task",
+      "health-task",
+      "loose-task",
+    ]);
   });
 
-  it("lets a to-do inherit its goal's life area", () => {
+  it("lets a to-do inherit its goal's life area when ranking", () => {
     // A to-do filed only under a goal still belongs to that goal's area, which
-    // is the normal case once the hierarchy is being used properly.
+    // is the normal case once the hierarchy is being used properly. It should
+    // therefore outrank an identical to-do that belongs nowhere.
     const result = suggestionsFor({
       ...base,
       allocation: allocation({ kind: "life_area", lifeAreaId: "career", label: "Career" }),
-      candidates: [task({ id: "via-goal", goalId: "g1" })],
+      candidates: [task({ id: "unrelated" }), task({ id: "via-goal", goalId: "g1" })],
       goalLifeArea: new Map([["g1", "career"]]),
     });
-    expect(result.map((s) => s.task.id)).toEqual(["via-goal"]);
+    expect(result[0]?.task.id).toBe("via-goal");
   });
 
-  it("gives a planner-only category the work no life area claims", () => {
+  it("offers a category the user invented every open to-do, not a subset", () => {
+    /*
+     * "Study" is not a life area and never will be, but the work someone wants
+     * to put in it is usually filed under one. Excluding claimed work left that
+     * category permanently empty, which read as a bug rather than as a rule.
+     */
     const result = suggestionsFor({
       ...base,
       allocation: allocation({ label: "Study" }),
       candidates: [task({ id: "loose" }), task({ id: "claimed", lifeAreaId: "career" })],
     });
-    expect(result.map((s) => s.task.id)).toEqual(["loose"]);
+    expect(result.map((s) => s.task.id).sort()).toEqual(["claimed", "loose"]);
+  });
+
+  it("never silently places anything: every result is a suggestion only", () => {
+    // The whole contract of this module. It returns a ranked LIST; writing an
+    // entry is a separate, user-initiated Server Action.
+    const result = suggestionsFor({
+      ...base,
+      allocation: allocation(),
+      candidates: [task({ id: "t1" }), task({ id: "t2" })],
+    });
+    expect(result).toHaveLength(2);
+    expect(result.every((s) => "score" in s && "reasons" in s)).toBe(true);
   });
 
   it("puts overdue work first, then work due soon, then priority", () => {
@@ -294,7 +297,11 @@ describe("estimates are never invented", () => {
     expect(needsEstimate(suggestions).map((s) => s.task.id)).toEqual(["unsized"]);
   });
 
-  it("never auto-fills with an unsized to-do", () => {
+  it("still offers an unsized to-do, because the user may size it", () => {
+    /*
+     * Suggesting it is fine; PLACING it is not. The estimate prompt is the
+     * gate, and it is in the UI where the person who knows the answer is.
+     */
     const suggestions = suggestionsFor({
       allocation: allocation({ label: "Study" }),
       candidates: [task({ id: "unsized", estimateMinutes: null, priority: "urgent" })],
@@ -303,39 +310,8 @@ describe("estimates are never invented", () => {
       goalLifeArea: new Map(),
       today: TODAY,
     });
-    expect(autoFill({ suggestions, freeMinutes: 480 })).toEqual([]);
-  });
-});
-
-describe("autoFill", () => {
-  const suggestions = (...minutes: (number | null)[]) =>
-    minutes.map((m, i) => ({
-      task: task({ id: `t${i}`, estimateMinutes: m }),
-      reasons: [],
-      score: 100 - i,
-      minutes: m,
-    }));
-
-  it("takes work in rank order while it fits", () => {
-    const chosen = autoFill({ suggestions: suggestions(180, 120, 120), freeMinutes: 300 });
-    expect(chosen.map((s) => s.minutes)).toEqual([180, 120]);
-  });
-
-  it("never exceeds the category's free time", () => {
-    const chosen = autoFill({ suggestions: suggestions(240, 240), freeMinutes: 300 });
-    expect(chosen.reduce((sum, s) => sum + (s.minutes ?? 0), 0)).toBeLessThanOrEqual(300);
-  });
-
-  it("stops once the leftover is too small to hold anything", () => {
-    const chosen = autoFill({ suggestions: suggestions(60, 15, 15), freeMinutes: 70 });
-    // 60 fits; 10 minutes left is under the floor, so it stops rather than
-    // hunting for a 10-minute job that does not exist.
-    expect(chosen).toHaveLength(1);
-    expect(70 - 60).toBeLessThan(ALLOCATION_MIN_MINUTES);
-  });
-
-  it("adds nothing when there is no room", () => {
-    expect(autoFill({ suggestions: suggestions(60), freeMinutes: 0 })).toEqual([]);
+    expect(suggestions.map((s) => s.task.id)).toEqual(["unsized"]);
+    expect(suggestions[0]?.minutes).toBeNull();
   });
 });
 
@@ -345,5 +321,293 @@ describe("formatDuration", () => {
     expect(formatDuration(480)).toBe("8h");
     expect(formatDuration(45)).toBe("45m");
     expect(formatDuration(0)).toBe("0m");
+  });
+});
+
+/**
+ * Planned vs actual.
+ *
+ * The link from a focus session to a planner category is deliberately
+ * indirect: a session names a to-do, and a to-do reaches a category only by
+ * having been put there in this day's plan. Nothing is attributed by guesswork,
+ * and time that fits nowhere is reported rather than absorbed.
+ */
+describe("day actuals", () => {
+  const allocations = [{ id: "work" }, { id: "health" }];
+
+  it("counts focus on a planned to-do towards that to-do's category", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "work", taskId: "t1", plannedMinutes: 120, actualMinutes: null },
+        { allocationId: "health", taskId: "t2", plannedMinutes: 60, actualMinutes: null },
+      ],
+      focus: [
+        { taskId: "t1", seconds: 90 * 60, sessions: 2 },
+        { taskId: "t2", seconds: 30 * 60, sessions: 1 },
+      ],
+    });
+    expect(result.byAllocation.get("work")).toMatchObject({
+      plannedMinutes: 120,
+      actualMinutes: 90,
+      sessions: 2,
+    });
+    expect(result.byAllocation.get("health")).toMatchObject({
+      plannedMinutes: 60,
+      actualMinutes: 30,
+      sessions: 1,
+    });
+    expect(result.unassignedMinutes).toBe(0);
+  });
+
+  it("adds up several sessions on the same to-do", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "work", taskId: "t1", plannedMinutes: 120, actualMinutes: null }],
+      focus: [{ taskId: "t1", seconds: 3 * 25 * 60, sessions: 3 }],
+    });
+    expect(result.byAllocation.get("work")?.actualMinutes).toBe(75);
+  });
+
+  it("reports focus with no to-do as unassigned rather than inventing a home", () => {
+    // The rule the redesign is built on: GoHa does not place anything the user
+    // did not place. An open focus session belongs to no category, and saying
+    // so is more useful than quietly padding whichever bar looked plausible.
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "work", taskId: "t1", plannedMinutes: 120, actualMinutes: null }],
+      focus: [{ taskId: null, seconds: 45 * 60, sessions: 1 }],
+    });
+    expect(result.unassignedMinutes).toBe(45);
+    expect(result.unassignedSessions).toBe(1);
+    expect(result.byAllocation.get("work")?.actualMinutes).toBe(0);
+  });
+
+  it("treats focus on an unplanned to-do as unassigned too", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "work", taskId: "t1", plannedMinutes: 120, actualMinutes: null }],
+      focus: [{ taskId: "not-in-the-plan", seconds: 20 * 60, sessions: 1 }],
+    });
+    expect(result.unassignedMinutes).toBe(20);
+    expect(result.byAllocation.get("work")?.actualMinutes).toBe(0);
+  });
+
+  it("never counts a freeform entry as focus, since nothing tracks it", () => {
+    // A freeform line has no to-do, so no focus session can point at it. Its
+    // planned minutes still count; its actual is honestly zero.
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "work", taskId: null, plannedMinutes: 60, actualMinutes: null },
+        { allocationId: "work", taskId: "t1", plannedMinutes: 60, actualMinutes: null },
+      ],
+      focus: [{ taskId: "t1", seconds: 60 * 60, sessions: 1 }],
+    });
+    expect(result.byAllocation.get("work")).toMatchObject({
+      plannedMinutes: 120,
+      focusMinutes: 60,
+      manualMinutes: 0,
+      actualMinutes: 60,
+    });
+  });
+
+  it("gives every category a row, so a card never reads undefined", () => {
+    const result = dayActuals({ allocations, entries: [], focus: [] });
+    expect(result.byAllocation.get("work")).toMatchObject({
+      plannedMinutes: 0,
+      focusMinutes: 0,
+      manualMinutes: 0,
+      actualMinutes: 0,
+      sessions: 0,
+    });
+    expect(result.byAllocation.get("health")).toBeDefined();
+  });
+
+  it("rounds once at the end, so short sessions do not lose a minute each", () => {
+    // Two 90-second sessions are three minutes, not two.
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "work", taskId: "t1", plannedMinutes: 60, actualMinutes: null }],
+      focus: [{ taskId: "t1", seconds: 180, sessions: 2 }],
+    });
+    expect(result.byAllocation.get("work")?.actualMinutes).toBe(3);
+  });
+
+  it("totals all recorded focus, assigned or not", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "work", taskId: "t1", plannedMinutes: 60, actualMinutes: null }],
+      focus: [
+        { taskId: "t1", seconds: 30 * 60, sessions: 1 },
+        { taskId: null, seconds: 15 * 60, sessions: 1 },
+      ],
+    });
+    expect(result.focusedMinutes).toBe(45);
+    expect(result.trackedMinutes).toBe(45);
+  });
+});
+
+/**
+ * Entries: a linked to-do, or the user's own words.
+ *
+ * Reserved time is deliberately not a third kind of row. A category with hours
+ * and no entries already means "these hours are spoken for", and an empty row
+ * saying the same thing would be a line nobody can name or complete.
+ */
+describe("plan entries", () => {
+  const titles = new Map([["t1", "Finish the resume"]]);
+
+  it("names a linked entry from its to-do, so a rename follows the to-do", () => {
+    expect(entryTitle({ taskId: "t1", label: null }, titles)).toBe("Finish the resume");
+  });
+
+  it("names a freeform entry from its own text", () => {
+    expect(entryTitle({ taskId: null, label: "Client work" }, titles)).toBe("Client work");
+  });
+
+  it("does not fall back to the label when a linked to-do is gone", () => {
+    // The row is a pointer at a to-do that no longer exists. Saying so beats
+    // showing a name from a column that a linked row is not allowed to fill.
+    expect(entryTitle({ taskId: "deleted", label: null }, titles)).toBe("To-do");
+  });
+});
+
+/**
+ * Manual actuals for freeform activities.
+ *
+ * The rule that makes the two sources safe to add together: a linked entry
+ * takes its actual from focus sessions and a freeform entry takes it from a
+ * number the user typed, and no row can ever be both. The database enforces
+ * that (`day_plan_items_actual_manual_only`, `day_plan_items_task_or_label`),
+ * so these check the arithmetic on top of it.
+ */
+describe("manual actuals", () => {
+  const allocations = [{ id: "health" }, { id: "work" }];
+
+  it("counts a logged freeform activity towards its category", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "health", taskId: null, plannedMinutes: 90, actualMinutes: 60 },
+        { allocationId: "health", taskId: null, plannedMinutes: 30, actualMinutes: 40 },
+      ],
+      focus: [],
+    });
+    expect(result.byAllocation.get("health")).toMatchObject({
+      plannedMinutes: 120,
+      focusMinutes: 0,
+      manualMinutes: 100,
+      actualMinutes: 100,
+    });
+  });
+
+  it("adds focus and manual time in one category without double counting", () => {
+    /*
+     * The example from the brief: a category holding both a linked to-do that
+     * was focused on and a freeform activity that was logged. 100 + 45 = 145,
+     * and the focus minutes must appear exactly once.
+     */
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "work", taskId: "resume", plannedMinutes: 120, actualMinutes: null },
+        { allocationId: "work", taskId: null, plannedMinutes: 60, actualMinutes: 45 },
+      ],
+      focus: [{ taskId: "resume", seconds: 100 * 60, sessions: 2 }],
+    });
+    expect(result.byAllocation.get("work")).toMatchObject({
+      plannedMinutes: 180,
+      focusMinutes: 100,
+      manualMinutes: 45,
+      actualMinutes: 145,
+      sessions: 2,
+    });
+  });
+
+  it("keeps Focused as focus alone while Tracked carries both", () => {
+    // The day summary distinction: a measurement and an estimate must not be
+    // presented as one number, so Tracked is the sum and Focused is not.
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "work", taskId: "resume", plannedMinutes: 120, actualMinutes: null },
+        { allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: 45 },
+      ],
+      focus: [{ taskId: "resume", seconds: 100 * 60, sessions: 1 }],
+    });
+    expect(result.focusedMinutes).toBe(100);
+    expect(result.manualMinutes).toBe(45);
+    expect(result.trackedMinutes).toBe(145);
+  });
+
+  it("treats null as not recorded and zero as recorded", () => {
+    // Different statements: "I have not said yet" and "I did none of it".
+    const unrecorded = dayActuals({
+      allocations,
+      entries: [{ allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: null }],
+      focus: [],
+    });
+    expect(unrecorded.byAllocation.get("health")?.manualMinutes).toBe(0);
+    expect(unrecorded.trackedMinutes).toBe(0);
+
+    const zero = dayActuals({
+      allocations,
+      entries: [{ allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: 0 }],
+      focus: [],
+    });
+    expect(zero.byAllocation.get("health")?.manualMinutes).toBe(0);
+    expect(zero.trackedMinutes).toBe(0);
+  });
+
+  it("ignores a manual value that somehow sits on a linked entry", () => {
+    /*
+     * Unstorable: the check constraint refuses it. Belt and braces, because the
+     * one thing this must never do is count a to-do's time twice, once from its
+     * focus sessions and once from a stale column.
+     */
+    const result = dayActuals({
+      allocations,
+      entries: [
+        { allocationId: "work", taskId: "resume", plannedMinutes: 120, actualMinutes: 999 },
+      ],
+      focus: [{ taskId: "resume", seconds: 60 * 60, sessions: 1 }],
+    });
+    expect(result.byAllocation.get("work")?.manualMinutes).toBe(0);
+    expect(result.byAllocation.get("work")?.actualMinutes).toBe(60);
+    expect(result.trackedMinutes).toBe(60);
+  });
+
+  it("does not let manual time leak into another category", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: 45 }],
+      focus: [],
+    });
+    expect(result.byAllocation.get("health")?.manualMinutes).toBe(45);
+    expect(result.byAllocation.get("work")?.manualMinutes).toBe(0);
+  });
+
+  it("never counts manual time as a focus session", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: 45 }],
+      focus: [],
+    });
+    expect(result.byAllocation.get("health")?.sessions).toBe(0);
+    expect(result.focusedMinutes).toBe(0);
+  });
+
+  it("keeps unassigned focus out of both category totals", () => {
+    const result = dayActuals({
+      allocations,
+      entries: [{ allocationId: "health", taskId: null, plannedMinutes: 60, actualMinutes: 30 }],
+      focus: [{ taskId: null, seconds: 20 * 60, sessions: 1 }],
+    });
+    expect(result.unassignedMinutes).toBe(20);
+    expect(result.byAllocation.get("health")?.actualMinutes).toBe(30);
+    // Unassigned focus is still real time that was spent, so the day totals it.
+    expect(result.focusedMinutes).toBe(20);
+    expect(result.trackedMinutes).toBe(50);
   });
 });

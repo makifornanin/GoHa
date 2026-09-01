@@ -20,6 +20,7 @@ import type {
   dayPlanAllocations,
   dayPlanItems,
   dayPlans,
+  plannerDefaultCategories,
   focusSessions,
   goalProgressUpdates,
   goals,
@@ -77,6 +78,8 @@ export type DayPlanAllocation = typeof dayPlanAllocations.$inferSelect;
 export type NewDayPlanAllocation = typeof dayPlanAllocations.$inferInsert;
 export type DayPlanItem = typeof dayPlanItems.$inferSelect;
 export type NewDayPlanItem = typeof dayPlanItems.$inferInsert;
+export type PlannerDefaultCategory = typeof plannerDefaultCategories.$inferSelect;
+export type NewPlannerDefaultCategory = typeof plannerDefaultCategories.$inferInsert;
 
 export type TaskMap = typeof taskMaps.$inferSelect;
 export type NewTaskMap = typeof taskMaps.$inferInsert;

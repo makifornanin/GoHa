@@ -28,11 +28,15 @@ export default async function PlannerPage({
   // today rather than rendering a day the UI has no controls for.
   const planDate = date === tomorrow ? tomorrow : today;
 
-  const [contents, lifeAreas, tasks, goals] = await Promise.all([
+  const [contents, lifeAreas, tasks, goals, defaults, focus] = await Promise.all([
     plannerRepo.getPlanContents(user.id, planDate),
     lifeAreasRepo.listLifeAreas(user.id),
     tasksRepo.listTasksForUser(user.id),
     goalsRepo.listGoalsWithTaskCounts(user.id),
+    plannerRepo.listDefaultCategories(user.id),
+    // Recorded focus for THIS date, which is how planned time gets an actual
+    // to sit beside it. Tomorrow simply has none yet.
+    plannerRepo.focusActualsForDate(user.id, planDate),
   ]);
 
   return (
@@ -47,6 +51,9 @@ export default async function PlannerPage({
         dateLabel={formatManilaLongDate(planDate) ?? planDate}
         allocations={contents?.allocations ?? []}
         items={contents?.items ?? []}
+        focusActuals={focus}
+        hasSavedDefaults={defaults.length > 0}
+        isToday={planDate === today}
         lifeAreas={lifeAreas}
         tasks={tasks}
         goals={goals.map((goal) => ({

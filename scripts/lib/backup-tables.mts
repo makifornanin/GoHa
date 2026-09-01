@@ -59,6 +59,11 @@ export const BACKUP_TABLES = [
   "day_plan_allocations",
   "day_plan_items",
 
+  // The reusable default day (migration 0023). References `user` and
+  // `life_areas` only, and nothing references it, so its position just has to
+  // follow those two.
+  "planner_default_categories",
+
   // Task maps. Nodes reference maps and tasks; edges reference nodes.
   "task_maps",
   "task_map_nodes",

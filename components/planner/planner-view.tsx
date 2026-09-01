@@ -4,25 +4,33 @@ import { motion } from "motion/react";
 import {
   AlertTriangle,
   ArrowRight,
+  BookmarkCheck,
   CalendarCheck,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
-  Hourglass,
+  Link2,
   Minus,
+  Pencil,
   Plus,
   Sparkles,
+  Timer,
   Trash2,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
   acceptSuggestionAction,
+  addFreeformItemAction,
   addPlanToTodayAction,
+  logActualMinutesAction,
   removePlanItemAction,
+  renameFreeformItemAction,
+  saveAsDefaultsAction,
   savePlanAction,
   seedPlanAction,
 } from "@/app/(app)/planner/actions";
@@ -36,19 +44,26 @@ import { Select } from "@/components/ui/select";
 import type { DayPlanAllocation, DayPlanItem, LifeArea, Task } from "@/db";
 import type { GoalStatus } from "@/db/schema/enums";
 import type { Weekday } from "@/lib/date";
-import { lifeAreaColorConfig, resolveColorKey } from "@/lib/life-areas";
+import {
+  LIFE_AREA_COLOR_KEYS,
+  lifeAreaColorConfig,
+  resolveColorKey,
+  type LifeAreaColorKey,
+} from "@/lib/life-areas";
 import { listContainer, listItem, spring } from "@/lib/motion";
 import {
   ALLOCATION_STEP_MINUTES,
   MINUTES_IN_DAY,
   capacitySummary,
   categoryLoad,
+  dayActuals,
   dayCapacity,
+  entryTitle,
   formatDuration,
-  isActionable,
   SUGGESTION_REASON_LABEL,
   suggestionsFor,
   type Allocation,
+  type CategoryActual,
   type PlannerCandidate,
   type Suggestion,
 } from "@/lib/planner";
@@ -56,18 +71,44 @@ import { TASK_ESTIMATE_OPTIONS, formatEstimate } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 
 type GoalRef = { id: string; title: string; status: GoalStatus; lifeAreaId: string | null };
+type FocusActual = { taskId: string | null; seconds: number; sessions: number };
+
+/**
+ * The colour a category draws with.
+ *
+ * Three sources, most deliberate first: a colour the user picked for this
+ * category, the colour of the life area behind it, then one derived from the
+ * category's own id so that an untouched plan is still legible rather than a
+ * row of grey bars. Same vocabulary as Life Areas throughout, so "Health" looks
+ * like Health wherever it appears.
+ */
+function categoryColorKey(
+  allocation: Pick<Allocation, "id" | "color">,
+  area: LifeArea | null,
+): LifeAreaColorKey {
+  if (allocation.color) return resolveColorKey(allocation.color, allocation.id);
+  if (area) return resolveColorKey(area.color, area.id);
+  return resolveColorKey(null, allocation.id);
+}
 
 /**
  * The Day Planner.
  *
- * Three questions, top to bottom: how are my 24 hours divided, what work fits
- * in the parts that hold work, and do I commit it. The whole screen is one
- * arithmetic statement, so the total sits at the top and never scrolls out of
- * the reader's mind.
+ * A CAPACITY tool, not a calendar: it answers "does what I intend to do fit in
+ * the day I have", never "at what o'clock". No hour grid and no start times,
+ * because the honest answer to "when will I write the case study" is usually
+ * "sometime in the eight hours I call work".
  *
- * It is NOT a calendar and does not become one at any width. No hour grid, no
- * start times, no drag-to-a-slot: those all demand an answer ("when exactly?")
- * that the person planning their morning does not have and does not need.
+ * The screen reads top to bottom as four plain questions:
+ *
+ *   1. How are my 24 hours divided?      the day summary
+ *   2. What is in each part?             the category cards
+ *   3. What actually happened?           planned vs actual, from Focus
+ *   4. Do I commit it?                   the bottom bar
+ *
+ * GoHa decides NONE of it. Categories are the user's, entries are the user's,
+ * and a suggestion is a list you may read and ignore. Nothing is placed
+ * anywhere without someone pressing something.
  */
 export function PlannerView({
   planDate,
@@ -79,6 +120,9 @@ export function PlannerView({
   lifeAreas,
   tasks,
   goals,
+  focusActuals,
+  hasSavedDefaults,
+  isToday,
 }: {
   planDate: string;
   today: string;
@@ -89,6 +133,9 @@ export function PlannerView({
   lifeAreas: LifeArea[];
   tasks: Task[];
   goals: GoalRef[];
+  focusActuals: FocusActual[];
+  hasSavedDefaults: boolean;
+  isToday: boolean;
   timeZone?: string;
   weekStartsOn?: Weekday;
 }) {
@@ -101,6 +148,10 @@ export function PlannerView({
   } | null>(null);
 
   const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const taskTitles = useMemo(
+    () => new Map(tasks.map((task) => [task.id, task.title])),
+    [tasks],
+  );
   const lifeAreaById = useMemo(() => new Map(lifeAreas.map((a) => [a.id, a])), [lifeAreas]);
 
   const activeGoalIds = useMemo(
@@ -131,7 +182,10 @@ export function PlannerView({
     [tasks],
   );
 
-  const acceptedTaskIds = useMemo(() => new Set(items.map((item) => item.taskId)), [items]);
+  const acceptedTaskIds = useMemo(
+    () => new Set(items.map((item) => item.taskId).filter((id): id is string => Boolean(id))),
+    [items],
+  );
   const itemsByAllocation = useMemo(() => {
     const map = new Map<string, DayPlanItem[]>();
     for (const item of items) {
@@ -145,6 +199,24 @@ export function PlannerView({
   const capacity = dayCapacity(allocations);
   const plannedTotal = items.reduce((sum, item) => sum + item.plannedMinutes, 0);
 
+  const actuals = useMemo(
+    () => dayActuals({ allocations, entries: items, focus: focusActuals }),
+    [allocations, items, focusActuals],
+  );
+
+  /*
+   * Focus minutes per to-do, so a linked entry can show its OWN actual and not
+   * just its category's. Derived from the same rows `dayActuals` totals, so the
+   * per-entry numbers and the category number can never disagree.
+   */
+  const focusByTask = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of focusActuals) {
+      if (row.taskId) map.set(row.taskId, Math.round(row.seconds / 60));
+    }
+    return map;
+  }, [focusActuals]);
+
   /*
    * A life area can back at most ONE category in a plan.
    *
@@ -152,20 +224,38 @@ export function PlannerView({
    * right rule: two bars drawing on the same area would suggest the same work
    * twice and double-count the day. So the link control must not offer an area
    * that is already taken, or the user picks it and gets a failed save with
-   * nothing explaining why. Found exactly that way: yesterday's plan is copied
-   * forward, so today already contained the Career category the user was then
-   * offered again.
+   * nothing explaining why.
    */
   const linkedAreaIds = new Set(
     allocations.map((a) => a.lifeAreaId).filter((id): id is string => Boolean(id)),
   );
   const linkableAreas = lifeAreas.filter((area) => !linkedAreaIds.has(area.id));
 
+  const asAllocations: Allocation[] = allocations.map((a) => ({
+    id: a.id,
+    kind: a.kind,
+    lifeAreaId: a.lifeAreaId,
+    label: a.label,
+    minutes: a.minutes,
+    sortOrder: a.sortOrder,
+    color: a.color,
+    icon: a.icon,
+  }));
+
+  function refreshAfter(result: { ok: boolean; error?: string }, success?: string) {
+    if (!result.ok) {
+      toast.error(result.error ?? "Something went wrong.");
+      return false;
+    }
+    if (success) toast.success(success);
+    router.refresh();
+    return true;
+  }
+
   function seed() {
     startTransition(async () => {
       const result = await seedPlanAction(planDate);
-      if (!result.ok) toast.error(result.error);
-      else router.refresh();
+      refreshAfter(result);
     });
   }
 
@@ -177,22 +267,41 @@ export function PlannerView({
         taskId: suggestion.task.id,
         plannedMinutes: minutes,
       });
-      if (!result.ok) toast.error(result.error);
-      else {
-        toast.success(`Added "${suggestion.task.title}"`);
-        router.refresh();
-      }
+      refreshAfter(result, `Added "${suggestion.task.title}"`);
+    });
+  }
+
+  function addFreeform(allocationId: string, label: string, minutes: number) {
+    startTransition(async () => {
+      const result = await addFreeformItemAction({
+        planDate,
+        allocationId,
+        label,
+        plannedMinutes: minutes,
+      });
+      refreshAfter(result, `Added "${label}"`);
+    });
+  }
+
+  function renameFreeform(id: string, label: string) {
+    startTransition(async () => {
+      const result = await renameFreeformItemAction(id, label);
+      refreshAfter(result, "Renamed");
+    });
+  }
+
+  /** Record, change or clear the time a freeform activity actually took. */
+  function logActual(id: string, minutes: number | null) {
+    startTransition(async () => {
+      const result = await logActualMinutesAction({ itemId: id, actualMinutes: minutes });
+      refreshAfter(result, minutes === null ? "Cleared" : `Logged ${formatDuration(minutes)}`);
     });
   }
 
   function remove(item: DayPlanItem, title: string) {
     startTransition(async () => {
       const result = await removePlanItemAction(item.id);
-      if (!result.ok) toast.error(result.error);
-      else {
-        toast.success(`Removed "${title}" from the plan`);
-        router.refresh();
-      }
+      refreshAfter(result, `Removed "${title}" from the plan`);
     });
   }
 
@@ -201,37 +310,52 @@ export function PlannerView({
    *
    * Reuses `savePlanAction`, the SAME path the category editor uses, rather
    * than adding a second way to write an allocation. `syncAllocations` updates
-   * rows in place by id, so the category keeps its id and the to-dos already
-   * accepted into it are untouched.
-   *
-   * The kind changes with the link because the database insists: the check
-   * constraint `day_plan_allocations_kind_matches_link` forbids a `planner` row
-   * from carrying a life_area_id. The LABEL is deliberately kept, so a category
-   * the user called "Work" stays called "Work" and simply starts drawing on
-   * that area's work.
+   * rows in place by id, so the category keeps its id and everything already
+   * inside it is untouched.
    */
   function linkLifeArea(allocationId: string, lifeAreaId: string) {
     startTransition(async () => {
       const result = await savePlanAction({
         planDate,
-        allocations: allocations.map((a) =>
-          a.id === allocationId
-            ? { id: a.id, kind: "life_area" as const, lifeAreaId, label: a.label, minutes: a.minutes }
-            : {
-                id: a.id,
-                kind: a.kind,
-                lifeAreaId: a.lifeAreaId ?? "",
-                label: a.label,
-                minutes: a.minutes,
-              },
-        ),
+        allocations: allocations.map((a) => ({
+          id: a.id,
+          kind: a.id === allocationId ? ("life_area" as const) : a.kind,
+          lifeAreaId: a.id === allocationId ? lifeAreaId : (a.lifeAreaId ?? ""),
+          label: a.label,
+          minutes: a.minutes,
+          color: a.color ?? undefined,
+          icon: a.icon ?? undefined,
+        })),
       });
-      if (!result.ok) toast.error(result.error);
-      else {
-        const area = lifeAreas.find((a) => a.id === lifeAreaId);
-        toast.success(`Linked to ${area?.name ?? "that life area"}`);
-        router.refresh();
-      }
+      const area = lifeAreas.find((a) => a.id === lifeAreaId);
+      refreshAfter(result, `Linked to ${area?.name ?? "that life area"}`);
+    });
+  }
+
+  /**
+   * Save the CATEGORIES of this day as the reusable default day.
+   *
+   * Explicit and one-directional, which is the whole point of the split: days
+   * are seeded FROM the default and never write back to it by themselves, so
+   * shuffling Tuesday around cannot quietly change what every future morning
+   * starts from.
+   */
+  function saveAsDefault() {
+    startTransition(async () => {
+      const result = await saveAsDefaultsAction({
+        categories: allocations.map((a) => ({
+          kind: a.kind,
+          lifeAreaId: a.lifeAreaId ?? "",
+          label: a.label,
+          minutes: a.minutes,
+          color: a.color ?? undefined,
+          icon: a.icon ?? undefined,
+        })),
+      });
+      refreshAfter(
+        result,
+        hasSavedDefaults ? "Default day updated" : "Saved as your default day",
+      );
     });
   }
 
@@ -243,10 +367,11 @@ export function PlannerView({
         return;
       }
       const { scheduled, alreadyThere } = result.data;
+      const dayWord = isToday ? "today" : "tomorrow";
       toast.success(
         scheduled > 0
-          ? `${scheduled} to-do${scheduled === 1 ? "" : "s"} added to ${planDate === today ? "today" : "tomorrow"}`
-          : `Everything in this plan was already on ${planDate === today ? "today" : "tomorrow"}`,
+          ? `${scheduled} to-do${scheduled === 1 ? "" : "s"} added to ${dayWord}`
+          : `Everything in this plan was already on ${dayWord}`,
         alreadyThere > 0 && scheduled > 0
           ? { description: `${alreadyThere} was already there.` }
           : undefined,
@@ -256,67 +381,70 @@ export function PlannerView({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PageHeader
         title="Day Planner"
-        description="You have 24 hours. Decide where they go, then choose what fits."
+        description="Your day, your categories. Decide where the hours go, then fill them however you like."
         action={
-          <div className="flex items-center gap-2">
-            <DayToggle
-              current={planDate}
-              today={today}
-              tomorrow={tomorrow}
-              disabled={pending}
-            />
-          </div>
+          <DayToggle current={planDate} today={today} tomorrow={tomorrow} disabled={pending} />
         }
       />
 
       {allocations.length === 0 ? (
-        <EmptyPlanner dateLabel={dateLabel} onSeed={seed} pending={pending} />
+        <EmptyPlanner
+          dateLabel={dateLabel}
+          hasSavedDefaults={hasSavedDefaults}
+          onSeed={seed}
+          pending={pending}
+        />
       ) : (
         <>
-          <CapacityBar
-            allocations={allocations}
+          <DaySummary
+            allocations={asAllocations}
             lifeAreaById={lifeAreaById}
+            capacity={capacity}
+            trackedMinutes={actuals.trackedMinutes}
+            focusedMinutes={actuals.focusedMinutes}
+            plannedTotal={plannedTotal}
+            dateLabel={dateLabel}
+            isToday={isToday}
+            hasSavedDefaults={hasSavedDefaults}
+            pending={pending}
             onEdit={() => setEditingCategories(true)}
+            onSaveDefault={saveAsDefault}
           />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {allocations.map((allocation) => {
-              const asAllocation: Allocation = {
-                id: allocation.id,
-                kind: allocation.kind,
-                lifeAreaId: allocation.lifeAreaId,
-                label: allocation.label,
-                minutes: allocation.minutes,
-                sortOrder: allocation.sortOrder,
-              };
+            {asAllocations.map((allocation) => {
+              const area = allocation.lifeAreaId
+                ? (lifeAreaById.get(allocation.lifeAreaId) ?? null)
+                : null;
               const allocItems = itemsByAllocation.get(allocation.id) ?? [];
-              const load = categoryLoad(asAllocation, allocItems);
-              const suggestions = suggestionsFor({
-                allocation: asAllocation,
-                candidates,
-                acceptedTaskIds,
-                activeGoalIds,
-                goalLifeArea,
-                today: planDate,
-              });
-
               return (
                 <CategoryCard
                   key={allocation.id}
-                  allocation={asAllocation}
-                  area={
-                    allocation.lifeAreaId ? (lifeAreaById.get(allocation.lifeAreaId) ?? null) : null
-                  }
-                  load={load}
+                  allocation={allocation}
+                  area={area}
+                  colorKey={categoryColorKey(allocation, area)}
+                  load={categoryLoad(allocation, allocItems)}
+                  actual={actuals.byAllocation.get(allocation.id)}
                   items={allocItems}
+                  taskTitles={taskTitles}
                   taskById={taskById}
-                  suggestions={suggestions}
+                  focusByTask={focusByTask}
                   linkableAreas={linkableAreas}
-                  hasLifeAreas={lifeAreas.length > 0}
                   pending={pending}
+                  isToday={isToday}
+                  suggestionsFactory={() =>
+                    suggestionsFor({
+                      allocation,
+                      candidates,
+                      acceptedTaskIds,
+                      activeGoalIds,
+                      goalLifeArea,
+                      today: planDate,
+                    })
+                  }
                   onAccept={(suggestion) => {
                     if (suggestion.minutes === null) {
                       // GoHa will not invent a duration. Ask, then accept.
@@ -325,6 +453,9 @@ export function PlannerView({
                     }
                     accept(allocation.id, suggestion, suggestion.minutes);
                   }}
+                  onAddFreeform={(label, minutes) => addFreeform(allocation.id, label, minutes)}
+                  onRenameFreeform={renameFreeform}
+                  onLogActual={logActual}
                   onRemove={remove}
                   onLink={linkLifeArea}
                 />
@@ -332,10 +463,17 @@ export function PlannerView({
             })}
           </div>
 
+          {actuals.unassignedMinutes > 0 ? (
+            <UnassignedFocus
+              minutes={actuals.unassignedMinutes}
+              sessions={actuals.unassignedSessions}
+            />
+          ) : null}
+
           <CommitBar
-            planDate={planDate}
-            today={today}
+            isToday={isToday}
             itemCount={items.length}
+            linkedCount={items.filter((item) => item.taskId !== null).length}
             plannedTotal={plannedTotal}
             capacity={capacity}
             pending={pending}
@@ -349,6 +487,7 @@ export function PlannerView({
         planDate={planDate}
         allocations={allocations}
         lifeAreas={lifeAreas}
+        isToday={isToday}
         onClose={() => setEditingCategories(false)}
         onSaved={() => {
           setEditingCategories(false);
@@ -380,82 +519,113 @@ function DayToggle({
   current: string;
   today: string;
   tomorrow: string;
-  disabled?: boolean;
+  disabled: boolean;
 }) {
-  const options = [
-    { label: "Today", value: today },
-    { label: "Tomorrow", value: tomorrow },
+  const router = useRouter();
+  const options: { value: string; label: string }[] = [
+    { value: today, label: "Today" },
+    { value: tomorrow, label: "Tomorrow" },
   ];
+
   return (
     <div
-      className="inline-flex rounded-lg bg-fill-tertiary p-0.5"
+      className="flex rounded-xl bg-fill-tertiary p-1"
       role="group"
       aria-label="Which day to plan"
     >
-      {options.map((option) => (
-        <Link
-          key={option.value}
-          href={option.value === today ? "/planner" : `/planner?date=${option.value}`}
-          aria-current={current === option.value ? "page" : undefined}
-          aria-disabled={disabled}
-          className={cn(
-            "touch-target rounded-md px-3 text-callout font-medium transition-colors",
-            current === option.value
-              ? "bg-surface text-label shadow-e1"
-              : "text-label-secondary hover:text-label",
-          )}
-        >
-          {option.label}
-        </Link>
-      ))}
+      {options.map((option) => {
+        const active = option.value === current;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            disabled={disabled}
+            aria-current={active ? "page" : undefined}
+            onClick={() => router.push(`/planner?date=${option.value}`)}
+            className={cn(
+              "hit-44 hit-44-narrow cursor-pointer rounded-lg px-4 py-1.5 text-subhead transition-colors focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:cursor-not-allowed disabled:opacity-60",
+              active
+                ? "bg-surface text-label shadow-e1"
+                : "text-label-secondary hover:text-label",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 function EmptyPlanner({
   dateLabel,
+  hasSavedDefaults,
   onSeed,
   pending,
 }: {
   dateLabel: string;
+  hasSavedDefaults: boolean;
   onSeed: () => void;
   pending: boolean;
 }) {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center py-12 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-surface-secondary text-blue">
-          <Hourglass className="size-7" aria-hidden />
+      <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-fill-tertiary text-label-secondary">
+          <Clock className="size-6" aria-hidden />
+        </span>
+        <div className="max-w-md">
+          <h2 className="text-headline text-label">Nothing planned for {dateLabel}</h2>
+          <p className="mt-1.5 text-callout text-label-secondary">
+            {hasSavedDefaults
+              ? "Start from your default day, then change anything you like. Editing this day will not touch your default."
+              : "Start from a normal-looking 24 hours, then rename, resize or remove anything. None of it is fixed."}
+          </p>
         </div>
-        <h2 className="mt-5 text-title-3 text-label">Shape {dateLabel}</h2>
-        <p className="mt-2 max-w-md text-body text-label-secondary">
-          Split the day into the parts it actually has, like sleep, work and time for yourself.
-          Then GoHa can show you what fits in the parts that hold real work.
-        </p>
-        <Button className="mt-6" onClick={onSeed} loading={pending} disabled={pending}>
+        <Button onClick={onSeed} loading={pending}>
           <Sparkles aria-hidden />
-          Start with a typical day
+          {hasSavedDefaults ? "Use my default day" : "Start planning"}
         </Button>
-        <p className="mt-3 max-w-sm text-footnote text-label-tertiary">
-          You can change every category and every hour afterwards. Nothing is added to your day
-          until you say so.
-        </p>
       </CardContent>
     </Card>
   );
 }
 
-/** The 24-hour bar: one stacked strip, then the numbers under it. */
-function CapacityBar({
+/**
+ * The one place the whole day is stated at once.
+ *
+ * Planned and actual sit side by side because the question people bring back to
+ * a planner the next morning is not "what did I intend" but "where did it
+ * actually go". On a day with no recorded focus the actual column simply says
+ * so rather than showing a confident zero.
+ */
+function DaySummary({
   allocations,
   lifeAreaById,
+  capacity,
+  trackedMinutes,
+  focusedMinutes,
+  plannedTotal,
+  dateLabel,
+  isToday,
+  hasSavedDefaults,
+  pending,
   onEdit,
+  onSaveDefault,
 }: {
-  allocations: DayPlanAllocation[];
+  allocations: Allocation[];
   lifeAreaById: Map<string, LifeArea>;
+  capacity: ReturnType<typeof dayCapacity>;
+  trackedMinutes: number;
+  focusedMinutes: number;
+  plannedTotal: number;
+  dateLabel: string;
+  isToday: boolean;
+  hasSavedDefaults: boolean;
+  pending: boolean;
   onEdit: () => void;
+  onSaveDefault: () => void;
 }) {
-  const capacity = dayCapacity(allocations);
   // Over capacity, the strip is scaled by what was allocated rather than by 24
   // hours, so every category stays visible and the overflow is stated in words
   // instead of being drawn as a bar running off the edge.
@@ -464,9 +634,9 @@ function CapacityBar({
   return (
     <Card>
       <CardContent className="py-4">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-subhead text-label-secondary">Your 24 hours</p>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-subhead text-label">{dateLabel}</p>
             <p
               className={cn(
                 "mt-0.5 text-footnote",
@@ -476,13 +646,14 @@ function CapacityBar({
               {capacitySummary(capacity)}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-title-3 tabular-nums text-label">
-              {formatDuration(capacity.allocatedMinutes)}
-              <span className="text-label-tertiary"> / 24h</span>
-            </span>
-            <Button variant="secondary" size="sm" onClick={onEdit}>
-              Edit categories
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={onEdit} disabled={pending}>
+              <Pencil aria-hidden />
+              Categories
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onSaveDefault} disabled={pending}>
+              <BookmarkCheck aria-hidden />
+              {hasSavedDefaults ? "Update my default" : "Save as default"}
             </Button>
           </div>
         </div>
@@ -496,13 +667,13 @@ function CapacityBar({
             const area = allocation.lifeAreaId
               ? (lifeAreaById.get(allocation.lifeAreaId) ?? null)
               : null;
-            const color = area
-              ? lifeAreaColorConfig[resolveColorKey(area.color, area.id)].dot
-              : "bg-gray-3";
             return (
               <motion.span
                 key={allocation.id}
-                className={cn("h-full border-r border-surface last:border-r-0", color)}
+                className={cn(
+                  "h-full border-r border-surface last:border-r-0",
+                  lifeAreaColorConfig[categoryColorKey(allocation, area)].dot,
+                )}
                 initial={{ width: 0 }}
                 animate={{ width: `${(allocation.minutes / scale) * 100}%` }}
                 transition={spring.smooth}
@@ -512,20 +683,49 @@ function CapacityBar({
           })}
         </div>
 
-        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+        {/*
+          Four numbers, and TRACKED and FOCUSED are deliberately both here.
+
+          Focus time is a measured record; manual time is the user's own
+          estimate of an activity that was never timed. Folding the two into one
+          figure called "Focused" would quietly restate a guess as a
+          measurement, so Tracked is the total and Focused stays exactly what
+          its name says.
+        */}
+        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryStat label="Allocated" value={formatDuration(capacity.allocatedMinutes)} hint="of 24h" />
+          <SummaryStat label="Planned work" value={formatDuration(plannedTotal)} hint="in entries" />
+          <SummaryStat
+            label="Tracked"
+            value={trackedMinutes > 0 ? formatDuration(trackedMinutes) : "--"}
+            hint={trackedMinutes > 0 ? "focus + logged" : isToday ? "nothing yet" : "not started"}
+            muted={trackedMinutes === 0}
+          />
+          <SummaryStat
+            label="Focused"
+            value={focusedMinutes > 0 ? formatDuration(focusedMinutes) : "--"}
+            hint={focusedMinutes > 0 ? "from Focus Mode" : "no sessions"}
+            muted={focusedMinutes === 0}
+          />
+        </dl>
+
+        <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
           {allocations.map((allocation) => {
             const area = allocation.lifeAreaId
               ? (lifeAreaById.get(allocation.lifeAreaId) ?? null)
               : null;
-            const color = area
-              ? lifeAreaColorConfig[resolveColorKey(area.color, area.id)].dot
-              : "bg-gray-3";
             return (
               <li
                 key={allocation.id}
                 className="flex items-center gap-1.5 text-footnote text-label-secondary"
               >
-                <span className={cn("size-2 shrink-0 rounded-full", color)} aria-hidden />
+                <span
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    lifeAreaColorConfig[categoryColorKey(allocation, area)].dot,
+                  )}
+                  aria-hidden
+                />
                 {allocation.label}
                 <span className="font-mono tabular-nums text-label-tertiary">
                   {formatDuration(allocation.minutes)}
@@ -539,298 +739,97 @@ function CapacityBar({
   );
 }
 
-function CategoryCard({
-  allocation,
-  area,
-  load,
-  items,
-  taskById,
-  suggestions,
-  linkableAreas,
-  hasLifeAreas,
-  pending,
-  onAccept,
-  onRemove,
-  onLink,
+function SummaryStat({
+  label,
+  value,
+  hint,
+  muted,
 }: {
-  allocation: Allocation;
-  area: LifeArea | null;
-  load: ReturnType<typeof categoryLoad>;
-  items: DayPlanItem[];
-  taskById: Map<string, Task>;
-  suggestions: Suggestion[];
-  /** Life areas not already backing another category in this plan. */
-  linkableAreas: LifeArea[];
-  /** Whether the user has any life areas at all, linked or not. */
-  hasLifeAreas: boolean;
-  pending: boolean;
-  onAccept: (suggestion: Suggestion) => void;
-  onRemove: (item: DayPlanItem, title: string) => void;
-  onLink: (allocationId: string, lifeAreaId: string) => void;
+  label: string;
+  value: string;
+  hint: string;
+  muted?: boolean;
 }) {
-  const actionable = isActionable(allocation);
-  /*
-   * Actionable, but with nothing to match against.
-   *
-   * Sleep and Meals are NOT this: they are non-actionable and keep their
-   * "time reserved" note, with no suggestions and nothing to link.
-   */
-  const unlinked = actionable && allocation.kind === "planner";
-  const color = area ? lifeAreaColorConfig[resolveColorKey(area.color, area.id)] : null;
-
   return (
-    <Card className="flex h-full flex-col">
-      <CardContent className="flex flex-1 flex-col py-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="flex min-w-0 items-center gap-2 text-headline text-label">
-            {area ? (
-              <span
-                className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-md",
-                  color?.tile,
-                )}
-              >
-                <LifeAreaIcon iconKey={area.icon} className="size-3.5" />
-              </span>
-            ) : (
-              <span className={cn("size-2 shrink-0 rounded-full", "bg-gray-3")} aria-hidden />
-            )}
-            <span className="truncate">{allocation.label}</span>
-          </h3>
-          <span className="shrink-0 font-mono text-callout tabular-nums text-label-secondary">
-            {formatDuration(allocation.minutes)}
-          </span>
-        </div>
-
-        {!actionable ? (
-          /* Sleep is not a category you get behind on. Reserving the hours is
-             the whole contribution; offering to fill them would be nonsense. */
-          <p className="mt-3 rounded-xl bg-fill-quaternary px-3 py-2.5 text-callout text-label-tertiary">
-            Time reserved. Nothing to plan here.
-          </p>
-        ) : (
-          <>
-            <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between text-footnote">
-                <span className="text-label-secondary">
-                  {formatDuration(load.plannedMinutes)} planned
-                </span>
-                <span
-                  className={cn(
-                    "font-mono tabular-nums",
-                    load.overMinutes > 0 ? "text-orange" : "text-label-tertiary",
-                  )}
-                >
-                  {load.overMinutes > 0
-                    ? `${formatDuration(load.overMinutes)} over`
-                    : `${formatDuration(load.freeMinutes)} free`}
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-fill-tertiary">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-[width] duration-300",
-                    load.overMinutes > 0 ? "bg-orange" : color ? color.dot : "bg-blue",
-                  )}
-                  style={{
-                    width: `${Math.min(100, (load.plannedMinutes / Math.max(1, load.capacityMinutes)) * 100)}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            {items.length > 0 ? (
-              <motion.ul
-                variants={listContainer}
-                initial="hidden"
-                animate="visible"
-                className="mt-3 flex flex-col gap-1.5"
-              >
-                {items.map((item) => {
-                  const task = taskById.get(item.taskId);
-                  return (
-                    <motion.li
-                      key={item.id}
-                      variants={listItem}
-                      className="flex items-center gap-2 rounded-xl bg-fill-quaternary px-2.5 py-2"
-                    >
-                      <Check className="size-3.5 shrink-0 text-green" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-callout text-label">
-                        {task?.title ?? "A to-do that has since been removed"}
-                      </span>
-                      <span className="shrink-0 font-mono text-footnote tabular-nums text-label-secondary">
-                        {formatDuration(item.plannedMinutes)}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => onRemove(item, task?.title ?? "that to-do")}
-                        aria-label={`Remove ${task?.title ?? "this item"} from the plan`}
-                        className="hit-44 hit-44-narrow flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-label-tertiary transition-colors hover:text-red focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
-                      >
-                        <X className="size-3.5" aria-hidden />
-                      </button>
-                    </motion.li>
-                  );
-                })}
-              </motion.ul>
-            ) : null}
-
-            <div className="mt-3 flex-1">
-              <p className="mb-1.5 text-footnote font-medium uppercase tracking-wide text-label-tertiary">
-                Suggested
-              </p>
-              {suggestions.length === 0 && unlinked ? (
-                /*
-                 * Say WHY it is empty, and offer the one-click cure.
-                 *
-                 * A planner-only category matches to-dos that no life area
-                 * claims. That rule is right, but the starter day ships with
-                 * "Work", and most real work IS under a life area, so this card
-                 * read "No open to-dos belong to this category yet" on a day
-                 * that was full of exactly the work the user meant by it. The
-                 * message was true and sounded like a bug.
-                 *
-                 * Linking promotes the row to a life-area category. The DB check
-                 * `day_plan_allocations_kind_matches_link` forbids a `planner`
-                 * row from holding a life_area_id, so the kind has to change
-                 * with it; the LABEL is kept, so the category the user named
-                 * stays named that.
-                 */
-                <div className="rounded-xl bg-fill-quaternary px-3 py-2.5">
-                  <p className="text-callout text-label-tertiary">
-                    No life area is linked to {allocation.label} yet, so GoHa has nothing to suggest
-                    here.
-                  </p>
-                  {linkableAreas.length > 0 ? (
-                    <div className="mt-2">
-                      <Select
-                        aria-label={`Link a life area to ${allocation.label}`}
-                        value=""
-                        disabled={pending}
-                        onChange={(value) => value && onLink(allocation.id, value)}
-                        options={[
-                          { value: "", label: "Link a life area" },
-                          ...linkableAreas.map((area) => ({ value: area.id, label: area.name })),
-                        ]}
-                      />
-                      <p className="mt-1 text-footnote text-label-quaternary">
-                        Keeps the name {allocation.label}, and starts suggesting that area&apos;s
-                        work.
-                      </p>
-                    </div>
-                  ) : hasLifeAreas ? (
-                    /* Every area already backs another category in this plan. */
-                    <p className="mt-1 text-footnote text-label-quaternary">
-                      Every life area already has its own category today.
-                    </p>
-                  ) : (
-                    /* No life areas yet. Point at them; never force one. */
-                    <p className="mt-1 text-footnote text-label-quaternary">
-                      Create a life area and its work can appear here.
-                    </p>
-                  )}
-                </div>
-              ) : suggestions.length === 0 ? (
-                <p className="rounded-xl bg-fill-quaternary px-3 py-2.5 text-callout text-label-tertiary">
-                  {items.length > 0
-                    ? "Nothing else open for this category."
-                    : "No open to-dos belong to this category yet."}
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {suggestions.slice(0, 4).map((suggestion) => (
-                    <li key={suggestion.task.id}>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => onAccept(suggestion)}
-                        className="group flex w-full cursor-pointer items-center gap-2.5 rounded-xl border border-separator-opaque px-2.5 py-2 text-left transition-colors hover:border-blue/40 hover:bg-surface-hover focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40 disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        <Plus
-                          className="size-3.5 shrink-0 text-label-tertiary transition-colors group-hover:text-blue"
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-callout text-label">
-                            {suggestion.task.title}
-                          </span>
-                          {suggestion.reasons.length > 0 ? (
-                            <span className="mt-0.5 flex flex-wrap gap-1.5">
-                              {suggestion.reasons.slice(0, 2).map((reason) => (
-                                <span
-                                  key={reason}
-                                  className={cn(
-                                    "rounded-sm px-1 py-0.5 text-footnote",
-                                    reason === "overdue"
-                                      ? "bg-red/15 text-red"
-                                      : "bg-fill-tertiary text-label-tertiary",
-                                  )}
-                                >
-                                  {SUGGESTION_REASON_LABEL[reason]}
-                                </span>
-                              ))}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span
-                          className={cn(
-                            "shrink-0 font-mono text-footnote tabular-nums",
-                            suggestion.minutes === null
-                              ? "text-label-quaternary"
-                              : "text-label-secondary",
-                          )}
-                        >
-                          {/* Never a guessed number. An unestimated to-do says
-                              so, and accepting it asks how long it takes. */}
-                          {suggestion.minutes === null
-                            ? "?"
-                            : formatDuration(suggestion.minutes)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </>
+    <div className="rounded-xl bg-fill-quaternary px-3 py-2.5">
+      <dt className="text-caption uppercase tracking-wide text-label-tertiary">{label}</dt>
+      <dd
+        className={cn(
+          "mt-0.5 font-mono text-title-3 tabular-nums",
+          muted ? "text-label-tertiary" : "text-label",
         )}
+      >
+        {value}
+      </dd>
+      <p className="text-footnote text-label-tertiary">{hint}</p>
+    </div>
+  );
+}
+
+/**
+ * Focus time that belongs to no category today.
+ *
+ * Shown rather than absorbed. Quietly adding it to whichever category looked
+ * plausible would be the exact invented placement this redesign removed, and
+ * the honest version is more useful anyway: it tells the user their plan and
+ * their day have drifted apart.
+ */
+function UnassignedFocus({ minutes, sessions }: { minutes: number; sessions: number }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center gap-3 py-3.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-fill-tertiary text-label-secondary">
+          <Timer className="size-4" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-callout text-label">
+            {formatDuration(minutes)} of focus outside your plan
+          </p>
+          <p className="text-footnote text-label-tertiary">
+            {sessions} session{sessions === 1 ? "" : "s"} on work that is not in a category today.
+            Add that to-do to a category and this will count towards it.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 function CommitBar({
-  planDate,
-  today,
+  isToday,
   itemCount,
+  linkedCount,
   plannedTotal,
   capacity,
   pending,
   onCommit,
 }: {
-  planDate: string;
-  today: string;
+  isToday: boolean;
   itemCount: number;
+  linkedCount: number;
   plannedTotal: number;
   capacity: ReturnType<typeof dayCapacity>;
   pending: boolean;
   onCommit: () => void;
 }) {
-  const dayWord = planDate === today ? "Today" : "Tomorrow";
+  const dayWord = isToday ? "Today" : "Tomorrow";
+  const freeform = itemCount - linkedCount;
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-subhead text-label">
             {itemCount === 0
-              ? "Nothing chosen yet"
-              : `${itemCount} to-do${itemCount === 1 ? "" : "s"}, ${formatDuration(plannedTotal)} of work`}
+              ? "Nothing in the plan yet"
+              : `${itemCount} entr${itemCount === 1 ? "y" : "ies"}, ${formatDuration(plannedTotal)} of work`}
           </p>
           <p className="mt-0.5 text-footnote text-label-tertiary">
             {itemCount === 0
-              ? "Pick from the suggestions above. Nothing moves until you add it."
-              : `Adds these to ${dayWord.toLowerCase()} so they appear on your dashboard.`}
+              ? "Add your own entries, or ask for a suggestion. Nothing moves until you do."
+              : linkedCount === 0
+                ? "These are all your own entries, so there is nothing to schedule. They stay here on this day."
+                : `Puts ${linkedCount} linked to-do${linkedCount === 1 ? "" : "s"} on ${dayWord.toLowerCase()}${freeform > 0 ? `. Your ${freeform} own entr${freeform === 1 ? "y stays" : "ies stay"} here.` : "."}`}
           </p>
           {capacity.status === "over" ? (
             <p className="mt-1.5 flex items-center gap-1.5 text-footnote text-orange">
@@ -839,7 +838,7 @@ function CommitBar({
             </p>
           ) : null}
         </div>
-        <Button onClick={onCommit} loading={pending} disabled={pending || itemCount === 0}>
+        <Button onClick={onCommit} loading={pending} disabled={pending || linkedCount === 0}>
           <CalendarCheck aria-hidden />
           Add to {dayWord}
           <ArrowRight aria-hidden />
@@ -851,27 +850,632 @@ function CommitBar({
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * One category: its hours, what is in it, and what actually happened.
+ *
+ * Every category is the same. There is no list of names that behave
+ * differently, no category that refuses entries, and nothing GoHa decides on
+ * the user's behalf. "Sleep" holds entries if the user wants it to, and a
+ * category with no entries is simply reserved time, which is a legitimate and
+ * common answer rather than an empty state to apologise for.
+ *
+ * Suggestions are PULLED. The list is not rendered until the user asks for it,
+ * which is the difference between an assistant and a system that keeps putting
+ * things in front of you.
+ */
+function CategoryCard({
+  allocation,
+  area,
+  colorKey,
+  load,
+  actual,
+  items,
+  taskTitles,
+  taskById,
+  focusByTask,
+  linkableAreas,
+  pending,
+  isToday,
+  suggestionsFactory,
+  onAccept,
+  onAddFreeform,
+  onRenameFreeform,
+  onLogActual,
+  onRemove,
+  onLink,
+}: {
+  allocation: Allocation;
+  area: LifeArea | null;
+  colorKey: LifeAreaColorKey;
+  load: ReturnType<typeof categoryLoad>;
+  actual: CategoryActual | undefined;
+  items: DayPlanItem[];
+  taskTitles: Map<string, string>;
+  taskById: Map<string, Task>;
+  /** Focus minutes per to-do id, for a linked entry's own actual. */
+  focusByTask: Map<string, number>;
+  linkableAreas: LifeArea[];
+  pending: boolean;
+  isToday: boolean;
+  suggestionsFactory: () => Suggestion[];
+  onAccept: (suggestion: Suggestion) => void;
+  onAddFreeform: (label: string, minutes: number) => void;
+  onRenameFreeform: (id: string, label: string) => void;
+  onLogActual: (id: string, minutes: number | null) => void;
+  onRemove: (item: DayPlanItem, title: string) => void;
+  onLink: (allocationId: string, lifeAreaId: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [loggingId, setLoggingId] = useState<string | null>(null);
+
+  /*
+   * Tomorrow can be planned in full, but it has not happened, so there is
+   * nothing to record about it yet. The server refuses a future date as well;
+   * this only keeps the control from appearing in the first place.
+   */
+  const canLogActual = isToday;
+
+  const color = lifeAreaColorConfig[colorKey];
+  const actualMinutes = actual?.actualMinutes ?? 0;
+  const focusMinutes = actual?.focusMinutes ?? 0;
+  const manualMinutes = actual?.manualMinutes ?? 0;
+  const suggestions = showSuggestions ? suggestionsFactory() : [];
+
+  return (
+    <Card className="flex h-full flex-col">
+      <CardContent className="flex flex-1 flex-col py-4">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="flex min-w-0 items-center gap-2 text-headline text-label">
+            <span
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-md",
+                color.tile,
+              )}
+            >
+              <LifeAreaIcon iconKey={allocation.icon ?? area?.icon ?? null} className="size-3.5" />
+            </span>
+            <span className="truncate">{allocation.label}</span>
+          </h3>
+          <span className="shrink-0 font-mono text-callout tabular-nums text-label-secondary">
+            {formatDuration(allocation.minutes)}
+          </span>
+        </div>
+
+        {/* Planned against the category's own capacity, with the recorded
+            focus drawn underneath it so the two are read together. */}
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-footnote">
+            <span className="text-label-secondary">
+              {formatDuration(load.plannedMinutes)} planned
+            </span>
+            <span
+              className={cn(
+                "font-mono tabular-nums",
+                load.overMinutes > 0 ? "text-orange" : "text-label-tertiary",
+              )}
+            >
+              {load.overMinutes > 0
+                ? `${formatDuration(load.overMinutes)} over`
+                : `${formatDuration(load.freeMinutes)} free`}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-fill-tertiary">
+            <div
+              className={cn(
+                "h-full rounded-full transition-[width] duration-300",
+                load.overMinutes > 0 ? "bg-orange" : color.dot,
+              )}
+              style={{
+                width: `${Math.min(100, (load.plannedMinutes / Math.max(1, load.capacityMinutes)) * 100)}%`,
+              }}
+            />
+          </div>
+
+          {/*
+            The category's actual: automatic focus plus manually logged time.
+
+            The breakdown is spelled out whenever both halves are non-zero,
+            because "5h 20m tracked" invites the question "from what", and the
+            answer is the difference between a measurement and an estimate.
+          */}
+          <div className="mt-2 flex items-center justify-between text-footnote">
+            <span className="flex items-center gap-1.5 text-label-tertiary">
+              <Timer className="size-3.5 shrink-0" aria-hidden />
+              {actualMinutes > 0
+                ? `${formatDuration(actualMinutes)} tracked`
+                : isToday
+                  ? "Nothing tracked yet"
+                  : "Not started"}
+            </span>
+            {actualMinutes > 0 && load.plannedMinutes > 0 ? (
+              <span className="font-mono tabular-nums text-label-tertiary">
+                {Math.round((actualMinutes / load.plannedMinutes) * 100)}% of planned
+              </span>
+            ) : null}
+          </div>
+          {focusMinutes > 0 && manualMinutes > 0 ? (
+            <p className="mt-0.5 text-footnote text-label-tertiary">
+              {formatDuration(focusMinutes)} focus + {formatDuration(manualMinutes)} logged
+            </p>
+          ) : null}
+          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-fill-quaternary">
+            <div
+              className="h-full rounded-full bg-label-tertiary/50 transition-[width] duration-300"
+              style={{
+                width: `${Math.min(100, (actualMinutes / Math.max(1, allocation.minutes)) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        {items.length > 0 ? (
+          <motion.ul
+            variants={listContainer}
+            initial="hidden"
+            animate="visible"
+            className="mt-3 flex flex-col gap-1.5"
+          >
+            {items.map((item) => {
+              const title = entryTitle(item, taskTitles);
+              const linked = item.taskId !== null;
+              const missing = linked && !taskById.has(item.taskId ?? "");
+              const entryFocus = item.taskId ? (focusByTask.get(item.taskId) ?? 0) : 0;
+              return (
+                <motion.li
+                  key={item.id}
+                  variants={listItem}
+                  className="rounded-xl bg-fill-quaternary px-2.5 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    {linked ? (
+                      <Check className="size-3.5 shrink-0 text-green" aria-hidden />
+                    ) : (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-label-tertiary"
+                        aria-hidden
+                      />
+                    )}
+                    {renamingId === item.id ? (
+                      <InlineRename
+                        initial={title}
+                        onCancel={() => setRenamingId(null)}
+                        onSave={(next) => {
+                          setRenamingId(null);
+                          if (next !== title) onRenameFreeform(item.id, next);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-callout",
+                          missing ? "italic text-label-tertiary" : "text-label",
+                        )}
+                      >
+                        {missing ? "A to-do that has since been removed" : title}
+                      </span>
+                    )}
+                    {!linked && renamingId !== item.id ? (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setRenamingId(item.id)}
+                        aria-label={`Rename ${title}`}
+                        className="hit-44 hit-44-narrow flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-label-tertiary transition-colors hover:text-label focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+                      >
+                        <Pencil className="size-3" aria-hidden />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => onRemove(item, title)}
+                      aria-label={`Remove ${title} from the plan`}
+                      className="hit-44 hit-44-narrow flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-label-tertiary transition-colors hover:text-red focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </div>
+
+                  {/*
+                    Planned against actual, per entry.
+
+                    A linked entry's actual is READ from its focus sessions and
+                    has no control here: Focus Mode is the tracker for to-dos,
+                    and offering a second way to state the same number would let
+                    the two disagree. A freeform entry has no session to draw
+                    on, so it gets a manual one.
+                  */}
+                  {loggingId === item.id ? (
+                    <ActualComposer
+                      initial={item.actualMinutes}
+                      pending={pending}
+                      onCancel={() => setLoggingId(null)}
+                      onSave={(minutes) => {
+                        setLoggingId(null);
+                        onLogActual(item.id, minutes);
+                      }}
+                    />
+                  ) : (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 text-footnote">
+                      <span className="text-label-tertiary">
+                        Planned{" "}
+                        <span className="font-mono tabular-nums text-label-secondary">
+                          {formatDuration(item.plannedMinutes)}
+                        </span>
+                      </span>
+                      {linked ? (
+                        <span className="flex items-center gap-1 text-label-tertiary">
+                          <Timer className="size-3 shrink-0" aria-hidden />
+                          {entryFocus > 0 ? (
+                            <>
+                              Focus{" "}
+                              <span className="font-mono tabular-nums text-label-secondary">
+                                {formatDuration(entryFocus)}
+                              </span>
+                            </>
+                          ) : (
+                            "No focus yet"
+                          )}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-label-tertiary">
+                          Actual{" "}
+                          <span
+                            className={cn(
+                              "font-mono tabular-nums",
+                              item.actualMinutes === null
+                                ? "text-label-tertiary"
+                                : "text-label-secondary",
+                            )}
+                          >
+                            {item.actualMinutes === null
+                              ? "--"
+                              : formatDuration(item.actualMinutes)}
+                          </span>
+                          {canLogActual ? (
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => setLoggingId(item.id)}
+                              className="hit-44 hit-44-narrow cursor-pointer rounded-md px-1.5 py-0.5 text-footnote text-blue underline-offset-2 transition-colors hover:underline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+                            >
+                              {item.actualMinutes === null ? "Log time" : "Edit"}
+                            </button>
+                          ) : null}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+        ) : (
+          <p className="mt-3 rounded-xl bg-fill-quaternary px-3 py-2.5 text-callout text-label-tertiary">
+            Time reserved. Add something if you want to, or leave it as it is.
+          </p>
+        )}
+
+        <div className="mt-3 flex flex-1 flex-col justify-end gap-2">
+          {adding ? (
+            <FreeformComposer
+              pending={pending}
+              onCancel={() => setAdding(false)}
+              onAdd={(label, minutes) => {
+                setAdding(false);
+                onAddFreeform(label, minutes);
+              }}
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => setAdding(true)}
+              >
+                <Plus aria-hidden />
+                Add entry
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                onClick={() => setShowSuggestions((open) => !open)}
+                aria-expanded={showSuggestions}
+              >
+                <Sparkles aria-hidden />
+                {showSuggestions ? "Hide suggestions" : "Suggest a to-do"}
+              </Button>
+            </div>
+          )}
+
+          {showSuggestions ? (
+            <div className="rounded-xl border border-separator-opaque p-2.5">
+              {suggestions.length === 0 ? (
+                <p className="text-footnote text-label-tertiary">
+                  No open to-dos left to suggest. Add an entry of your own instead.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {suggestions.map((suggestion) => (
+                    <li key={suggestion.task.id} className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-callout text-label">
+                          {suggestion.task.title}
+                        </p>
+                        <p className="flex flex-wrap items-center gap-x-2 text-footnote text-label-tertiary">
+                          {suggestion.reasons.length > 0
+                            ? suggestion.reasons
+                                .map((reason) => SUGGESTION_REASON_LABEL[reason])
+                                .join(" · ")
+                            : "Open work"}
+                          {suggestion.minutes !== null ? (
+                            <span className="font-mono tabular-nums">
+                              {formatDuration(suggestion.minutes)}
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => onAccept(suggestion)}
+                      >
+                        Add
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {allocation.kind === "planner" && linkableAreas.length > 0 ? (
+                <div className="mt-2.5 border-t border-separator pt-2.5">
+                  <label
+                    htmlFor={`link-${allocation.id}`}
+                    className="mb-1.5 flex items-center gap-1.5 text-footnote text-label-tertiary"
+                  >
+                    <Link2 className="size-3.5" aria-hidden />
+                    Link to a life area for better suggestions
+                  </label>
+                  <Select
+                    id={`link-${allocation.id}`}
+                    value=""
+                    onChange={(value) => {
+                      if (value) onLink(allocation.id, value);
+                    }}
+                    options={[
+                      { value: "", label: "Choose a life area" },
+                      ...linkableAreas.map((a) => ({ value: a.id, label: a.name })),
+                    ]}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Record how long a freeform activity actually took.
+ *
+ * Deliberately NOT a timer. Focus Mode is the tracker, and a second one for
+ * "Gym" and "Netflix" would be a whole parallel system to build, explain and
+ * keep in sync. This is a number the user states, during the day or after it.
+ *
+ * Offers the same durations the rest of GoHa offers, plus a free entry for the
+ * ones that never land on a round number, and a Clear that returns the entry to
+ * "not recorded" rather than to a recorded zero.
+ */
+function ActualComposer({
+  initial,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  initial: number | null;
+  pending: boolean;
+  onSave: (minutes: number | null) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial === null ? "" : String(initial));
+
+  function commit() {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      onSave(null);
+      return;
+    }
+    const minutes = Number(trimmed);
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > MINUTES_IN_DAY) return;
+    onSave(Math.round(minutes));
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-lg border border-separator-opaque bg-surface p-2">
+      <div className="flex flex-wrap gap-1" role="group" aria-label="How long it actually took">
+        {TASK_ESTIMATE_OPTIONS.map((minutes) => (
+          <button
+            key={minutes}
+            type="button"
+            disabled={pending}
+            onClick={() => onSave(minutes)}
+            className="hit-44 hit-44-narrow cursor-pointer rounded-md bg-fill-tertiary px-2 py-1 font-mono text-footnote tabular-nums text-label transition-colors hover:bg-fill-secondary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-blue/40"
+          >
+            {formatEstimate(minutes) ?? `${minutes}m`}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          autoFocus
+          value={value}
+          inputMode="numeric"
+          aria-label="Actual minutes"
+          placeholder="minutes"
+          className="h-8 w-28"
+          onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ""))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+        <Button type="button" size="sm" onClick={commit} disabled={pending}>
+          Save
+        </Button>
+        {initial !== null ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => onSave(null)}
+          >
+            Clear
+          </Button>
+        ) : null}
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Type an entry and how long it should take. No to-do is created. */
+function FreeformComposer({
+  pending,
+  onAdd,
+  onCancel,
+}: {
+  pending: boolean;
+  onAdd: (label: string, minutes: number) => void;
+  onCancel: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [minutes, setMinutes] = useState(60);
+
+  function submit() {
+    const value = label.trim();
+    if (!value) return;
+    onAdd(value, minutes);
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-separator-opaque p-2.5">
+      <Input
+        autoFocus
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder="Client work, Gym, Admin..."
+        maxLength={80}
+        aria-label="What is this entry"
+      />
+      <div className="flex items-center gap-2">
+        <Select
+          value={String(minutes)}
+          onChange={(value) => setMinutes(Number(value))}
+          aria-label="How long"
+          options={TASK_ESTIMATE_OPTIONS.map((option) => ({
+            value: String(option),
+            label: formatEstimate(option) ?? `${option}m`,
+          }))}
+        />
+        <Button type="button" size="sm" onClick={submit} disabled={pending || !label.trim()}>
+          Add
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Rename a freeform entry in place. Linked entries are named by their to-do. */
+function InlineRename({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  onSave: (label: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <Input
+      autoFocus
+      value={value}
+      maxLength={80}
+      aria-label="Entry name"
+      className="h-7 flex-1"
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => {
+        const next = value.trim();
+        if (next) onSave(next);
+        else onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const next = value.trim();
+          if (next) onSave(next);
+        }
+        if (e.key === "Escape") onCancel();
+      }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
 type DraftAllocation = {
   id?: string;
   kind: "life_area" | "planner";
   lifeAreaId: string | null;
   label: string;
   minutes: number;
+  color: string | null;
+  icon: string | null;
 };
 
 /**
- * Editing the day's shape.
+ * Editing the day's shape: add, rename, reorder, recolour, resize, remove.
  *
  * A modal rather than inline editing, because changing the split is a distinct
  * act from choosing work, and doing both on one surface made the capacity
- * number move for two unrelated reasons. The running total updates live here,
- * so the consequence of every change is visible before it is saved.
+ * number move for two unrelated reasons. The running total updates live, so the
+ * consequence of every change is visible before it is saved.
+ *
+ * Everything here edits ONE DAY. The modal says so out loud, because the single
+ * most confusing thing a planner with defaults can do is leave someone unsure
+ * which of the two they just changed.
  */
 function CategoryEditor({
   open,
   planDate,
   allocations,
   lifeAreas,
+  isToday,
   onClose,
   onSaved,
 }: {
@@ -879,6 +1483,7 @@ function CategoryEditor({
   planDate: string;
   allocations: DayPlanAllocation[];
   lifeAreas: LifeArea[];
+  isToday: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -886,8 +1491,8 @@ function CategoryEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title="Your day's categories"
-      description="Split 24 hours into the parts your day actually has."
+      title={isToday ? "Today's categories" : "Tomorrow's categories"}
+      description="Split 24 hours into the parts your day actually has. This changes this day only."
       className="sm:max-w-2xl"
     >
       {open ? (
@@ -895,6 +1500,7 @@ function CategoryEditor({
           planDate={planDate}
           allocations={allocations}
           lifeAreas={lifeAreas}
+          isToday={isToday}
           onClose={onClose}
           onSaved={onSaved}
         />
@@ -907,12 +1513,14 @@ function CategoryEditorBody({
   planDate,
   allocations,
   lifeAreas,
+  isToday,
   onClose,
   onSaved,
 }: {
   planDate: string;
   allocations: DayPlanAllocation[];
   lifeAreas: LifeArea[];
+  isToday: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -923,24 +1531,37 @@ function CategoryEditorBody({
       lifeAreaId: a.lifeAreaId,
       label: a.label,
       minutes: a.minutes,
+      color: a.color,
+      icon: a.icon,
     })),
   );
   const [newLabel, setNewLabel] = useState("");
   const [newAreaId, setNewAreaId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [paletteFor, setPaletteFor] = useState<number | null>(null);
 
   const capacity = dayCapacity(draft);
   const usedAreaIds = new Set(draft.map((d) => d.lifeAreaId).filter(Boolean));
 
+  function patch(index: number, changes: Partial<DraftAllocation>) {
+    setDraft((rows) => rows.map((row, i) => (i === index ? { ...row, ...changes } : row)));
+  }
+
   function setMinutes(index: number, minutes: number) {
-    setDraft((rows) =>
-      rows.map((row, i) =>
-        i === index
-          ? { ...row, minutes: Math.max(15, Math.min(MINUTES_IN_DAY, minutes)) }
-          : row,
-      ),
-    );
+    patch(index, { minutes: Math.max(15, Math.min(MINUTES_IN_DAY, minutes)) });
+  }
+
+  /** Reorder by one place. Buttons rather than drag: this list is short, and a
+      keyboard and a touch screen both reach these without a drag surface. */
+  function move(index: number, delta: number) {
+    setDraft((rows) => {
+      const next = [...rows];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return rows;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   function addPlannerCategory() {
@@ -953,7 +1574,7 @@ function CategoryEditorBody({
     setError(null);
     setDraft((rows) => [
       ...rows,
-      { kind: "planner", lifeAreaId: null, label, minutes: 60 },
+      { kind: "planner", lifeAreaId: null, label, minutes: 60, color: null, icon: null },
     ]);
     setNewLabel("");
   }
@@ -968,7 +1589,14 @@ function CategoryEditorBody({
     setError(null);
     setDraft((rows) => [
       ...rows,
-      { kind: "life_area", lifeAreaId: area.id, label: area.name, minutes: 60 },
+      {
+        kind: "life_area",
+        lifeAreaId: area.id,
+        label: area.name,
+        minutes: 60,
+        color: area.color,
+        icon: area.icon,
+      },
     ]);
     setNewAreaId("");
   }
@@ -984,6 +1612,8 @@ function CategoryEditorBody({
         lifeAreaId: row.lifeAreaId ?? "",
         label: row.label,
         minutes: row.minutes,
+        color: row.color ?? undefined,
+        icon: row.icon ?? undefined,
       })),
     });
     setSaving(false);
@@ -991,7 +1621,7 @@ function CategoryEditorBody({
       setError(result.error);
       return;
     }
-    toast.success("Categories saved");
+    toast.success(isToday ? "Today's categories saved" : "Tomorrow's categories saved");
     onSaved();
   }
 
@@ -1025,49 +1655,127 @@ function CategoryEditorBody({
       </div>
 
       <ul className="flex flex-col gap-2">
-        {draft.map((row, index) => (
-          <li
-            key={row.id ?? `${row.label}-${index}`}
-            className="flex items-center gap-2 rounded-xl border border-separator-opaque px-3 py-2"
-          >
-            <span className="min-w-0 flex-1 truncate text-body text-label">{row.label}</span>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setMinutes(index, row.minutes - ALLOCATION_STEP_MINUTES)}
-                aria-label={`Less time for ${row.label}`}
-                disabled={row.minutes <= 15}
-                className="hit-44 flex size-8 cursor-pointer items-center justify-center rounded-lg bg-fill-tertiary text-label transition-colors hover:bg-fill-secondary disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Minus className="size-3.5" aria-hidden />
-              </button>
-              <span className="w-16 text-center font-mono text-callout tabular-nums text-label">
-                {formatDuration(row.minutes)}
-              </span>
-              <button
-                type="button"
-                onClick={() => setMinutes(index, row.minutes + ALLOCATION_STEP_MINUTES)}
-                aria-label={`More time for ${row.label}`}
-                className="hit-44 flex size-8 cursor-pointer items-center justify-center rounded-lg bg-fill-tertiary text-label transition-colors hover:bg-fill-secondary"
-              >
-                <Plus className="size-3.5" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDraft((rows) => rows.filter((_, i) => i !== index))}
-                aria-label={`Remove ${row.label}`}
-                className="hit-44 ml-1 flex size-8 cursor-pointer items-center justify-center rounded-lg text-label-tertiary transition-colors hover:text-red"
-              >
-                <Trash2 className="size-3.5" aria-hidden />
-              </button>
-            </div>
-          </li>
-        ))}
+        {draft.map((row, index) => {
+          const colorKey = row.color
+            ? resolveColorKey(row.color, row.id ?? row.label)
+            : resolveColorKey(null, row.id ?? row.label);
+          return (
+            <li
+              key={row.id ?? `${row.label}-${index}`}
+              className="rounded-xl border border-separator-opaque px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    type="button"
+                    onClick={() => move(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${row.label} up`}
+                    className="flex size-5 cursor-pointer items-center justify-center rounded text-label-tertiary transition-colors hover:text-label disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <ChevronUp className="size-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(index, 1)}
+                    disabled={index === draft.length - 1}
+                    aria-label={`Move ${row.label} down`}
+                    className="flex size-5 cursor-pointer items-center justify-center rounded text-label-tertiary transition-colors hover:text-label disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <ChevronDown className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPaletteFor(paletteFor === index ? null : index)}
+                  aria-label={`Choose a colour for ${row.label}`}
+                  aria-expanded={paletteFor === index}
+                  className={cn(
+                    "size-6 shrink-0 cursor-pointer rounded-md transition-transform hover:scale-110",
+                    lifeAreaColorConfig[colorKey].dot,
+                  )}
+                />
+
+                <Input
+                  value={row.label}
+                  onChange={(e) => patch(index, { label: e.target.value })}
+                  maxLength={40}
+                  aria-label={`Name of category ${index + 1}`}
+                  className="h-8 min-w-0 flex-1"
+                />
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMinutes(index, row.minutes - ALLOCATION_STEP_MINUTES)}
+                    aria-label={`Less time for ${row.label}`}
+                    disabled={row.minutes <= 15}
+                    className="hit-44 flex size-8 cursor-pointer items-center justify-center rounded-lg bg-fill-tertiary text-label transition-colors hover:bg-fill-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Minus className="size-3.5" aria-hidden />
+                  </button>
+                  <span className="w-16 text-center font-mono text-callout tabular-nums text-label">
+                    {formatDuration(row.minutes)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMinutes(index, row.minutes + ALLOCATION_STEP_MINUTES)}
+                    aria-label={`More time for ${row.label}`}
+                    className="hit-44 flex size-8 cursor-pointer items-center justify-center rounded-lg bg-fill-tertiary text-label transition-colors hover:bg-fill-secondary"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaletteFor(null);
+                      setDraft((rows) => rows.filter((_, i) => i !== index));
+                    }}
+                    aria-label={`Remove ${row.label}`}
+                    className="hit-44 ml-1 flex size-8 cursor-pointer items-center justify-center rounded-lg text-label-tertiary transition-colors hover:text-red"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+              </div>
+
+              {paletteFor === index ? (
+                <div
+                  className="mt-2 flex flex-wrap gap-1.5"
+                  role="group"
+                  aria-label={`Colour for ${row.label}`}
+                >
+                  {LIFE_AREA_COLOR_KEYS.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-label={key}
+                      aria-pressed={colorKey === key}
+                      onClick={() => {
+                        patch(index, { color: key });
+                        setPaletteFor(null);
+                      }}
+                      className={cn(
+                        "size-6 cursor-pointer rounded-full transition-transform hover:scale-110",
+                        lifeAreaColorConfig[key].dot,
+                        colorKey === key ? "ring-2 ring-label ring-offset-2 ring-offset-surface" : "",
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="flex flex-col gap-3 border-t border-separator pt-4">
         <div>
-          <label htmlFor="planner-new-label" className="mb-1.5 block text-subhead text-label-secondary">
+          <label
+            htmlFor="planner-new-label"
+            className="mb-1.5 block text-subhead text-label-secondary"
+          >
             Add a category
           </label>
           <div className="flex gap-2">
@@ -1089,13 +1797,17 @@ function CategoryEditorBody({
             </Button>
           </div>
           <p className="mt-1 text-footnote text-label-tertiary">
-            A planner category just reserves time. It does not become a life area.
+            Call it whatever you like. A planner category just reserves time, and it does not
+            become a life area.
           </p>
         </div>
 
         {lifeAreas.length > 0 ? (
           <div>
-            <label htmlFor="planner-new-area" className="mb-1.5 block text-subhead text-label-secondary">
+            <label
+              htmlFor="planner-new-area"
+              className="mb-1.5 block text-subhead text-label-secondary"
+            >
               Or use a life area
             </label>
             <Select
@@ -1124,7 +1836,7 @@ function CategoryEditorBody({
           Cancel
         </Button>
         <Button type="button" onClick={save} loading={saving}>
-          Save categories
+          Save this day
         </Button>
       </div>
     </div>
@@ -1162,11 +1874,7 @@ function EstimatePrompt({
       <div className="flex flex-col gap-4 px-6 py-5">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Estimated time">
           {TASK_ESTIMATE_OPTIONS.map((minutes) => (
-            <Button
-              key={minutes}
-              variant="secondary"
-              onClick={() => onConfirm(minutes)}
-            >
+            <Button key={minutes} variant="secondary" onClick={() => onConfirm(minutes)}>
               <Clock aria-hidden />
               {formatEstimate(minutes)}
             </Button>

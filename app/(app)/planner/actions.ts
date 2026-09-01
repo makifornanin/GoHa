@@ -6,14 +6,21 @@ import { lifeAreasRepo, plannerRepo, tasksRepo } from "@/db";
 import type { DayPlanAllocation, DayPlanItem } from "@/db";
 import { requireUser } from "@/lib/session";
 import { getUserDatePrefs } from "@/lib/user-settings";
+import { zonedToday } from "@/lib/date";
 import { STARTER_CATEGORIES } from "@/lib/planner";
 import {
   acceptItemSchema,
+  freeformItemSchema,
+  logActualSchema,
   plannerIdSchema,
+  saveDefaultsSchema,
   savePlanSchema,
   toPlannerFieldErrors,
   type AcceptItemInput,
+  type FreeformItemInput,
+  type LogActualInput,
   type PlannerFieldErrors,
+  type SaveDefaultsInput,
   type SavePlanInput,
 } from "@/lib/validations/planner";
 
@@ -122,11 +129,11 @@ export async function savePlanAction(
 /**
  * Give a brand-new day a shape to react to.
  *
- * Reuses yesterday's categories when there are any, because most days are alike
- * and retyping them every morning is a tax on using the feature. Falls back to
- * a recognisable 24 hours, so the first thing anybody sees is a full day they
- * can adjust rather than an empty form and a question they have never been
- * asked. Nothing here touches a to-do.
+ * Seeds from the user's saved default day when they have one, otherwise from
+ * yesterday's categories, otherwise from a recognisable 24 hours. Whichever it
+ * used, the result is an ORDINARY plan from that moment on: editing it changes
+ * this date and nothing else, and the default is only ever rewritten by the
+ * explicit action below. Nothing here touches a to-do.
  */
 export async function seedPlanAction(
   planDate: string,
@@ -143,21 +150,49 @@ export async function seedPlanAction(
       return { ok: true, data: { allocations: existing.allocations } };
     }
 
-    const previous = await plannerRepo.findPreviousAllocations(user.id, dateResult.data);
+    /*
+     * Three sources, most deliberate first.
+     *
+     * The saved default day wins because it is the only one the user actually
+     * chose: they pressed "Save as my default day" and said "this is my normal
+     * shape". Yesterday is a good guess but only a guess, and the starter set
+     * is a first draft for someone who has neither.
+     */
+    const defaults = await plannerRepo.listDefaultCategories(user.id);
+    const previous =
+      defaults.length > 0
+        ? []
+        : await plannerRepo.findPreviousAllocations(user.id, dateResult.data);
+
+    const copy = (row: {
+      kind: "life_area" | "planner";
+      lifeAreaId: string | null;
+      label: string;
+      minutes: number;
+      color: string | null;
+      icon: string | null;
+    }) => ({
+      kind: row.kind,
+      lifeAreaId: row.lifeAreaId,
+      label: row.label,
+      minutes: row.minutes,
+      color: row.color,
+      icon: row.icon,
+    });
+
     const source =
-      previous.length > 0
-        ? previous.map((row) => ({
-            kind: row.kind,
-            lifeAreaId: row.lifeAreaId,
-            label: row.label,
-            minutes: row.minutes,
-          }))
-        : STARTER_CATEGORIES.map((entry) => ({
-            kind: "planner" as const,
-            lifeAreaId: null,
-            label: entry.label,
-            minutes: entry.minutes,
-          }));
+      defaults.length > 0
+        ? defaults.map(copy)
+        : previous.length > 0
+          ? previous.map(copy)
+          : STARTER_CATEGORIES.map((entry) => ({
+              kind: "planner" as const,
+              lifeAreaId: null,
+              label: entry.label,
+              minutes: entry.minutes,
+              color: null,
+              icon: null,
+            }));
 
     const allocations = await plannerRepo.syncAllocations(user.id, plan.id, source);
     revalidatePlannerSurfaces();
@@ -302,8 +337,15 @@ export async function addPlanToTodayAction(
 
   try {
     const contents = await plannerRepo.getPlanContents(user.id, dateResult.data);
-    if (!contents || contents.items.length === 0) {
-      return { ok: false, error: "There is nothing in this plan yet." };
+    /*
+     * Only LINKED entries can be committed: a freeform line has no to-do to
+     * schedule. That is the honest behaviour rather than a limitation, since
+     * silently creating to-dos out of the user's shorthand would put rows in
+     * Tasks that they never asked for.
+     */
+    const linked = contents?.items.filter((item) => item.taskId !== null) ?? [];
+    if (linked.length === 0) {
+      return { ok: false, error: "There are no linked to-dos in this plan yet." };
     }
 
     const tasks = await tasksRepo.listTasksForUser(user.id);
@@ -311,8 +353,8 @@ export async function addPlanToTodayAction(
 
     let scheduled = 0;
     let alreadyThere = 0;
-    for (const item of contents.items) {
-      const task = byId.get(item.taskId);
+    for (const item of linked) {
+      const task = item.taskId ? byId.get(item.taskId) : undefined;
       // Skip anything finished or gone since the plan was built. Silently, on
       // purpose: it is not an error that a to-do was completed early.
       if (!task || task.status === "completed" || task.status === "cancelled") continue;
@@ -328,6 +370,220 @@ export async function addPlanToTodayAction(
     return { ok: true, data: { scheduled, alreadyThere } };
   } catch (error) {
     console.error("addPlanToTodayAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Add the user's own line of text to a category.
+ *
+ * The counterpart to accepting a suggestion, and the reason the planner stopped
+ * needing a to-do for everything. "Client work", "Gym", "Admin" are real parts
+ * of a day that were never going to be to-dos, and making the user create one
+ * just to plan an hour was the tax that made the categories feel rigid.
+ *
+ * Nothing is written to `tasks`. A freeform entry lives and dies inside the day
+ * it was typed into.
+ */
+export async function addFreeformItemAction(
+  input: FreeformItemInput,
+): Promise<ActionResult<{ item: DayPlanItem }>> {
+  const user = await requireUser();
+
+  const parsed = freeformItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check this entry.",
+      fieldErrors: toPlannerFieldErrors(parsed.error),
+    };
+  }
+
+  try {
+    // The allocation must be the caller's own AND on the day being edited: an
+    // id from a form is a claim, not permission (CLAUDE.md section 5).
+    const allocation = await plannerRepo.getAllocation(user.id, parsed.data.allocationId);
+    if (!allocation) return { ok: false, error: "That category could not be found." };
+
+    const plan = await plannerRepo.getOrCreatePlan(user.id, parsed.data.planDate);
+    if (allocation.dayPlanId !== plan.id) {
+      return { ok: false, error: "That category belongs to a different day." };
+    }
+
+    const item = await plannerRepo.addFreeformItem(user.id, {
+      dayPlanId: plan.id,
+      allocationId: allocation.id,
+      label: parsed.data.label,
+      plannedMinutes: parsed.data.plannedMinutes,
+    });
+    revalidatePlannerSurfaces();
+    return { ok: true, data: { item } };
+  } catch (error) {
+    console.error("addFreeformItemAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/** Rename a freeform entry. Linked entries are renamed on the to-do itself. */
+export async function renameFreeformItemAction(
+  id: string,
+  label: string,
+): Promise<ActionResult<{ item: DayPlanItem }>> {
+  const user = await requireUser();
+
+  const idResult = plannerIdSchema.safeParse(id);
+  if (!idResult.success) return { ok: false, error: "That entry could not be found." };
+
+  const labelResult = freeformItemSchema.shape.label.safeParse(label);
+  if (!labelResult.success) {
+    return { ok: false, error: labelResult.error.issues[0]?.message ?? "Check this entry." };
+  }
+
+  try {
+    const item = await plannerRepo.renameFreeformItem(user.id, idResult.data, labelResult.data);
+    // Null also covers "this row is a linked to-do", which the repository
+    // refuses on purpose: its name belongs to the to-do, not to the plan.
+    if (!item) return { ok: false, error: "That entry could not be renamed." };
+    revalidatePlannerSurfaces();
+    return { ok: true, data: { item } };
+  } catch (error) {
+    console.error("renameFreeformItemAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/** Move an entry from one category to another within the same day. */
+export async function moveItemAction(
+  id: string,
+  allocationId: string,
+): Promise<ActionResult<{ item: DayPlanItem }>> {
+  const user = await requireUser();
+
+  const idResult = plannerIdSchema.safeParse(id);
+  const allocationResult = plannerIdSchema.safeParse(allocationId);
+  if (!idResult.success || !allocationResult.success) {
+    return { ok: false, error: "That entry could not be moved." };
+  }
+
+  try {
+    const allocation = await plannerRepo.getAllocation(user.id, allocationResult.data);
+    if (!allocation) return { ok: false, error: "That category could not be found." };
+
+    const item = await plannerRepo.moveItem(user.id, idResult.data, allocation.id);
+    if (!item) return { ok: false, error: "That entry could not be moved." };
+    if (item.dayPlanId !== allocation.dayPlanId) {
+      // Cannot happen through the UI, and would silently move an entry into
+      // another day's category if it did.
+      return { ok: false, error: "That category belongs to a different day." };
+    }
+    revalidatePlannerSurfaces();
+    return { ok: true, data: { item } };
+  } catch (error) {
+    console.error("moveItemAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Save these categories as the reusable default day.
+ *
+ * The ONLY writer of `planner_default_categories`, and the reason editing a
+ * date is safe: nothing else in the planner can reach this table, so a change
+ * to Tuesday cannot leak into what every future day starts from. The user asks
+ * for it explicitly or it does not happen.
+ *
+ * Categories only. Entries are decisions about one particular day and are never
+ * part of a template.
+ */
+export async function saveAsDefaultsAction(
+  input: SaveDefaultsInput,
+): Promise<ActionResult<{ count: number }>> {
+  const user = await requireUser();
+
+  const parsed = saveDefaultsSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check these categories.",
+      fieldErrors: toPlannerFieldErrors(parsed.error),
+    };
+  }
+
+  try {
+    // Same ownership check the day's own save performs: a life-area id in a
+    // form is user input either way.
+    const areas = await lifeAreasRepo.listLifeAreas(user.id);
+    const ownArea = new Set(areas.map((area) => area.id));
+    for (const category of parsed.data.categories) {
+      if (category.kind === "life_area" && (!category.lifeAreaId || !ownArea.has(category.lifeAreaId))) {
+        return { ok: false, error: "That is not one of your life areas." };
+      }
+    }
+
+    const saved = await plannerRepo.replaceDefaultCategories(user.id, parsed.data.categories);
+    revalidatePath("/planner");
+    return { ok: true, data: { count: saved.length } };
+  } catch (error) {
+    console.error("saveAsDefaultsAction failed", error);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+/**
+ * Record how long a freeform activity actually took.
+ *
+ * The manual half of tracking. Linked to-dos have no equivalent action on
+ * purpose: their actual comes from focus sessions, and offering a second way to
+ * state it would let the two disagree.
+ *
+ * Refuses a FUTURE local date. Tomorrow can be planned in full, but it has not
+ * happened, and a plan that already claims time was spent on it is not a plan.
+ * The date is resolved from the row rather than taken from the caller, so this
+ * cannot be talked out of by a forged parameter.
+ */
+export async function logActualMinutesAction(
+  input: LogActualInput,
+): Promise<ActionResult<{ item: DayPlanItem }>> {
+  const user = await requireUser();
+
+  const parsed = logActualSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check that duration.",
+      fieldErrors: toPlannerFieldErrors(parsed.error),
+    };
+  }
+
+  try {
+    const item = await plannerRepo.getItem(user.id, parsed.data.itemId);
+    if (!item) return { ok: false, error: "That entry could not be found." };
+    if (item.taskId !== null) {
+      return {
+        ok: false,
+        error: "This to-do is tracked by Focus. Start a focus session to record time on it.",
+      };
+    }
+
+    const plan = await plannerRepo.getPlanById(user.id, item.dayPlanId);
+    if (!plan) return { ok: false, error: "That entry could not be found." };
+
+    const { timeZone } = await getUserDatePrefs(user.id);
+    const today = zonedToday(new Date(), timeZone);
+    if (plan.planDate > today) {
+      return { ok: false, error: "That day has not started yet." };
+    }
+
+    const saved = await plannerRepo.setItemActualMinutes(
+      user.id,
+      item.id,
+      parsed.data.actualMinutes,
+    );
+    if (!saved) return { ok: false, error: "That entry could not be updated." };
+    revalidatePlannerSurfaces();
+    return { ok: true, data: { item: saved } };
+  } catch (error) {
+    console.error("logActualMinutesAction failed", error);
     return { ok: false, error: GENERIC_ERROR };
   }
 }

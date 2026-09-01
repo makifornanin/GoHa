@@ -1,10 +1,21 @@
 import "server-only";
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
-import { dayPlanAllocations, dayPlanItems, dayPlans } from "../schema";
-import type { DayPlan, DayPlanAllocation, DayPlanItem } from "../types";
+import {
+  dayPlanAllocations,
+  dayPlanItems,
+  dayPlans,
+  focusSessions,
+  plannerDefaultCategories,
+} from "../schema";
+import type {
+  DayPlan,
+  DayPlanAllocation,
+  DayPlanItem,
+  PlannerDefaultCategory,
+} from "../types";
 
 /**
  * Day Planner persistence. User-scoped throughout, like every repository here:
@@ -83,6 +94,8 @@ export type AllocationInput = {
   label: string;
   minutes: number;
   sortOrder?: number;
+  color?: string | null;
+  icon?: string | null;
 };
 
 export async function addAllocation(
@@ -100,6 +113,8 @@ export async function addAllocation(
       label: input.label,
       minutes: input.minutes,
       sortOrder: input.sortOrder ?? 0,
+      color: input.color ?? null,
+      icon: input.icon ?? null,
     })
     .returning();
   return row;
@@ -150,6 +165,8 @@ export async function syncAllocations(
           label: entry.label,
           minutes: entry.minutes,
           sortOrder: index,
+          color: entry.color ?? null,
+          icon: entry.icon ?? null,
         })
         .where(
           and(
@@ -214,6 +231,7 @@ export async function addItem(
       dayPlanId: input.dayPlanId,
       allocationId: input.allocationId,
       taskId: input.taskId,
+      label: null,
       plannedMinutes: input.plannedMinutes,
       sortOrder: input.sortOrder ?? 0,
     })
@@ -227,6 +245,124 @@ export async function addItem(
     })
     .returning();
   return row;
+}
+
+/**
+ * Add a FREEFORM entry: a line of the user's own text, with no to-do behind it.
+ *
+ * No upsert here, unlike the linked version. Two entries called "Admin" in one
+ * day are a perfectly ordinary thing to want, and the conflict target that
+ * makes a to-do unique per plan does not apply to a row whose task is null.
+ */
+export async function addFreeformItem(
+  userId: string,
+  input: {
+    dayPlanId: string;
+    allocationId: string;
+    label: string;
+    plannedMinutes: number;
+    sortOrder?: number;
+  },
+): Promise<DayPlanItem> {
+  const [row] = await db
+    .insert(dayPlanItems)
+    .values({
+      userId,
+      dayPlanId: input.dayPlanId,
+      allocationId: input.allocationId,
+      taskId: null,
+      label: input.label,
+      plannedMinutes: input.plannedMinutes,
+      // Not recorded yet. The user logs it during or after the day.
+      actualMinutes: null,
+      sortOrder: input.sortOrder ?? 0,
+    })
+    .returning();
+  return row;
+}
+
+/** Rename a freeform entry. Scoped to rows that actually are freeform. */
+export async function renameFreeformItem(
+  userId: string,
+  id: string,
+  label: string,
+): Promise<DayPlanItem | null> {
+  const [row] = await db
+    .update(dayPlanItems)
+    .set({ label })
+    .where(
+      and(
+        eq(dayPlanItems.userId, userId),
+        eq(dayPlanItems.id, id),
+        isNull(dayPlanItems.taskId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** One entry, scoped to its owner. */
+export async function getItem(userId: string, id: string): Promise<DayPlanItem | null> {
+  const [row] = await db
+    .select()
+    .from(dayPlanItems)
+    .where(and(eq(dayPlanItems.userId, userId), eq(dayPlanItems.id, id)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** A plan by id, so an action can resolve an entry's DATE from the server. */
+export async function getPlanById(userId: string, id: string): Promise<DayPlan | null> {
+  const [row] = await db
+    .select()
+    .from(dayPlans)
+    .where(and(eq(dayPlans.userId, userId), eq(dayPlans.id, id)))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Record (or clear) the time a FREEFORM entry actually took.
+ *
+ * Scoped to rows whose task is null, the same way the rename is. A linked
+ * to-do's actual comes from its focus sessions, and the database refuses to
+ * store one here anyway (`day_plan_items_actual_manual_only`); scoping the
+ * query as well means the refusal is a no-op rather than an error the user has
+ * to see.
+ *
+ * `null` clears the record, which is different from logging zero.
+ */
+export async function setItemActualMinutes(
+  userId: string,
+  id: string,
+  actualMinutes: number | null,
+): Promise<DayPlanItem | null> {
+  const [row] = await db
+    .update(dayPlanItems)
+    .set({ actualMinutes })
+    .where(
+      and(
+        eq(dayPlanItems.userId, userId),
+        eq(dayPlanItems.id, id),
+        isNull(dayPlanItems.taskId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Move an entry into another category of the same plan. */
+export async function moveItem(
+  userId: string,
+  id: string,
+  allocationId: string,
+): Promise<DayPlanItem | null> {
+  const [row] = await db
+    .update(dayPlanItems)
+    .set({ allocationId })
+    .where(and(eq(dayPlanItems.userId, userId), eq(dayPlanItems.id, id)))
+    .returning();
+  return row ?? null;
 }
 
 export async function updateItemMinutes(
@@ -276,4 +412,124 @@ export async function findPreviousAllocations(
     .from(dayPlanAllocations)
     .where(and(eq(dayPlanAllocations.userId, userId), eq(dayPlanAllocations.dayPlanId, previous.id)))
     .orderBy(asc(dayPlanAllocations.sortOrder));
+}
+
+// ---------------------------------------------------------------------------
+// Default categories (the reusable template)
+// ---------------------------------------------------------------------------
+
+/** The user's saved default day, in display order. Empty when never saved. */
+export async function listDefaultCategories(
+  userId: string,
+): Promise<PlannerDefaultCategory[]> {
+  return db
+    .select()
+    .from(plannerDefaultCategories)
+    .where(eq(plannerDefaultCategories.userId, userId))
+    .orderBy(asc(plannerDefaultCategories.sortOrder), asc(plannerDefaultCategories.createdAt));
+}
+
+/**
+ * Replace the saved default day with this set.
+ *
+ * A full replace is right here in a way it would NOT be for a plan: nothing
+ * hangs off a default category, so there are no child rows to preserve and no
+ * ids anyone else is holding.
+ *
+ * `db.batch`, NOT `db.transaction`. GoHa talks to Neon over the HTTP driver
+ * (`drizzle-orm/neon-http`), which has no interactive transactions at all: a
+ * `db.transaction(async tx => ...)` here threw "No transactions support in
+ * neon-http driver" on every call, so saving a default silently did nothing
+ * until browser QA caught it. `batch` sends both statements in ONE request that
+ * Neon runs as a single transaction, which is the atomicity this needs: the
+ * delete and the insert either both land or neither does, so a failure leaves
+ * the previous default intact rather than an empty template.
+ *
+ * Only ever reached from the explicit "Save as my default day" action. Editing
+ * a date never calls this (CLAUDE.md section 7: no blanket synchronisation that
+ * can erase unrelated rows).
+ */
+export async function replaceDefaultCategories(
+  userId: string,
+  desired: readonly AllocationInput[],
+): Promise<PlannerDefaultCategory[]> {
+  const remove = db
+    .delete(plannerDefaultCategories)
+    .where(eq(plannerDefaultCategories.userId, userId));
+
+  // Clearing the template is a single statement and needs no batch.
+  if (desired.length === 0) {
+    await remove;
+    return [];
+  }
+
+  const insert = db
+    .insert(plannerDefaultCategories)
+    .values(
+      desired.map((entry, index) => ({
+        userId,
+        kind: entry.kind,
+        lifeAreaId: entry.lifeAreaId ?? null,
+        label: entry.label,
+        minutes: entry.minutes,
+        sortOrder: index,
+        color: entry.color ?? null,
+        icon: entry.icon ?? null,
+      })),
+    )
+    .returning();
+
+  const [, inserted] = await db.batch([remove, insert]);
+  return inserted;
+}
+
+// ---------------------------------------------------------------------------
+// Actuals
+// ---------------------------------------------------------------------------
+
+export type FocusActual = {
+  /** Null for a session that was never tied to a to-do. */
+  taskId: string | null;
+  seconds: number;
+  sessions: number;
+};
+
+/**
+ * Focus time actually recorded on a local date, grouped by to-do.
+ *
+ * The raw material for "planned vs actual". Grouping happens here rather than
+ * in the page so the whole day is one query, and the mapping from to-do to
+ * planner category is done in `lib/planner.ts` where it can be tested without a
+ * database.
+ *
+ * `sessionDate` is the user's own local date (CLAUDE.md section 6), so a
+ * session finished at 00:30 counts for the day it belonged to rather than the
+ * UTC one. In-progress sessions are excluded: they have no duration yet, and a
+ * running timer is not yet time spent.
+ */
+export async function focusActualsForDate(
+  userId: string,
+  sessionDate: string,
+): Promise<FocusActual[]> {
+  const rows = await db
+    .select({
+      taskId: focusSessions.taskId,
+      seconds: sql<number>`coalesce(sum(${focusSessions.durationSeconds}), 0)::int`,
+      sessions: sql<number>`count(*)::int`,
+    })
+    .from(focusSessions)
+    .where(
+      and(
+        eq(focusSessions.userId, userId),
+        eq(focusSessions.sessionDate, sessionDate),
+        eq(focusSessions.status, "completed"),
+      ),
+    )
+    .groupBy(focusSessions.taskId);
+
+  return rows.map((row) => ({
+    taskId: row.taskId,
+    seconds: Number(row.seconds) || 0,
+    sessions: Number(row.sessions) || 0,
+  }));
 }

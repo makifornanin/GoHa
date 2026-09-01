@@ -107,6 +107,16 @@ export const dayPlanAllocations = pgTable(
     label: text().notNull(),
     minutes: integer().notNull(),
     sortOrder: integer().notNull().default(0),
+    /**
+     * Presentation, reusing the Life Area vocabulary (`lib/life-areas.ts`).
+     *
+     * Nullable so an untouched category keeps deriving its colour from its id,
+     * exactly as life-area cards already do. Storing a key rather than a hex
+     * keeps the palette swappable and the theme in charge of the actual value.
+     */
+    color: text(),
+    /** lucide-react icon key, from the same groups Life Areas offer. */
+    icon: text(),
     ...auditTimestamps,
   },
   (t) => [
@@ -183,14 +193,45 @@ export const dayPlanItems = pgTable(
       .notNull()
       .references(() => dayPlanAllocations.id, { onDelete: "cascade" }),
     /**
-     * The real to-do. CASCADES: this row is a pointer into a plan, so if the
-     * to-do is deleted the pointer is meaningless and must go with it. The
-     * to-do itself is never deleted BY the planner.
+     * The real to-do, for a LINKED entry. CASCADES: this row is a pointer into
+     * a plan, so if the to-do is deleted the pointer is meaningless and must go
+     * with it. The to-do itself is never deleted BY the planner.
+     *
+     * Nullable since the freeform redesign: an entry is either a pointer at a
+     * to-do or a plain line of text the user typed. "Client work" and "Walk the
+     * dog" are real parts of a day that were never going to be to-dos, and
+     * forcing them to become ones filled the Tasks screen with things that have
+     * no due date, no goal and nothing to complete.
      */
-    taskId: uuid()
-      .notNull()
-      .references(() => tasks.id, { onDelete: "cascade" }),
+    taskId: uuid().references(() => tasks.id, { onDelete: "cascade" }),
+    /**
+     * The text of a FREEFORM entry. Mutually exclusive with `taskId`, enforced
+     * by the check below rather than by convention: a row carrying both would
+     * render two different names for one block of time, and a row carrying
+     * neither is an unlabelled item that nothing can display.
+     *
+     * Reserved time with no entry at all is NOT this: that is simply a category
+     * with minutes and no items, which needs no row here.
+     */
+    label: text(),
     plannedMinutes: smallint().notNull(),
+    /**
+     * Manually recorded time, for a FREEFORM entry only.
+     *
+     * The two entry kinds are tracked by different means on purpose. A linked
+     * to-do already has an automatic, timestamped record of the time spent on
+     * it (its focus sessions), so copying that total into this column would be
+     * a second source of truth that starts drifting the moment either side
+     * changes. A freeform activity has no such record and never will, because
+     * "Gym" and "Netflix" are not to-dos and building a second timer for them
+     * would be a whole parallel tracking system.
+     *
+     * So: derived for linked entries, stored for freeform ones, and the check
+     * below makes the wrong combination unstorable rather than merely
+     * discouraged. Null means "not recorded", which is different from a
+     * recorded zero.
+     */
+    actualMinutes: smallint(),
     sortOrder: integer().notNull().default(0),
     ...auditTimestamps,
   },
@@ -209,5 +250,79 @@ export const dayPlanItems = pgTable(
      */
     unique("day_plan_items_plan_task_uq").on(t.dayPlanId, t.taskId),
     check("day_plan_items_minutes_range", sql`${t.plannedMinutes} between 5 and 1440`),
+    /*
+     * Exactly one of the two identities.
+     *
+     * Postgres treats NULLs as distinct in a UNIQUE, so the plan/task index
+     * above still stops one to-do being booked twice while leaving any number
+     * of freeform lines free to coexist. That only holds while a freeform row
+     * really does carry a null task, which is what this enforces.
+     */
+    check(
+      "day_plan_items_task_or_label",
+      sql`(${t.taskId} is not null and ${t.label} is null) or (${t.taskId} is null and ${t.label} is not null)`,
+    ),
+    /*
+     * Manual actuals belong to freeform entries alone.
+     *
+     * A linked to-do's actual time is DERIVED from its focus sessions. Letting
+     * a row carry both would create two answers to "how long did this take",
+     * and the one the UI happened to read would win. The database refusing it
+     * is what makes "never persisted redundantly" a fact rather than an
+     * intention.
+     */
+    check(
+      "day_plan_items_actual_manual_only",
+      sql`${t.actualMinutes} is null or ${t.taskId} is null`,
+    ),
+    check(
+      "day_plan_items_actual_range",
+      sql`${t.actualMinutes} is null or ${t.actualMinutes} between 0 and 1440`,
+    ),
+  ],
+);
+
+/**
+ * The user's REUSABLE default categories: their normal day, saved once.
+ *
+ * The hybrid model the planner is built on. These are a template and never a
+ * plan: opening a date with no plan yet offers to seed it from here, and from
+ * that moment the two are independent. Editing Tuesday must not quietly rewrite
+ * what every future day starts from, and the only thing that writes this table
+ * is the explicit "Save as my default day" action.
+ *
+ * Deliberately the same shape as `day_plan_allocations` minus the plan: seeding
+ * is then a copy rather than a translation, and there is one set of rules about
+ * what a category is.
+ */
+export const plannerDefaultCategories = pgTable(
+  "planner_default_categories",
+  {
+    id: primaryId(),
+    userId: uuid()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: plannerCategoryKind().notNull(),
+    lifeAreaId: uuid().references(() => lifeAreas.id, { onDelete: "set null" }),
+    label: text().notNull(),
+    minutes: integer().notNull(),
+    sortOrder: integer().notNull().default(0),
+    color: text(),
+    icon: text(),
+    ...auditTimestamps,
+  },
+  (t) => [
+    index("planner_default_categories_user_idx").on(t.userId, t.sortOrder),
+    // Same uniqueness rules as a plan's categories, and for the same reasons:
+    // two "Work" defaults would seed two bars that each look authoritative.
+    uniqueIndex("planner_default_categories_label_uq").on(t.userId, sql`lower(${t.label})`),
+    uniqueIndex("planner_default_categories_life_area_uq")
+      .on(t.userId, t.lifeAreaId)
+      .where(sql`${t.lifeAreaId} is not null`),
+    check(
+      "planner_default_categories_kind_matches_link",
+      sql`(${t.kind} = 'life_area') or (${t.kind} = 'planner' and ${t.lifeAreaId} is null)`,
+    ),
+    check("planner_default_categories_minutes_range", sql`${t.minutes} between 15 and 1440`),
   ],
 );

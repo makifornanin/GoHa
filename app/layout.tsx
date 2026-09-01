@@ -70,29 +70,42 @@ export default function RootLayout({
           <MotionProvider>
             {children}
             {/*
-              Top-CENTRE, which is the only band that is reliably empty.
+              BOTTOM-CENTRE: out of the reading path, and off the right rail.
 
-              Two positions have now been ruled out by real use, in opposite
-              directions. BOTTOM-right stacked toasts sat on Settings' selects
-              and intercepted their clicks until they timed out. TOP-right then
-              covered the page-header actions, because every page header puts
-              its actions at the right: the Day Planner's Today/Tomorrow toggle
-              and the goal detail Archive/Edit/Add row were both obscured.
+              Three positions have now been ruled out by real use. BOTTOM-RIGHT
+              stacked toasts sat on Settings' selects and intercepted their
+              clicks until they timed out. TOP-RIGHT covered the page-header
+              actions, because every page header puts its actions at the right.
+              TOP-CENTRE then dropped a panel into the middle of whatever the
+              reader was looking at, which is where this one came from.
 
-              Page headers are title-left, actions-right, so the horizontal
-              middle is the one part of that band with nothing in it. The top
-              offset still clears the 56px app header.
+              The pattern in those three is structural rather than accidental:
+              GoHa right-aligns its actions (page headers, card footers, the
+              planner's commit bar, every select), so the right rail is never
+              safe, and the top band is where the page names itself. That leaves
+              the bottom centre, which is also where a notification of this kind
+              is conventionally looked for.
 
-              On a phone the header stacks and the toast is near full width, so
-              it briefly overlays the page TITLE. That is deliberate: a title is
-              not interactive, and the alternative bottom edge belongs to the
-              tab bar and the "+" button.
+              The stack is capped and kept collapsed so a burst of toasts can
+              never grow into a column tall enough to reach a control, which was
+              the actual mechanism of the bottom-right failure rather than the
+              corner itself.
+
+              On a phone the toast is near full width and is lifted clear of the
+              tab bar and its "+" button, so the primary navigation is never
+              covered.
             */}
             <Toaster
-              position="top-center"
+              position="bottom-center"
               duration={3500}
-              offset={{ top: "72px" }}
-              mobileOffset={{ top: "64px", left: "16px", right: "16px" }}
+              visibleToasts={3}
+              expand={false}
+              offset={{ bottom: "24px" }}
+              mobileOffset={{
+                bottom: "calc(76px + env(safe-area-inset-bottom))",
+                left: "16px",
+                right: "16px",
+              }}
             />
           </MotionProvider>
         </ThemeProvider>

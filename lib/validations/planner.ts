@@ -15,6 +15,8 @@ import {
  */
 
 export const PLANNER_LABEL_MAX = 40;
+/** A freeform entry is a short line, not a note. Long enough for "Client work: onboarding call". */
+export const PLANNER_ENTRY_LABEL_MAX = 80;
 
 const uuid = z.uuid("That item could not be found.");
 
@@ -43,6 +45,9 @@ export const allocationInputSchema = z.object({
     .pipe(z.union([uuid, z.null()])),
   label: categoryLabel,
   minutes: allocationMinutes,
+  /** Presentation only. Unknown keys are normalised away by `lib/life-areas.ts`. */
+  color: z.string().trim().max(24).optional().transform((v) => (v && v.length > 0 ? v : null)),
+  icon: z.string().trim().max(40).optional().transform((v) => (v && v.length > 0 ? v : null)),
 });
 
 /**
@@ -85,6 +90,63 @@ export const acceptItemSchema = z.object({
 });
 
 export type AcceptItemInput = z.input<typeof acceptItemSchema>;
+
+/** Adding the user's own line of text to a category. */
+export const freeformItemSchema = z.object({
+  planDate: z.iso.date("Pick a valid date."),
+  allocationId: uuid,
+  label: z
+    .string()
+    .trim()
+    .min(1, "Give this entry a name.")
+    .max(PLANNER_ENTRY_LABEL_MAX, `Keep it to ${PLANNER_ENTRY_LABEL_MAX} characters or fewer.`),
+  plannedMinutes: z.coerce
+    .number()
+    .int("Use whole minutes.")
+    .min(5, "Give this at least five minutes.")
+    .max(MINUTES_IN_DAY, "That is longer than a day."),
+});
+
+export type FreeformItemInput = z.input<typeof freeformItemSchema>;
+
+/**
+ * Recording how long a freeform activity actually took.
+ *
+ * Accepts null to CLEAR the record, which is a different statement from
+ * logging zero and has to stay tellable apart. The ceiling is a day, matching
+ * the database check; the floor is zero, because "I planned an hour of this and
+ * did none of it" is a true and useful thing to record.
+ */
+export const logActualSchema = z.object({
+  itemId: uuid,
+  actualMinutes: z
+    .union([
+      z.coerce
+        .number()
+        .int("Use whole minutes.")
+        .min(0, "That cannot be negative.")
+        .max(MINUTES_IN_DAY, "That is longer than a day."),
+      z.null(),
+    ]),
+});
+
+export type LogActualInput = z.input<typeof logActualSchema>;
+
+/**
+ * Saving the current categories as the reusable default day.
+ *
+ * The same category shape as a plan, minus the date: a default belongs to the
+ * user, not to a day. Kept as its own schema rather than reusing `savePlanSchema`
+ * so that the two can never be confused at the boundary, which is the whole
+ * safety property the defaults/day split is there to provide.
+ */
+export const saveDefaultsSchema = z.object({
+  categories: z
+    .array(allocationInputSchema.omit({ id: true }))
+    .max(30, "That is more categories than a day can usefully hold."),
+});
+
+export type SaveDefaultsInput = z.input<typeof saveDefaultsSchema>;
 
 export const plannerIdSchema = uuid;
 

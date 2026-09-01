@@ -33,12 +33,16 @@ export const ALLOCATION_MIN_MINUTES = 15;
 export const ALLOCATION_MAX_MINUTES = MINUTES_IN_DAY;
 
 /**
- * Categories offered to someone whose day is empty.
+ * A starting point for someone whose day is empty, and nothing more.
  *
  * Chosen to add up to a recognisable 24 hours so the first thing a new user
  * sees is a full day they can adjust, not a blank form and a question they have
  * never been asked before. Sleep is first because it is the one everybody
  * forgets to count, and forgetting it is what makes a plan quietly impossible.
+ *
+ * Every one of these is renameable, resizable and removable the moment it lands
+ * in a plan, and none of them is treated specially anywhere in the code. They
+ * are a first draft of a day, not a set of categories GoHa believes in.
  */
 export const STARTER_CATEGORIES: readonly { label: string; minutes: number }[] = [
   { label: "Sleep", minutes: 8 * 60 },
@@ -47,29 +51,6 @@ export const STARTER_CATEGORIES: readonly { label: string; minutes: number }[] =
   { label: "Meals", minutes: 90 },
   { label: "Free time", minutes: 210 },
 ];
-
-/**
- * Planner-only category names that do not hold to-dos.
- *
- * Sleep is not a category you get behind on. These reserve capacity and nothing
- * else: no suggestions, no "add work here", no empty-list nag. Matched
- * case-insensitively on the label, because a planner category has no id to
- * check against and asking the user to declare the type of "Commute" would be
- * a question with an obvious answer.
- */
-const NON_ACTIONABLE = new Set([
-  "sleep",
-  "rest",
-  "commute",
-  "travel",
-  "free time",
-  "downtime",
-  "meals",
-  "eating",
-  "family",
-  "chores",
-  "errands",
-]);
 
 export type PlannerCategoryKind = "life_area" | "planner";
 
@@ -80,18 +61,40 @@ export type Allocation = {
   label: string;
   minutes: number;
   sortOrder: number;
+  color: string | null;
+  icon: string | null;
 };
 
 /**
- * Whether work can be planned INTO this category.
+ * An entry inside a category: a linked to-do, or the user's own line of text.
  *
- * A life-area category always can: it exists precisely because the user files
- * goals under it. A planner-only one can unless its name is one of the reserved
- * kinds above.
+ * Reserved time is deliberately NOT a third variant. A category with minutes
+ * and no entries already means "these hours are spoken for, the detail is not
+ * decided yet", and inventing an empty row to say the same thing would put a
+ * blank line in the UI that nobody can name, edit or complete.
  */
-export function isActionable(allocation: Pick<Allocation, "kind" | "label">): boolean {
-  if (allocation.kind === "life_area") return true;
-  return !NON_ACTIONABLE.has(allocation.label.trim().toLowerCase());
+export type PlanEntry = {
+  id: string;
+  allocationId: string;
+  taskId: string | null;
+  label: string | null;
+  plannedMinutes: number;
+  /**
+   * Manually recorded time, for a freeform entry only. Null means "not
+   * recorded yet", which the UI shows differently from a recorded zero. A
+   * linked entry is always null here: its actual comes from focus sessions.
+   */
+  actualMinutes: number | null;
+  sortOrder: number;
+};
+
+/** The display name of an entry, whichever kind it is. */
+export function entryTitle(
+  entry: Pick<PlanEntry, "taskId" | "label">,
+  taskTitles: ReadonlyMap<string, string>,
+): string {
+  if (entry.taskId) return taskTitles.get(entry.taskId) ?? "To-do";
+  return entry.label ?? "Untitled";
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +201,15 @@ export const SUGGESTION_REASON_LABEL: Record<SuggestionReason, string> = {
 export const DUE_SOON_DAYS = 3;
 
 /**
+ * How much a to-do gains for already living in this category's life area.
+ *
+ * Larger than any single reason score, so an area's own work sorts above
+ * unrelated work, and smaller than two reasons combined, so a to-do that is
+ * overdue AND due soon elsewhere can still surface. Preference, not a gate.
+ */
+export const AREA_MATCH_BONUS = 6;
+
+/**
  * Rank one to-do for one day.
  *
  * The order the brief asks for, expressed as additive weights rather than a
@@ -276,22 +288,35 @@ export function suggestionsFor(params: {
   limit?: number;
 }): Suggestion[] {
   const { allocation, candidates, acceptedTaskIds, activeGoalIds, goalLifeArea, today } = params;
-  if (!isActionable(allocation)) return [];
 
   const matches = candidates.filter((task) => {
     if (task.status === "completed" || task.status === "cancelled") return false;
-    if (acceptedTaskIds.has(task.id)) return false;
-
-    const area = task.lifeAreaId ?? (task.goalId ? (goalLifeArea.get(task.goalId) ?? null) : null);
-    if (allocation.kind === "life_area") return area === allocation.lifeAreaId;
-    // A planner-only category holds work that is not claimed by any life area.
-    return area === null;
+    return !acceptedTaskIds.has(task.id);
   });
 
   return matches
     .map((task): Suggestion => {
       const { score, reasons } = scoreCandidate(task, { today, activeGoalIds });
-      return { task, reasons, score, minutes: task.estimateMinutes };
+      const area = task.lifeAreaId ?? (task.goalId ? (goalLifeArea.get(task.goalId) ?? null) : null);
+      /*
+       * Belonging to this category's life area is a strong PREFERENCE, not a
+       * filter.
+       *
+       * It used to be a filter, and the filter is what made the planner feel
+       * like it was holding work back: a category the user invented called
+       * "Deep work" could only ever be offered to-dos that belonged to no life
+       * area at all, so the list was usually empty and the reason was invisible.
+       * Ranking says the same thing without hiding anything, and the user
+       * decides what actually goes in (the brief's "suggestions stay
+       * suggestions" rule).
+       */
+      const matchesArea = allocation.kind === "life_area" && area === allocation.lifeAreaId;
+      return {
+        task,
+        reasons,
+        score: score + (matchesArea ? AREA_MATCH_BONUS : 0),
+        minutes: task.estimateMinutes,
+      };
     })
     .sort(
       (a, b) =>
@@ -302,32 +327,151 @@ export function suggestionsFor(params: {
     .slice(0, params.limit ?? 8);
 }
 
+// ---------------------------------------------------------------------------
+// Actuals: what the day really held
+// ---------------------------------------------------------------------------
+
+/** One category's planned time set against what was actually tracked. */
+export type CategoryActual = {
+  allocationId: string;
+  plannedMinutes: number;
+  /** Automatic, from focus sessions on linked to-dos in this category. */
+  focusMinutes: number;
+  /** Manual, from freeform entries in this category the user logged time on. */
+  manualMinutes: number;
+  /** The two added together. The number a category card leads with. */
+  actualMinutes: number;
+  /** Focus sessions only. Manual entries are not sessions and are not counted. */
+  sessions: number;
+};
+
+export type DayActuals = {
+  byAllocation: Map<string, CategoryActual>;
+  /**
+   * Focus time that belongs to no category on this day.
+   *
+   * Either the session had no to-do, or its to-do is not in the plan. Kept
+   * separate and shown as its own line rather than folded into a category:
+   * inventing a home for it would be exactly the silent auto-placement this
+   * redesign exists to remove.
+   */
+  unassignedMinutes: number;
+  unassignedSessions: number;
+  /** Focus sessions across the whole day, assigned or not. */
+  focusedMinutes: number;
+  /** Manually logged freeform time across the whole day. */
+  manualMinutes: number;
+  /**
+   * Everything the day actually accounted for: focus plus manual.
+   *
+   * Deliberately a SEPARATE number from `focusedMinutes` rather than a
+   * replacement for it. Manual time is the user's own estimate of an activity
+   * that was never timed; focus time is a measured record. Presenting the two
+   * as one figure called "Focused" would quietly restate a guess as a
+   * measurement.
+   */
+  trackedMinutes: number;
+};
+
 /**
- * A first pass at filling a category, up to its free capacity.
+ * Attribute tracked time to planner categories.
  *
- * Offered as a convenience ("fill this category"), never applied on its own.
- * Greedy by rank rather than by best fit: the point is to propose the most
- * important work that fits, and a bin-packing solution that drops the top item
- * to squeeze in three small ones is optimising the wrong thing.
+ * Two sources that cannot overlap, which is what makes the sum safe:
  *
- * To-dos with no estimate are skipped here and surfaced separately, because a
- * plan built on a guessed duration is the failure mode this feature exists to
- * avoid.
+ *   LINKED entries take their actual from focus sessions. The link is
+ *   indirect: a session names a to-do, and a to-do reaches a category only by
+ *   having been put there in this day's plan.
+ *
+ *   FREEFORM entries take their actual from `actualMinutes`, which the user
+ *   typed. They have no to-do, so no focus session can ever point at one.
+ *
+ * The database enforces that disjointness (`day_plan_items_actual_manual_only`
+ * and `day_plan_items_task_or_label`), so double counting is not something this
+ * function has to defend against; it would have to be stored first, and it
+ * cannot be.
+ *
+ * Seconds are converted once, at the end, per category: rounding each session
+ * first loses a minute every time two 90-second sessions meet.
  */
-export function autoFill(params: {
-  suggestions: readonly Suggestion[];
-  freeMinutes: number;
-}): Suggestion[] {
-  const chosen: Suggestion[] = [];
-  let remaining = params.freeMinutes;
-  for (const suggestion of params.suggestions) {
-    if (suggestion.minutes === null) continue;
-    if (suggestion.minutes > remaining) continue;
-    chosen.push(suggestion);
-    remaining -= suggestion.minutes;
-    if (remaining < ALLOCATION_MIN_MINUTES) break;
+export function dayActuals(params: {
+  allocations: readonly Pick<Allocation, "id">[];
+  entries: readonly Pick<
+    PlanEntry,
+    "allocationId" | "taskId" | "plannedMinutes" | "actualMinutes"
+  >[];
+  focus: readonly { taskId: string | null; seconds: number; sessions: number }[];
+}): DayActuals {
+  const allocationByTask = new Map<string, string>();
+  for (const entry of params.entries) {
+    if (entry.taskId) allocationByTask.set(entry.taskId, entry.allocationId);
   }
-  return chosen;
+
+  const plannedByAllocation = new Map<string, number>();
+  const manualByAllocation = new Map<string, number>();
+  let manualTotal = 0;
+  for (const entry of params.entries) {
+    plannedByAllocation.set(
+      entry.allocationId,
+      (plannedByAllocation.get(entry.allocationId) ?? 0) + entry.plannedMinutes,
+    );
+    // Null means "not recorded" and contributes nothing. A recorded zero is a
+    // different statement and is summed as the zero it is.
+    if (entry.taskId === null && entry.actualMinutes !== null) {
+      manualByAllocation.set(
+        entry.allocationId,
+        (manualByAllocation.get(entry.allocationId) ?? 0) + entry.actualMinutes,
+      );
+      manualTotal += entry.actualMinutes;
+    }
+  }
+
+  const secondsByAllocation = new Map<string, number>();
+  const sessionsByAllocation = new Map<string, number>();
+  let unassignedSeconds = 0;
+  let unassignedSessions = 0;
+  let focusSeconds = 0;
+
+  for (const row of params.focus) {
+    focusSeconds += row.seconds;
+    const allocationId = row.taskId ? allocationByTask.get(row.taskId) : undefined;
+    if (!allocationId) {
+      unassignedSeconds += row.seconds;
+      unassignedSessions += row.sessions;
+      continue;
+    }
+    secondsByAllocation.set(
+      allocationId,
+      (secondsByAllocation.get(allocationId) ?? 0) + row.seconds,
+    );
+    sessionsByAllocation.set(
+      allocationId,
+      (sessionsByAllocation.get(allocationId) ?? 0) + row.sessions,
+    );
+  }
+
+  const byAllocation = new Map<string, CategoryActual>();
+  for (const allocation of params.allocations) {
+    const focusMinutes = Math.round((secondsByAllocation.get(allocation.id) ?? 0) / 60);
+    const manualMinutes = manualByAllocation.get(allocation.id) ?? 0;
+    byAllocation.set(allocation.id, {
+      allocationId: allocation.id,
+      plannedMinutes: plannedByAllocation.get(allocation.id) ?? 0,
+      focusMinutes,
+      manualMinutes,
+      actualMinutes: focusMinutes + manualMinutes,
+      sessions: sessionsByAllocation.get(allocation.id) ?? 0,
+    });
+  }
+
+  const focusedMinutes = Math.round(focusSeconds / 60);
+  return {
+    byAllocation,
+    unassignedMinutes: Math.round(unassignedSeconds / 60),
+    unassignedSessions,
+    focusedMinutes,
+    manualMinutes: manualTotal,
+    trackedMinutes: focusedMinutes + manualTotal,
+  };
 }
 
 /** Suggestions that cannot be planned precisely because nobody sized them. */
