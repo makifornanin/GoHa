@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -38,6 +38,7 @@ import { LifeAreaIcon } from "@/components/life-areas/icon";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
@@ -282,15 +283,24 @@ export function PlannerView({
     });
   }
 
-  function addFreeform(allocationId: string, label: string, minutes: number) {
+  function addFreeform(
+    allocationId: string,
+    label: string,
+    minutes: number,
+    alsoCreateTask: boolean,
+  ) {
     startTransition(async () => {
       const result = await addFreeformItemAction({
         planDate,
         allocationId,
         label,
         plannedMinutes: minutes,
+        alsoCreateTask,
       });
-      refreshAfter(result, `Added "${label}"`);
+      refreshAfter(
+        result,
+        alsoCreateTask ? `Added "${label}" and created a to-do` : `Added "${label}"`,
+      );
     });
   }
 
@@ -464,7 +474,9 @@ export function PlannerView({
                     }
                     accept(allocation.id, suggestion, suggestion.minutes);
                   }}
-                  onAddFreeform={(label, minutes) => addFreeform(allocation.id, label, minutes)}
+                  onAddFreeform={(label, minutes, alsoTask) =>
+                    addFreeform(allocation.id, label, minutes, alsoTask)
+                  }
                   onRenameFreeform={renameFreeform}
                   onLogActual={logActual}
                   onRemove={remove}
@@ -908,7 +920,7 @@ function CategoryCard({
   isToday: boolean;
   suggestionsFactory: () => Suggestion[];
   onAccept: (suggestion: Suggestion) => void;
-  onAddFreeform: (label: string, minutes: number) => void;
+  onAddFreeform: (label: string, minutes: number, alsoCreateTask: boolean) => void;
   onRenameFreeform: (id: string, label: string) => void;
   onLogActual: (id: string, minutes: number | null) => void;
   onRemove: (item: DayPlanItem, title: string) => void;
@@ -1174,9 +1186,9 @@ function CategoryCard({
             <FreeformComposer
               pending={pending}
               onCancel={() => setAdding(false)}
-              onAdd={(label, minutes) => {
+              onAdd={(label, minutes, alsoCreateTask) => {
                 setAdding(false);
-                onAddFreeform(label, minutes);
+                onAddFreeform(label, minutes, alsoCreateTask);
               }}
             />
           ) : (
@@ -1364,23 +1376,35 @@ function ActualComposer({
   );
 }
 
-/** Type an entry and how long it should take. No to-do is created. */
+/**
+ * Type an entry, how long it should take, and whether it is also a to-do.
+ *
+ * The duration is repeated on the Add button on purpose. It used to sit only in
+ * the select, defaulting to 1h, and pressing Enter in the name field committed
+ * that default without the user ever looking at it: someone who meant a
+ * half-hour entry got a full hour, and on a one-hour category that reads as
+ * "0m free" and looks like an arithmetic bug. Naming the duration on the
+ * control that commits it makes the value impossible to miss at the moment it
+ * is chosen.
+ */
 function FreeformComposer({
   pending,
   onAdd,
   onCancel,
 }: {
   pending: boolean;
-  onAdd: (label: string, minutes: number) => void;
+  onAdd: (label: string, minutes: number, alsoCreateTask: boolean) => void;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState("");
   const [minutes, setMinutes] = useState(60);
+  const [alsoCreateTask, setAlsoCreateTask] = useState(false);
+  const checkboxId = useId();
 
   function submit() {
     const value = label.trim();
     if (!value) return;
-    onAdd(value, minutes);
+    onAdd(value, minutes, alsoCreateTask);
   }
 
   return (
@@ -1400,7 +1424,7 @@ function FreeformComposer({
         maxLength={80}
         aria-label="What is this entry"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select
           value={String(minutes)}
           onChange={(value) => setMinutes(Number(value))}
@@ -1411,12 +1435,27 @@ function FreeformComposer({
           }))}
         />
         <Button type="button" size="sm" onClick={submit} disabled={pending || !label.trim()}>
-          Add
+          Add {formatDuration(minutes)}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
       </div>
+      {/* Off by default: most planner entries are not to-dos, and creating one
+          silently would put rows in Tasks that nobody asked for. */}
+      <label
+        htmlFor={checkboxId}
+        className="flex cursor-pointer items-center gap-2 text-footnote text-label-secondary"
+      >
+        <Checkbox
+          id={checkboxId}
+          checked={alsoCreateTask}
+          onToggle={() => setAlsoCreateTask((on) => !on)}
+          disabled={pending}
+          aria-label="Also add to To-dos"
+        />
+        Also add to To-dos
+      </label>
     </div>
   );
 }

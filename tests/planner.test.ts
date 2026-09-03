@@ -611,3 +611,79 @@ describe("manual actuals", () => {
     expect(result.trackedMinutes).toBe(50);
   });
 });
+
+/**
+ * Free time inside one category.
+ *
+ * Reported as a bug: "Meals reserved 1h, add a 30-minute entry, and it shows 0m
+ * free". The arithmetic below was correct and stayed correct under test; what
+ * actually produced that symptom was the composer committing its 1h default
+ * when the name field was submitted with Enter, so the stored entry really was
+ * 60 minutes. These pin the calculation so a future change cannot make the
+ * reported behaviour real.
+ *
+ * The distinction that matters: free time is reserved MINUS PLANNED. Actual
+ * tracked time is a different measurement and must never consume capacity.
+ */
+describe("remaining free time", () => {
+  const meals = { id: "meals", minutes: 60 };
+
+  it("60 reserved - 30 planned = 30 free", () => {
+    const load = categoryLoad(meals, [{ plannedMinutes: 30 }]);
+    expect(load.plannedMinutes).toBe(30);
+    expect(load.freeMinutes).toBe(30);
+    expect(load.overMinutes).toBe(0);
+  });
+
+  it("60 reserved - 60 planned = 0 free", () => {
+    const load = categoryLoad(meals, [{ plannedMinutes: 60 }]);
+    expect(load.freeMinutes).toBe(0);
+    expect(load.overMinutes).toBe(0);
+  });
+
+  it("60 reserved - 90 planned = 0 free, and says how far over", () => {
+    // Clamped at zero rather than going negative, and the overage is reported
+    // separately so the UI can say "30m over" instead of "-30m free".
+    const load = categoryLoad(meals, [{ plannedMinutes: 90 }]);
+    expect(load.freeMinutes).toBe(0);
+    expect(load.overMinutes).toBe(30);
+  });
+
+  it("120 reserved - entries totalling 75 = 45 free", () => {
+    const load = categoryLoad({ id: "work", minutes: 120 }, [
+      { plannedMinutes: 30 },
+      { plannedMinutes: 25 },
+      { plannedMinutes: 20 },
+    ]);
+    expect(load.plannedMinutes).toBe(75);
+    expect(load.freeMinutes).toBe(45);
+  });
+
+  it("an empty category has all of its time free", () => {
+    expect(categoryLoad(meals, []).freeMinutes).toBe(60);
+  });
+
+  it("actual tracked time never consumes planned capacity", () => {
+    /*
+     * The explicit distinction from the report: 60 reserved, 30 planned, 20
+     * actually spent still leaves 30 free, because 30 of the 60 were ALLOCATED.
+     * `categoryLoad` reads only plannedMinutes; actuals are computed separately
+     * by `dayActuals` and never feed back into capacity.
+     */
+    const load = categoryLoad(meals, [{ plannedMinutes: 30 }]);
+    const actuals = dayActuals({
+      allocations: [meals],
+      entries: [{ allocationId: "meals", taskId: null, plannedMinutes: 30, actualMinutes: 20 }],
+      focus: [],
+    });
+    expect(load.freeMinutes).toBe(30);
+    expect(actuals.byAllocation.get("meals")?.actualMinutes).toBe(20);
+    // Recomputing the load with the same entries is unchanged by the actual.
+    expect(categoryLoad(meals, [{ plannedMinutes: 30 }]).freeMinutes).toBe(30);
+  });
+
+  it("ignores a negative planned duration rather than crediting time back", () => {
+    // Not reachable through the UI, but a stored oddity must not invent capacity.
+    expect(categoryLoad(meals, [{ plannedMinutes: -30 }]).freeMinutes).toBe(60);
+  });
+});

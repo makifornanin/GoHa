@@ -105,6 +105,14 @@ export const freeformItemSchema = z.object({
     .int("Use whole minutes.")
     .min(5, "Give this at least five minutes.")
     .max(MINUTES_IN_DAY, "That is longer than a day."),
+  /**
+   * Also create a real to-do for this entry.
+   *
+   * When set, the entry is stored as a LINKED one pointing at the new to-do
+   * rather than as freeform text, which is why it cannot double count: there is
+   * still exactly one `day_plan_items` row, and its minutes are counted once.
+   */
+  alsoCreateTask: z.boolean().default(false),
 });
 
 export type FreeformItemInput = z.input<typeof freeformItemSchema>;

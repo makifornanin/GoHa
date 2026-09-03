@@ -70,42 +70,30 @@ export default function RootLayout({
           <MotionProvider>
             {children}
             {/*
-              BOTTOM-CENTRE: out of the reading path, and off the right rail.
+              TOP-RIGHT, by request.
 
-              Three positions have now been ruled out by real use. BOTTOM-RIGHT
-              stacked toasts sat on Settings' selects and intercepted their
-              clicks until they timed out. TOP-RIGHT covered the page-header
-              actions, because every page header puts its actions at the right.
-              TOP-CENTRE then dropped a panel into the middle of whatever the
-              reader was looking at, which is where this one came from.
+              Recorded because this position has been here before and was moved
+              for a reason: every GoHa page header puts its actions on the right
+              (the planner's Today/Tomorrow toggle, the goal detail
+              Archive/Edit/Add row), and a toast landing there covered them.
 
-              The pattern in those three is structural rather than accidental:
-              GoHa right-aligns its actions (page headers, card footers, the
-              planner's commit bar, every select), so the right rail is never
-              safe, and the top band is where the page names itself. That leaves
-              the bottom centre, which is also where a notification of this kind
-              is conventionally looked for.
+              Two things keep that from happening again. The top offset clears
+              the 56px app header and then some, so a toast sits BELOW the
+              header band rather than on it, and the stack is capped at three
+              and kept collapsed so a burst cannot grow into a column that
+              reaches the controls underneath. Toasts are also dismissible, so a
+              covered control is recoverable rather than blocked until timeout.
 
-              The stack is capped and kept collapsed so a burst of toasts can
-              never grow into a column tall enough to reach a control, which was
-              the actual mechanism of the bottom-right failure rather than the
-              corner itself.
-
-              On a phone the toast is near full width and is lifted clear of the
-              tab bar and its "+" button, so the primary navigation is never
-              covered.
+              On a phone the header stacks and Sonner goes near full width, so
+              the toast is pinned below the header with a margin on both sides.
             */}
             <Toaster
-              position="bottom-center"
+              position="top-right"
               duration={3500}
               visibleToasts={3}
               expand={false}
-              offset={{ bottom: "24px" }}
-              mobileOffset={{
-                bottom: "calc(76px + env(safe-area-inset-bottom))",
-                left: "16px",
-                right: "16px",
-              }}
+              offset={{ top: "72px", right: "24px" }}
+              mobileOffset={{ top: "68px", left: "16px", right: "16px" }}
             />
           </MotionProvider>
         </ThemeProvider>

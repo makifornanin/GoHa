@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { lifeAreasRepo, plannerRepo, tasksRepo } from "@/db";
-import type { DayPlanAllocation, DayPlanItem } from "@/db";
+import type { DayPlanAllocation, DayPlanItem, Task } from "@/db";
 import { requireUser } from "@/lib/session";
 import { getUserDatePrefs } from "@/lib/user-settings";
 import { zonedToday } from "@/lib/date";
@@ -387,7 +387,7 @@ export async function addPlanToTodayAction(
  */
 export async function addFreeformItemAction(
   input: FreeformItemInput,
-): Promise<ActionResult<{ item: DayPlanItem }>> {
+): Promise<ActionResult<{ item: DayPlanItem; task?: Task }>> {
   const user = await requireUser();
 
   const parsed = freeformItemSchema.safeParse(input);
@@ -408,6 +408,36 @@ export async function addFreeformItemAction(
     const plan = await plannerRepo.getOrCreatePlan(user.id, parsed.data.planDate);
     if (allocation.dayPlanId !== plan.id) {
       return { ok: false, error: "That category belongs to a different day." };
+    }
+
+    /*
+     * "Also add to To-dos" makes the entry LINKED rather than freeform.
+     *
+     * That is the whole implementation, and it is why nothing can be double
+     * counted: the to-do is created once through the SAME repository call
+     * `createTaskAction` uses, and the plan still gets exactly one
+     * `day_plan_items` row whose minutes are counted once. A second row, or a
+     * freeform row alongside a task, would be two answers to "how long is this".
+     *
+     * It deliberately does NOT schedule the to-do. Putting work in a plan and
+     * committing that plan to Today stay separate decisions, which is what the
+     * existing "Add to Today" button is for.
+     */
+    if (parsed.data.alsoCreateTask) {
+      const task = await tasksRepo.createTask(user.id, {
+        title: parsed.data.label,
+        status: "todo",
+        priority: "medium",
+        estimateMinutes: parsed.data.plannedMinutes,
+      });
+      const item = await plannerRepo.addItem(user.id, {
+        dayPlanId: plan.id,
+        allocationId: allocation.id,
+        taskId: task.id,
+        plannedMinutes: parsed.data.plannedMinutes,
+      });
+      revalidatePlannerSurfaces();
+      return { ok: true, data: { item, task } };
     }
 
     const item = await plannerRepo.addFreeformItem(user.id, {

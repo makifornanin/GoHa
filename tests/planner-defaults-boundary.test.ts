@@ -232,3 +232,51 @@ describe("the category editor row survives a narrow screen", () => {
     expect(view).toContain('className="h-8 min-w-[7rem] flex-1"');
   });
 });
+
+/**
+ * "Also add to To-dos" creates exactly one of each.
+ *
+ * The failure this guards against is two rows for one intention: a freeform
+ * entry AND a task, or two planner items, either of which makes the day read as
+ * fuller than it is. The implementation avoids it by making the entry LINKED
+ * rather than freeform, so there is one `day_plan_items` row whose minutes are
+ * counted once, pointing at one task.
+ */
+describe("planner entries that also become to-dos", () => {
+  const actions = stripComments(read("app/(app)/planner/actions.ts"));
+  const start = actions.indexOf("export async function addFreeformItemAction");
+  const body = actions.slice(start, actions.indexOf("\nexport async function ", start + 1));
+
+  it("reuses the existing task repository rather than a second implementation", () => {
+    expect(body).toContain("tasksRepo.createTask(user.id");
+  });
+
+  it("creates the entry LINKED, not as a freeform row alongside a task", () => {
+    // One row either way. The linked branch must not also call the freeform one.
+    const linkedBranch = body.slice(body.indexOf("if (parsed.data.alsoCreateTask)"));
+    const upToReturn = linkedBranch.slice(0, linkedBranch.indexOf("return { ok: true"));
+    expect(upToReturn).toContain("plannerRepo.addItem(user.id");
+    expect(upToReturn).not.toContain("addFreeformItem");
+  });
+
+  it("writes the planned duration once, to both the entry and the estimate", () => {
+    expect(body).toContain("estimateMinutes: parsed.data.plannedMinutes");
+    expect(body).toContain("plannedMinutes: parsed.data.plannedMinutes");
+  });
+
+  it("does not schedule the new to-do", () => {
+    /*
+     * Putting work in a plan and committing that plan to Today are separate
+     * decisions; `addPlanToTodayAction` is the one that writes scheduled_for.
+     */
+    expect(body).not.toContain("scheduledFor");
+  });
+
+  it("still derives identity from the session", () => {
+    expect(body.slice(0, 400)).toContain("await requireUser()");
+  });
+
+  it("leaves the plain freeform path untouched", () => {
+    expect(body).toContain("plannerRepo.addFreeformItem(user.id");
+  });
+});
