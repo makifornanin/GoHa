@@ -34,7 +34,8 @@ import {
   dueDailySchedule,
   dueWeeklySchedule,
   isPushJobKind,
-  isSameJobLocalDate,
+  dueEveningSchedule,
+  isJobDayCurrent,
   retryAt,
 } from "@/lib/automation/worker-schedule";
 import {
@@ -170,20 +171,29 @@ export async function materializeAndClaimJobs(
       }
 
       if (settings.eveningSummaryEnabled && hasDevice && !context.isSabbath) {
-        const scheduledFor = dueDailySchedule({
+        /*
+         * `summaryDate` is the day being reported and `scheduledFor` is when it
+         * goes out. They differ by one for a rhythm that ends after midnight, so
+         * a 2am summary describes the day that just finished rather than the
+         * four minutes of the new one. Storing the summary date as `localDate`
+         * keeps every date-scoped read in `prepareEvening` correct without
+         * touching it.
+         */
+        const evening = dueEveningSchedule({
           now,
-          date: localDate,
-          time: settings.eveningReflectionTime,
+          localDate,
+          morningTime: settings.dailyPlanningTime,
+          eveningTime: settings.eveningReflectionTime,
           timezone: settings.timezone,
         });
-        if (scheduledFor) {
+        if (evening) {
           await workerRepo.materializeJob({
             userId: settings.userId,
             kind: "evening_summary",
-            dedupeKey: `brief:evening:${localDate}`,
-            localDate,
+            dedupeKey: `brief:evening:${evening.summaryDate}`,
+            localDate: evening.summaryDate,
             timezone: settings.timezone,
-            scheduledFor,
+            scheduledFor: evening.scheduledFor,
           });
         }
       }
@@ -325,7 +335,9 @@ export async function prepareWorkerJob(
   if (settings.timezone !== job.timezone) {
     return { state: "skip", job, reason: "timezone_changed" };
   }
-  if (!isSameJobLocalDate(now, job.localDate, settings.timezone)) {
+  // Keyed to the date the job FIRES on, which is `localDate` for everything
+  // except a wrapped evening summary. See `isJobDayCurrent`.
+  if (!isJobDayCurrent(now, job)) {
     return { state: "skip", job, reason: "stale_local_date" };
   }
   if (
@@ -714,7 +726,7 @@ export async function completeWorkerJob(
     if (error instanceof VapidConfigurationError) {
       if (
         current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
-        isSameJobLocalDate(now, current.localDate, current.timezone)
+        isJobDayCurrent(now, current)
       ) {
         const availableAt = retryAt(now, current.attemptCount);
         await workerRepo.retryJob(current.id, leaseId, "push_not_configured", availableAt);
@@ -743,8 +755,7 @@ export async function completeWorkerJob(
 
   const disposition = workerDeliveryDisposition(
     deliveryCounts,
-    current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
-      isSameJobLocalDate(now, current.localDate, current.timezone),
+    current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS && isJobDayCurrent(now, current),
   );
   if (disposition.action === "complete") {
     if (!(await workerRepo.completeJob(current.id, leaseId, now))) {
@@ -781,7 +792,7 @@ export async function failWorkerJob(
   const safeCode = /^[a-z0-9][a-z0-9_:-]{0,63}$/.test(code) ? code : "worker_failure";
   if (
     current.attemptCount < AUTOMATION_JOB_MAX_ATTEMPTS &&
-    isSameJobLocalDate(now, current.localDate, current.timezone)
+    isJobDayCurrent(now, current)
   ) {
     const availableAt = retryAt(now, current.attemptCount);
     const retried = await workerRepo.retryUndeliveredJob(

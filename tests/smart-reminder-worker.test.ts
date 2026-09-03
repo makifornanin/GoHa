@@ -118,6 +118,8 @@ function job(n = 1, overrides: Record<string, unknown> = {}) {
     kind: "smart_task_reminder",
     dedupeKey: `smart:${DATE}:${n}`,
     localDate: DATE,
+    // Real rows always carry this (NOT NULL), and job liveness is keyed to it.
+    scheduledFor: at(`${DATE}T13:00:00`),
     timezone: TZ,
     entityType: null,
     entityId: null,
@@ -404,9 +406,27 @@ describe("preparing a leased slot", () => {
     expect(prepared).toMatchObject({ state: "skip", reason: "invalid_slot" });
   });
 
-  it("skips a job whose local date is no longer today", async () => {
-    const prepared = await prepareWorkerJob(job(1, { localDate: "2026-08-25" }), NOW);
+  it("skips a job whose day is no longer today", async () => {
+    // A genuinely stale job was both materialized AND scheduled on an old day.
+    const prepared = await prepareWorkerJob(
+      job(1, { localDate: "2026-08-25", scheduledFor: at("2026-08-25T13:00:00") }),
+      NOW,
+    );
     expect(prepared).toMatchObject({ state: "skip", reason: "stale_local_date" });
+  });
+
+  it("does NOT skip a job that reports an earlier day but fires today", async () => {
+    /*
+     * The wrapped evening case, guarded here because getting it wrong is
+     * silent. A rhythm that ends after midnight produces a job about the 25th
+     * that is delivered on the 26th; keying staleness to `localDate` would
+     * discard it at the exact moment it became claimable.
+     */
+    const prepared = await prepareWorkerJob(
+      job(1, { localDate: "2026-08-25", scheduledFor: NOW }),
+      NOW,
+    );
+    expect(prepared.state === "skip" && prepared.reason === "stale_local_date").toBe(false);
   });
 
   it("skips a job whose timezone no longer matches the account", async () => {

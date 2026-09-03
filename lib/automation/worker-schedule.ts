@@ -140,3 +140,114 @@ export const PUSH_JOB_KINDS = new Set([
 export function isPushJobKind(kind: string): boolean {
   return PUSH_JOB_KINDS.has(kind);
 }
+
+/**
+ * A day that ends after midnight.
+ *
+ * Someone who wakes at 1pm and stops working at 2am has a real day, and both of
+ * those are real rhythm times. The original model compared them as minutes from
+ * midnight ON THE SAME DATE, so "2am" always meant this morning rather than
+ * tonight: the evening landed *before* the morning, the smart-reminder window
+ * collapsed, and the evening summary fired at 2am at the START of its own day
+ * and summarised nothing. Night-shift accounts silently got an empty summary
+ * every single day.
+ *
+ * The rule that fixes it is one line: an evening time at or before the morning
+ * time belongs to the NEXT calendar day.
+ */
+export function eveningWrapsPastMidnight(
+  morningTime: string | null | undefined,
+  eveningTime: string | null | undefined,
+): boolean {
+  const morning = clockMinutes(morningTime);
+  const evening = clockMinutes(eveningTime);
+  if (morning === null || evening === null) return false;
+  return evening <= morning;
+}
+
+/** Minutes from local midnight, or null when the value is not a clock time. */
+export function clockMinutes(value: string | null | undefined): number | null {
+  const match = /^(\d{2}):(\d{2})/.exec(value ?? "");
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+/**
+ * When the evening summary is due, and which day it is ABOUT.
+ *
+ * The two are the same date on an ordinary day and one apart on a wrapped one.
+ * The summary always describes the day the user actually lived: set 1pm/2am and
+ * the 2am delivery on Tuesday reports Monday, not the four minutes of Tuesday
+ * that have happened so far.
+ *
+ * `summaryDate` becomes the job's `localDate`, so every date-scoped read in
+ * `prepareEvening` keeps working untouched, and the dedupe key stays one per
+ * real day.
+ */
+export function dueEveningSchedule(params: {
+  now: Date;
+  /** Today, in the user's zone. */
+  localDate: IsoDate;
+  morningTime: string | null | undefined;
+  eveningTime: string | null | undefined;
+  timezone: string;
+}): { summaryDate: IsoDate; scheduledFor: Date } | null {
+  const scheduledFor = dueDailySchedule({
+    now: params.now,
+    date: params.localDate,
+    time: params.eveningTime,
+    timezone: params.timezone,
+  });
+  if (!scheduledFor) return null;
+
+  if (!eveningWrapsPastMidnight(params.morningTime, params.eveningTime)) {
+    return { summaryDate: params.localDate, scheduledFor };
+  }
+  // Fires today, reports yesterday.
+  return { summaryDate: previousLocalDate(params.localDate), scheduledFor };
+}
+
+/** The calendar day before an ISO date, without going through a Date. */
+function previousLocalDate(date: IsoDate): IsoDate {
+  const [y, m, d] = date.split("-").map(Number);
+  const prev = new Date(Date.UTC(y, m - 1, d));
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  return prev.toISOString().slice(0, 10) as IsoDate;
+}
+
+/**
+ * Whether a job's day is still the day it is happening on.
+ *
+ * Retries and staleness are scoped to the job's own day, and for almost every
+ * job that is `localDate`. A wrapped evening summary is the exception: it is
+ * ABOUT one date and DELIVERED on the next, so keying its liveness to
+ * `localDate` would have the worker discard it as stale the moment it became
+ * claimable.
+ *
+ * Derived from `scheduledFor`, which already records the instant the job is
+ * due, rather than from a new column or a second lookup of the user's settings.
+ * For every non-wrapped job `scheduledFor` falls on `localDate`, so this is
+ * exactly the previous behaviour.
+ */
+export function isJobDayCurrent(
+  now: Date,
+  job: { localDate: IsoDate; scheduledFor?: Date | null; timezone: string },
+): boolean {
+  try {
+    /*
+     * `scheduled_for` is NOT NULL in the schema, so the fallback is unreachable
+     * for a real row. It is here because the failure it prevents is silent: a
+     * job-shaped value without it would make this return false and the worker
+     * would discard the notification as stale rather than send it. Falling back
+     * to `localDate` is exactly the behaviour this replaced.
+     */
+    const anchor = job.scheduledFor ?? null;
+    const firing = anchor ? toZonedDate(anchor, job.timezone) : job.localDate;
+    return toZonedDate(now, job.timezone) === firing;
+  } catch {
+    return false;
+  }
+}

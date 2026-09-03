@@ -1,5 +1,5 @@
 import { taskPriorityConfig } from "@/lib/tasks";
-import { getZonedParts, zonedLocalToInstant, type IsoDate } from "@/lib/date";
+import { addDays, getZonedParts, zonedLocalToInstant, type IsoDate } from "@/lib/date";
 
 /**
  * Smart task reminders: when to offer one, and what it should point at.
@@ -12,6 +12,9 @@ import { getZonedParts, zonedLocalToInstant, type IsoDate } from "@/lib/date";
  */
 
 /** Four opportunities a day, at most. */
+/** Minutes in a day, for the wrapped-evening arithmetic below. */
+const MINUTES_IN_A_DAY = 24 * 60;
+
 export const SMART_REMINDER_SLOTS = 4;
 
 /** The window opens this long after the morning brief and closes before evening. */
@@ -82,11 +85,25 @@ export function smartReminderWindow(params: {
   const evening = parseClock(params.eveningTime);
   if (morning === null || evening === null) return null;
 
-  const startMinute = morning + SMART_WINDOW_OPEN_OFFSET_MINUTES;
-  const endMinute = evening - SMART_WINDOW_CLOSE_OFFSET_MINUTES;
+  /*
+   * A day may end after midnight.
+   *
+   * An evening at or before the morning is not a mistake, it is a night shift:
+   * wake at 1pm, stop at 2am. Comparing both as minutes from the SAME midnight
+   * made that day collapse to an empty window, so nobody on that schedule could
+   * ever receive a reminder. Adding a day to the wrapped evening is the whole
+   * fix, and it leaves an ordinary 08:00/21:00 day byte-identical.
+   *
+   * The window is still bounded: the widest possible wrap is one minute short
+   * of a full day, so it can never exceed 24 hours minus the two offsets.
+   */
+  const closes = evening <= morning ? evening + MINUTES_IN_A_DAY : evening;
 
-  // An evening summary set before (or barely after) the morning brief leaves
-  // nothing between them. Someone whose rhythm is 08:00 and 09:00 has said
+  const startMinute = morning + SMART_WINDOW_OPEN_OFFSET_MINUTES;
+  const endMinute = closes - SMART_WINDOW_CLOSE_OFFSET_MINUTES;
+
+  // Genuinely too close still returns nothing: 08:00 and 09:00 does not wrap,
+  // and leaves no room between +2h and -2h. Someone with that rhythm has said
   // their day is not shaped for midday nudges.
   if (endMinute <= startMinute) return null;
   return { startMinute, endMinute };
@@ -204,10 +221,18 @@ export function smartReminderInstants(params: {
 
   const out: { slotIndex: number; minute: number; at: Date }[] = [];
   minutes.forEach((minute, i) => {
-    const hh = String(Math.floor(minute / 60)).padStart(2, "0");
-    const mm = String(minute % 60).padStart(2, "0");
+    /*
+     * A wrapped window runs past midnight, so a slot minute can exceed a day.
+     * It then belongs to the next calendar date at the remaining offset:
+     * minute 1500 on the 3rd is 01:00 on the 4th, not an impossible "25:00".
+     */
+    const dayOffset = Math.floor(minute / MINUTES_IN_A_DAY);
+    const withinDay = minute % MINUTES_IN_A_DAY;
+    const date = dayOffset === 0 ? params.localDate : addDays(params.localDate, dayOffset);
+    const hh = String(Math.floor(withinDay / 60)).padStart(2, "0");
+    const mm = String(withinDay % 60).padStart(2, "0");
     try {
-      const at = zonedLocalToInstant(`${params.localDate}T${hh}:${mm}:00`, params.timezone);
+      const at = zonedLocalToInstant(`${date}T${hh}:${mm}:00`, params.timezone);
       if (!at) return;
       /*
        * A local time a DST jump skipped does not exist, and scheduling it would

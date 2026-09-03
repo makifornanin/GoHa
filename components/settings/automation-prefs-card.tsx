@@ -254,7 +254,7 @@ export function AutomationPrefsCard({
           <CannotFire>
             These cannot be sent yet.{" "}
             {morningTime && eveningTime
-              ? "Your morning and evening times are too close together to leave room between them."
+              ? "Your morning and evening times leave no room between them. Reminders sit two hours after the first and two hours before the second, so those need to be further apart."
               : "Set both a morning and an evening time under Daily rhythm first."}
           </CannotFire>
         ) : null}

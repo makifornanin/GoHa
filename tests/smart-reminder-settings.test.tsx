@@ -16,8 +16,9 @@ afterEach(cleanup);
  *
  * Smart reminders live BETWEEN the two Daily Rhythm times: two hours after the
  * morning brief, two hours before the evening summary. Without both times the
- * worker computes no window and queues no slot; with the two too close together
- * the window is empty for the same reason. In both cases the feature was
+ * worker computes no window and queues no slot; with the two leaving no room
+ * between them the window is empty for the same reason. An evening EARLIER than
+ * the morning is not that case: it is a night shift, and it now gets a window. In both cases the feature was
  * silently inert while the switch read "on", which is worse than being off,
  * because the owner believed reminders were coming.
  *
@@ -49,7 +50,7 @@ describe("smart reminders warn when they cannot fire", () => {
   it("explains the real reason when the two times are too close", () => {
     // 08:00 and 09:00 leaves nothing between +2h and -2h.
     render(<AutomationPrefsCard prefs={prefs} morningTime="08:00" eveningTime="09:00" />);
-    expect(screen.getByText(/too close together/i)).toBeTruthy();
+    expect(screen.getByText(/leave no room between them/i)).toBeTruthy();
   });
 
   it("warns when only one of the two times is set", () => {

@@ -55,7 +55,17 @@ describe("the daily window", () => {
   it("has no window when the two times leave nothing between them", () => {
     // 08:00 and 09:00 means the day is not shaped for midday nudges at all.
     expect(smartReminderWindow({ morningTime: "08:00", eveningTime: "09:00" })).toBeNull();
-    expect(smartReminderWindow({ morningTime: "20:00", eveningTime: "08:00" })).toBeNull();
+  });
+
+  it("opens a window for a night shift rather than refusing it", () => {
+    /*
+     * 20:00 to 08:00 used to return null, because an evening earlier than the
+     * morning was read as the SAME day and collapsed. It is a night shift: a
+     * real twelve-hour day that happens to cross midnight, and the people on it
+     * could never receive a reminder.
+     */
+    const w = smartReminderWindow({ morningTime: "20:00", eveningTime: "08:00" });
+    expect(w).toEqual({ startMinute: 22 * 60, endMinute: 30 * 60 });
   });
 
   it("rejects a malformed saved time rather than guessing", () => {
