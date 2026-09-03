@@ -84,6 +84,25 @@ function ToggleRow({
  * All three default to OFF. A notification nobody asked for is worse than no
  * automation at all.
  */
+/**
+ * "This is on, and it still cannot happen."
+ *
+ * Deliberately not an error: nothing has gone wrong and the user has done
+ * nothing incorrect, so it explains and points at the fix rather than scolding
+ * (docs/TERMINOLOGY.md section 6).
+ */
+function CannotFire({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      role="status"
+      className="flex gap-2 rounded-xl border border-orange/30 bg-orange/10 px-3 py-2.5 text-callout text-label"
+    >
+      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-orange" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
 export function AutomationPrefsCard({
   prefs,
   morningTime,
@@ -102,6 +121,21 @@ export function AutomationPrefsCard({
   // The worker's own rule, not a copy of it: the same function decides whether
   // any slot exists, so this warning cannot drift from the actual behaviour.
   const hasReminderWindow = smartReminderWindow({ morningTime, eveningTime }) !== null;
+
+  /*
+   * The morning brief and the evening summary need their OWN time, and had no
+   * warning at all.
+   *
+   * `dueDailySchedule` refuses to materialize a job when the rhythm time is
+   * empty, so a switch left on with no time set is inert: no job, no
+   * notification, and nothing on this screen saying why. Three real accounts
+   * were sitting in exactly that state, believing notifications were coming.
+   *
+   * The rule is the same one already written above for smart reminders, and it
+   * is the reason it belongs on these two as well rather than only there.
+   */
+  const morningCannotFire = value.morningBriefEnabled && !morningTime;
+  const eveningCannotFire = value.eveningSummaryEnabled && !eveningTime;
 
   function persist(next: AutomationPrefs) {
     const previous = value;
@@ -141,6 +175,13 @@ export function AutomationPrefsCard({
           disabled={pending}
           onChange={(next) => persist({ ...value, morningBriefEnabled: next })}
         />
+        {morningCannotFire ? (
+          <CannotFire>
+            This cannot be sent yet. Set a &ldquo;Plan the day&rdquo; time under Daily rhythm, just
+            below, and it will start arriving tomorrow.
+          </CannotFire>
+        ) : null}
+
         <ToggleRow
           id="pref-evening"
           label="Evening summary"
@@ -149,6 +190,12 @@ export function AutomationPrefsCard({
           disabled={pending}
           onChange={(next) => persist({ ...value, eveningSummaryEnabled: next })}
         />
+        {eveningCannotFire ? (
+          <CannotFire>
+            This cannot be sent yet. Set a &ldquo;Look back&rdquo; time under Daily rhythm, just
+            below, and it will start arriving tomorrow.
+          </CannotFire>
+        ) : null}
         <ToggleRow
           id="pref-deadline"
           label="Deadline and focus alerts"
@@ -204,18 +251,12 @@ export function AutomationPrefsCard({
           this cannot drift from what actually happens.
         */}
         {value.smartRemindersEnabled && !hasReminderWindow ? (
-          <p
-            role="status"
-            className="flex gap-2 rounded-xl border border-orange/30 bg-orange/10 px-3 py-2.5 text-callout text-label"
-          >
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-orange" aria-hidden />
-            <span>
-              These cannot be sent yet.{" "}
-              {morningTime && eveningTime
-                ? "Your morning and evening times are too close together to leave room between them."
-                : "Set both a morning and an evening time under Daily Rhythm first."}
-            </span>
-          </p>
+          <CannotFire>
+            These cannot be sent yet.{" "}
+            {morningTime && eveningTime
+              ? "Your morning and evening times are too close together to leave room between them."
+              : "Set both a morning and an evening time under Daily rhythm first."}
+          </CannotFire>
         ) : null}
 
         <div className="space-y-1.5">

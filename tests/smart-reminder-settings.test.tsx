@@ -77,3 +77,62 @@ describe("smart reminders warn when they cannot fire", () => {
     }
   });
 });
+
+/**
+ * The same rule, for the two toggles that had no warning at all.
+ *
+ * `dueDailySchedule` refuses to materialize a morning brief or an evening
+ * summary when its rhythm time is empty, so a switch left on with no time set
+ * is inert. Three real accounts were in exactly that state, believing
+ * notifications were coming, and nothing on this screen said otherwise. This is
+ * the case the Smart Reminders warning already covered and these two did not.
+ */
+describe("morning and evening warn when their time is unset", () => {
+  const on = {
+    ...prefs,
+    morningBriefEnabled: true,
+    eveningSummaryEnabled: true,
+    smartRemindersEnabled: false,
+  };
+
+  it("says the morning brief cannot fire without a morning time", () => {
+    render(<AutomationPrefsCard prefs={on} morningTime={null} eveningTime="21:00" />);
+    expect(screen.getByText(/Plan the day/i)).toBeTruthy();
+  });
+
+  it("says the evening summary cannot fire without an evening time", () => {
+    render(<AutomationPrefsCard prefs={on} morningTime="06:00" eveningTime={null} />);
+    expect(screen.getByText(/Look back/i)).toBeTruthy();
+  });
+
+  it("warns about both when neither time is set", () => {
+    render(<AutomationPrefsCard prefs={on} morningTime={null} eveningTime={null} />);
+    expect(screen.getAllByText(/cannot be sent yet/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("says nothing once both times are set", () => {
+    render(<AutomationPrefsCard prefs={on} morningTime="06:00" eveningTime="21:00" />);
+    expect(screen.queryByText(/cannot be sent yet/i)).toBeNull();
+  });
+
+  it("stays quiet about a switch that is off", () => {
+    // Nothing is broken about a switch that is off, so nothing is warned about.
+    render(
+      <AutomationPrefsCard
+        prefs={{ ...on, morningBriefEnabled: false, eveningSummaryEnabled: false }}
+        morningTime={null}
+        eveningTime={null}
+      />,
+    );
+    expect(screen.queryByText(/cannot be sent yet/i)).toBeNull();
+  });
+
+  it("points at the fix rather than scolding", () => {
+    render(<AutomationPrefsCard prefs={on} morningTime={null} eveningTime={null} />);
+    const text = screen.getAllByText(/cannot be sent yet/i)[0].textContent?.toLowerCase() ?? "";
+    for (const word of ["failed", "wrong", "must", "error", "invalid"]) {
+      expect(text, word).not.toContain(word);
+    }
+    expect(text).toContain("daily rhythm");
+  });
+});
